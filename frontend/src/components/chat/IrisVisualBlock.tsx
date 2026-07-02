@@ -45,8 +45,9 @@ const IrisVisualBlock = ({ visualization: v }: IrisVisualBlockProps) => {
 
   return (
     <>
-    <motion.div 
-      layout
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
       transition={{ duration: 0.25, ease: "easeInOut" }}
       className={`iris-viz-block ${v.isStreaming ? "iris-viz-streaming" : ""}`}
     >

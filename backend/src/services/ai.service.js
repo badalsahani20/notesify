@@ -20,7 +20,7 @@ export const DEFAULT_CHAT_MODEL = "deepseek/deepseek-v4-flash";
 export const QUICK_MODEL = "inclusionai/ling-2.6-flash";
 export const COMPLEX_ANALYSIS_MODEL = "inclusionai/ling-2.6-1t";
 export const VISUALIZATION_MODEL = "qwen/qwen3.5-flash-02-23";
-export const NOTES_GENERATION_MODEL = "inclusionai/ling-2.6-flash";
+export const NOTES_GENERATION_MODEL = "openai/gpt-oss-120b";
 
 const FALLBACK_MODEL = "llama-3.3-70b-versatile";
 
@@ -576,6 +576,18 @@ export const performWebSearch = async (query) => {
     });
     const data = await response.json();
     if (!data.results) return "No results found";
+    
+    // Use only the first user message + first assistant reply for clean, focused title generation.
+    // Avoids noise from system prompts, tool calls, or image blobs that bloat the context.
+    const firstUser = sessionToUpdate.messages.find((m) => m.role === "user");
+    const firstAssistant = sessionToUpdate.messages.find((m) => m.role === "assistant");
+    const titleContext = [
+      firstUser ? `User: ${firstUser.content}` : "",
+      firstAssistant ? `Assistant: ${firstAssistant.content}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+
     return data.results
       .map((r) => `Title: ${r.title}\nContent: ${r.content}\nURL: ${r.url}`)
       .join("\n\n");
@@ -1242,11 +1254,11 @@ export const generateTitle = async (text) => {
     {
       role: "system",
       content:
-        "You are a helpful assistant. Your job is to read the provided chat transcript and generate a short, descriptive title (3-5 words). Do NOT continue the conversation. Do NOT use quotes or markdown. Return ONLY the title itself, nothing else.",
+        "Generate a short title (3-6 words) for this conversation. Be specific to the actual topic discussed. Do NOT use generic phrases like 'Chat Session' or 'User Inquiry'. No quotes, no markdown, no punctuation at the end. Return ONLY the title.",
     },
     {
       role: "user",
-      content: `Chat Transcript:\n${source.slice(0, 600)}\n\nGenerated Title:`,
+      content: `${source.slice(0, 1500)}\n\nTitle:`,
     },
   ];
 

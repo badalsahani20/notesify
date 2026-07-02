@@ -29,6 +29,15 @@ export const useNoteSync = ({
   const [draftTitle, setDraftTitle] = useState("");
   const prevTitleRef = useRef("");
 
+  // Reset draft title when navigating to a new (unsaved) note
+  // Without this, the previous note's title leaks into the new note title input
+  useEffect(() => {
+    if (isNew) {
+      setDraftTitle("");
+      prevTitleRef.current = "";
+    }
+  }, [isNew]);
+
   const noteRef = useRef(note);
   useEffect(() => {
     noteRef.current = note;

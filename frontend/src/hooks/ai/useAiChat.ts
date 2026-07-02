@@ -154,10 +154,24 @@ export const useAiChat = (noteId: string, noteContent: string, editor: Editor | 
 
   // If the note has no history initially, mark it as loaded so the button doesn't appear when chatting
   useEffect(() => {
-    if (!historyLoaded && activeNote?.chatHistory && activeNote.chatHistory.length === 0) {
+    if (historyLoaded) return;
+    if (!activeNote?.chatHistory) return;
+
+    if (activeNote.chatHistory.length === 0) {
+      // No history at all — mark as loaded so the load button never shows
       setHistoryLoaded(true);
+      return;
     }
-  }, [activeNote?.chatHistory, historyLoaded]);
+
+    // Auto-load history when it contains quiz tool calls so in-progress quizzes
+    // survive note switches without requiring the user to click "Load History".
+    const hasQuizInHistory = activeNote.chatHistory.some(
+      (m: any) => m.toolCalls?.some((tc: any) => tc.tool === "generate_quiz")
+    );
+    if (hasQuizInHistory) {
+      loadHistory();
+    }
+  }, [activeNote?.chatHistory, historyLoaded, loadHistory]);
 
   useEffect(() => {
     setHistoryLoaded(false);

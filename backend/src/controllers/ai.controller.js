@@ -589,9 +589,16 @@ const persistToDb = async (
 
   if (shouldGenerateTitle) {
     console.log("🏷️ Generating title for session:", activeSessionId);
-    const titleContext = sessionToUpdate.messages
-      .slice(0, 6)
-      .map((msg) => `${msg.role}: ${msg.content}`)
+
+    // Use only the first user message + first assistant reply.
+    // Avoids noise from system prompts, tool calls, and image blobs.
+    const firstUser = sessionToUpdate.messages.find((m) => m.role === "user");
+    const firstAssistant = sessionToUpdate.messages.find((m) => m.role === "assistant");
+    const titleContext = [
+      firstUser ? `User: ${firstUser.content}` : "",
+      firstAssistant ? `Assistant: ${firstAssistant.content}` : "",
+    ]
+      .filter(Boolean)
       .join("\n\n");
 
     generateTitle(titleContext)
