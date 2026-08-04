@@ -1,10 +1,13 @@
 import nodeMailer from "nodemailer";
 
+const getMailUser = () => process.env.MAIL_USER || process.env.EMAIL_USER;
+const getMailPass = () => process.env.MAIL_PASS || process.env.EMAIL_PASS;
+
 const transporter = nodeMailer.createTransport({
     service: "gmail",
     auth: {
-        user: process.env.MAIL_USER,
-        pass: process.env.MAIL_PASS,
+        get user() { return getMailUser(); },
+        get pass() { return getMailPass(); },
     }
 });
 
@@ -12,7 +15,7 @@ export const sendResetPasswordEmail = async (email, resetUrl) => {
     const year = new Date().getFullYear();
 
     const mailOptions = {
-        from: `"Notesify" <${process.env.MAIL_USER}>`,
+        from: `"Notesify" <${getMailUser()}>`,
         to: email,
         subject: "Reset Your Notesify Password 🔑",
         html: `
@@ -128,7 +131,7 @@ export const sendWelcomeEmail = async (email, name) => {
     const firstName = name ? name.split(" ")[0] : "there";
 
     const mailOptions = {
-        from: `"Notesify" <${process.env.MAIL_USER}>`,
+        from: `"Notesify" <${getMailUser()}>`,
         to: email,
         subject: `Welcome to Notesify, ${firstName}! 🎉`,
         html: `
@@ -293,7 +296,7 @@ export const sendVerificationEmail = async (email, name, verificationUrl) => {
     const firstName = name ? name.split(" ")[0] : "friend";
 
     const mailOptions = {
-        from: `"Notesify" <${process.env.MAIL_USER}>`,
+        from: `"Notesify" <${getMailUser()}>`,
         to: email,
         subject: "Verify your Notesify account 📧",
         html: `

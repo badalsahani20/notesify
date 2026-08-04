@@ -82,7 +82,7 @@ describe('Auth Service', () => {
     });
 
     it('should throw an error if user does not exist', async () => {
-      await expect(AuthService.loginUser('nonexistent@example.com', 'password123')).rejects.toThrow('Please sign up first');
+      await expect(AuthService.loginUser('nonexistent@example.com', 'password123')).rejects.toThrow('No account Found, Please sign up.');
     });
 
     it('should throw an error if user is not verified', async () => {

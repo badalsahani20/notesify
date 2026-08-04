@@ -97,12 +97,10 @@ export const resendVerificationToken = async(email) => {
 
   const verificationUrl = `${process.env.FRONTEND_URL}/verify-email/${rawToken}`;
 
-  await sendVerificationEmail(user.email, user.name, verificationUrl).catch((err) => {
-    console.error("Resend verification email failed:", err);
-  });
+  await sendVerificationEmail(user.email, user.name, verificationUrl);
 
   return { success: true };
-}
+};
 
 export const verifyCredentials = async (email, password) => {
     const user = await User.findOne({ email }).select("+password +verificationToken");
