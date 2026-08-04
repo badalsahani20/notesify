@@ -4,6 +4,7 @@ import { CheckCircle2, Loader2, MailCheck, ShieldCheck, TriangleAlert } from "lu
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/store/useAuthStore";
+import api from "@/lib/api";
 
 type VerificationState = "idle" | "pending" | "success" | "error";
 
@@ -32,43 +33,18 @@ const VerifyEmailPage = () => {
     if (!token || hasCalled.current) return;
     hasCalled.current = true;
 
-    let isMounted = true;
-
     const verify = async () => {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
-
       try {
-        // Small delay to ensure any background session provider check settles first
-        await new Promise(resolve => setTimeout(resolve, 800));
-
-        const apiUrl = import.meta.env.VITE_API_URL;
-        console.log("Starting verification with fetch...");
-
-        const res = await fetch(`${apiUrl}/users/verify-email/${token}`, {
-          method: "GET",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          signal: controller.signal
-        });
-
-        clearTimeout(timeoutId);
-
-        if (!res.ok) {
-          throw new Error(`Server responded with ${res.status}`);
-        }
-
-        const data = await res.json();
-        if (!isMounted) return;
+        console.log("Starting email verification for token:", token);
+        const res = await api.get(`/users/verify-email/${token}`);
+        const data = res.data;
 
         console.log("Verification Success:", data.success);
 
-        // Update UI status immediately
         setStatus("success");
         setMessage(data.message || "Email verified successfully.");
         toast.success("Email verified successfully");
 
-        // Sync the store with the new verified user
         setAuth(
           {
             id: data.user?.id || data.user?._id,
@@ -81,37 +57,32 @@ const VerifyEmailPage = () => {
         );
 
       } catch (error: any) {
-        clearTimeout(timeoutId);
-        if (!isMounted) return;
+        console.error("Verification error:", error?.response?.data?.message || error.message);
 
-        console.error("Verification error:", error.message);
-        if (error.name === "AbortError") console.error("Request timed out after 10 seconds");
-
-        // Safety fallback: if we got the welcome email, we are verified!
         if (user?.isVerified) {
-          console.log("User already verified, skipping error state.");
+          console.log("User already verified, redirecting to dashboard.");
           navigate("/", { replace: true });
           return;
         }
 
         setStatus("error");
-        setMessage(error.message?.includes("Abort")
-          ? "The request timed out. Please check your internet or try refreshing."
-          : "This verification link is invalid or has expired.");
+        setMessage(
+          error.response?.data?.message ||
+          "This verification link is invalid or has expired."
+        );
       }
     };
 
     const escapeTimer = setTimeout(() => {
       if (status === "pending") setShowManualContinue(true);
-    }, 5000);
+    }, 4000);
 
     verify();
 
     return () => {
-      isMounted = false;
       clearTimeout(escapeTimer);
     };
-  }, [navigate, setAuth, token, status, user?.isVerified]);
+  }, [navigate, setAuth, token, user?.isVerified]);
 
   // Handle post-success redirect in a dedicated effect
   useEffect(() => {
