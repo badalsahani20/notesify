@@ -37,7 +37,9 @@ export const registerUser = catchAsync(async (req, res) => {
   });
 
   const verificationUrl = `${process.env.FRONTEND_URL}/verify-email/${verificationToken}`;
-  await MailService.sendVerificationEmail(email, name, verificationUrl);
+  MailService.sendVerificationEmail(email, name, verificationUrl).catch((err) => {
+    console.error("Verification email sending failed on register:", err);
+  });
 
   res.status(201).json({
     success: true,
