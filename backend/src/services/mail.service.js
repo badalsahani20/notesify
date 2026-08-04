@@ -1,10 +1,12 @@
 import nodeMailer from "nodemailer";
 
-const getMailUser = () => process.env.MAIL_USER || process.env.EMAIL_USER;
-const getMailPass = () => process.env.MAIL_PASS || process.env.EMAIL_PASS;
+const getMailUser = () => (process.env.MAIL_USER || process.env.EMAIL_USER || "").trim();
+const getMailPass = () => (process.env.MAIL_PASS || process.env.EMAIL_PASS || "").replace(/\s+/g, "").trim();
 
 const transporter = nodeMailer.createTransport({
-    service: "gmail",
+    host: process.env.MAIL_HOST || "smtp.gmail.com",
+    port: Number(process.env.MAIL_PORT) || 465,
+    secure: (Number(process.env.MAIL_PORT) || 465) === 465,
     auth: {
         get user() { return getMailUser(); },
         get pass() { return getMailPass(); },
