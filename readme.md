@@ -2,7 +2,7 @@
 
 A production-grade, full-stack notes application built on the MERN stack — featuring a professional rich-text editor, multi-provider AI orchestration, optimistic concurrency control, and banking-level authentication patterns.
 
-**[Live Demo](https://notesify.in) · [GitHub](https://github.com/badalsahani20/fullstack-notes-app)**
+**[Live Demo](https://notesify.in) · [GitHub](https://github.com/badalsahani20/notesify)**
 
 <p align="center">
   <img src="./assets/dashboard.png" alt="Notesify Dashboard" width="100%">
@@ -198,8 +198,8 @@ fullstack-notes/
 
 ### 1. Clone the repository
 ```bash
-git clone https://github.com/badalsahani20/fullstack-notes-app.git
-cd fullstack-notes-app
+git clone https://github.com/badalsahani20/notesify.git
+cd notesify
 ```
 
 ### 2. Backend setup

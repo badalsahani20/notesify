@@ -1,5 +1,5 @@
 import express from "express";
-    import { initiateGoogleAuth, registerUser, verifyEmail, loginUser, desktopLogin, getAllUsers, refreshToken, logoutUser, getMe, googleCallback, forgotPassword, resetPassword, getShowcaseUsers, exchangeCode } from "../controllers/auth.controller.js";
+    import { initiateGoogleAuth, registerUser, verifyEmail, resendVerification, loginUser, desktopLogin, getAllUsers, refreshToken, logoutUser, getMe, googleCallback, forgotPassword, resetPassword, getShowcaseUsers, exchangeCode } from "../controllers/auth.controller.js";
     import authMiddleware from "../middleware/auth.middleware.js";
     import verifiedMiddleware from "../middleware/verified.middleware.js";
     import passport from "passport";
@@ -11,6 +11,7 @@ import express from "express";
     router.post("/login", loginUser);
     router.post("/desktop/login", desktopLogin);
     router.post("/exchange-code", exchangeCode);
+    router.post("/resend-verification", resendVerification);
     router.post("/forgot-password", forgotPassword);
     router.post("/reset-password/:token", resetPassword);
 

@@ -2,7 +2,7 @@ import User from "../models/user.model.js";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import { createWelcomeNote } from "./notes.service.js";
-import { sendWelcomeEmail } from "./mail.service.js";
+import { sendVerificationEmail, sendWelcomeEmail } from "./mail.service.js";
 
 const hashRefreshToken = (token) =>
   crypto.createHash("sha256").update(token).digest("hex");
@@ -74,11 +74,41 @@ export const verifyUserEmail = async (token) => {
   return { user, accessToken, refreshToken };
 };
 
+export const resendVerificationToken = async(email) => {
+  const user = await User.findOne({email});
+  if(!user) {
+    const error = new Error("User not found please sign Up");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if(user.isVerified) {
+    const error = new Error("Account is already verified. Please log in.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const rawToken = crypto.randomBytes(32).toString("hex");
+  const hashedToken = crypto.createHash("sha256").update(rawToken).digest("hex");
+
+  user.verificationToken = hashedToken;
+  user.verificationTokenExpires = Date.now() + 24 * 60 * 60 * 1000;
+  await user.save();
+
+  const verificationUrl = `${process.env.FRONTEND_URL}/verify-email/${rawToken}`;
+
+  await sendVerificationEmail(user.email, user.name, verificationUrl).catch((err) => {
+    console.error("Resend verification email failed:", err);
+  });
+
+  return { success: true };
+}
+
 export const verifyCredentials = async (email, password) => {
     const user = await User.findOne({ email }).select("+password +verificationToken");
     if(!user) {
-        const error = new Error("Invalid credentials");
-        error.statusCode = 400;
+        const error = new Error("No account Found, Please sign up.");
+        error.statusCode = 404;
         throw error;
     }
 
@@ -101,7 +131,7 @@ export const verifyCredentials = async (email, password) => {
 
     const isMatch = await user.comparePassword(password);
     if(!isMatch) {
-        const error = new Error("Invalid credentials");
+        const error = new Error("Incorrect Password or Username");
         error.statusCode = 400;
         throw error;
     }

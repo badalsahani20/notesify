@@ -43,7 +43,7 @@
     "publish": {
       "provider": "github",
       "owner": "badalsahani20",
-      "repo": "fullstack-notes-app"
+      "repo": "notesify"
     },
     "nsis": {
       "oneClick": false,
@@ -292,13 +292,13 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/badalsahani20/fullstack-notes-app.git"
+    "url": "git+https://github.com/badalsahani20/notesify.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/badalsahani20/fullstack-notes-app/issues"
+    "url": "https://github.com/badalsahani20/notesify/issues"
   },
-  "homepage": "https://github.com/badalsahani20/fullstack-notes-app#readme"
+  "homepage": "https://github.com/badalsahani20/notesify#readme"
 }

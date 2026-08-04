@@ -58,6 +58,19 @@ const Login = () => {
     }
   }, [isDesktop, nav, setAuth]);
 
+  const handleResendVerification = async (userEmail: string) => {
+    if (!userEmail) {
+      toast.error("Please enter your email address first.");
+      return;
+    }
+    try {
+      const res = await api.post("/users/resend-verification", { email: userEmail });
+      toast.success(res.data?.message || "Verification email sent! Check your inbox.");
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || "Failed to resend verification email.");
+    }
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -119,7 +132,19 @@ const Login = () => {
       }
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
-      toast.error(err?.response?.data?.message || "Invalid email or password");
+      const errorMessage = err?.response?.data?.message || "Invalid email or password";
+
+      if (errorMessage.toLowerCase().includes("verify your email")) {
+        toast.error(errorMessage, {
+          action: {
+            label: "Resend Email",
+            onClick: () => handleResendVerification(email),
+          },
+          duration: 8000,
+        });
+      } else {
+        toast.error(errorMessage);
+      }
     } finally {
       setLoading(false);
     }

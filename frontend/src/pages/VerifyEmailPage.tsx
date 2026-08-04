@@ -123,6 +123,35 @@ const VerifyEmailPage = () => {
     }
   }, [status, navigate]);
 
+  const [resending, setResending] = useState(false);
+  const [customEmail, setCustomEmail] = useState("");
+
+  const handleResendEmail = async () => {
+    const targetEmail = emailToDisplay || customEmail;
+    if (!targetEmail) {
+      toast.error("Please enter your email address");
+      return;
+    }
+
+    setResending(true);
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL;
+      const res = await fetch(`${apiUrl}/users/resend-verification`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: targetEmail }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to resend email");
+
+      toast.success(data.message || "Verification email sent!");
+    } catch (err: any) {
+      toast.error(err.message || "Could not resend verification email");
+    } finally {
+      setResending(false);
+    }
+  };
+
   const title = token ? "Verify your account" : "Check your inbox";
   const subtitle = token
     ? "We’re confirming your email before opening Notesify."
@@ -186,6 +215,22 @@ const VerifyEmailPage = () => {
             </div>
           ) : null}
 
+          {status === "error" && !emailToDisplay ? (
+            <div className="mb-6 space-y-2">
+              <label htmlFor="resend-email-input" className="text-xs font-medium text-zinc-300">
+                Enter email to receive new link:
+              </label>
+              <input
+                id="resend-email-input"
+                type="email"
+                placeholder="name@example.com"
+                value={customEmail}
+                onChange={(e) => setCustomEmail(e.target.value)}
+                className="w-full h-11 rounded-xl border border-white/10 bg-white/[0.04] px-3 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-indigo-400"
+              />
+            </div>
+          ) : null}
+
           <div className="space-y-3 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4">
             <div className="flex items-start gap-3">
               <ShieldCheck className="mt-0.5 size-4 text-indigo-300" />
@@ -203,9 +248,19 @@ const VerifyEmailPage = () => {
 
           <div className="mt-6 flex flex-col gap-3">
             {status === "error" ? (
-              <Button asChild className="auth-primary-button auth-gradient-hover h-12 w-full">
-                <Link to="/signup">Create a new account</Link>
-              </Button>
+              <>
+                <Button
+                  type="button"
+                  onClick={handleResendEmail}
+                  disabled={resending}
+                  className="auth-primary-button auth-gradient-hover h-12 w-full"
+                >
+                  {resending ? "Sending..." : "Resend Verification Email"}
+                </Button>
+                <Button asChild variant="outline" className="h-12 w-full border-white/10 bg-white/[0.03] text-white hover:bg-white/[0.06]">
+                  <Link to="/signup">Create a new account</Link>
+                </Button>
+              </>
             ) : token ? (
               <Button
                 asChild={status === "pending" && showManualContinue}
@@ -222,11 +277,22 @@ const VerifyEmailPage = () => {
                 )}
               </Button>
             ) : (
-              <Button asChild className="auth-primary-button auth-gradient-hover h-12 w-full">
-                <a href="https://mail.google.com" target="_blank" rel="noreferrer">
-                  Open Email
-                </a>
-              </Button>
+              <>
+                <Button asChild className="auth-primary-button auth-gradient-hover h-12 w-full">
+                  <a href="https://mail.google.com" target="_blank" rel="noreferrer">
+                    Open Email
+                  </a>
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleResendEmail}
+                  disabled={resending}
+                  className="h-12 w-full border-white/10 bg-white/[0.03] text-white hover:bg-white/[0.06]"
+                >
+                  {resending ? "Sending..." : "Resend Email"}
+                </Button>
+              </>
             )}
 
             <Button asChild variant="outline" className="h-12 w-full border-white/10 bg-white/[0.03] text-white hover:bg-white/[0.06]">

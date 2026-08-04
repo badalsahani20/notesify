@@ -54,6 +54,7 @@ const isAuthRoute = (url = "") =>
   url.includes("/users/desktop/login") ||
   url.includes("/users/register") ||
   url.includes("/users/verify-email") ||
+  url.includes("/users/resend-verification") ||
   url.includes("/users/refresh") ||
   url.includes("/users/forgot-password") ||
   url.includes("/users/reset-password") ||

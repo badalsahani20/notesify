@@ -78,11 +78,11 @@ describe('Auth Service', () => {
     });
 
     it('should throw an error with incorrect password', async () => {
-      await expect(AuthService.loginUser('login@example.com', 'wrongpassword')).rejects.toThrow('Invalid credentials');
+      await expect(AuthService.loginUser('login@example.com', 'wrongpassword')).rejects.toThrow('Incorrect Password or Username');
     });
 
     it('should throw an error if user does not exist', async () => {
-      await expect(AuthService.loginUser('nonexistent@example.com', 'password123')).rejects.toThrow('Invalid credentials');
+      await expect(AuthService.loginUser('nonexistent@example.com', 'password123')).rejects.toThrow('Please sign up first');
     });
 
     it('should throw an error if user is not verified', async () => {
@@ -92,4 +92,31 @@ describe('Auth Service', () => {
       await expect(AuthService.loginUser('unverified@example.com', 'password123')).rejects.toThrow('Please verify your email address before logging in');
     });
   });
+
+  describe('resendVerificationToken', () => {
+    it('should successfully generate a new token and send verification email for unverified user', async () => {
+      const userData = { name: 'Resend User', email: 'resend@example.com', password: 'password123' };
+      await AuthService.registerUser(userData);
+
+      const result = await AuthService.resendVerificationToken('resend@example.com');
+      expect(result.success).toBe(true);
+
+      const user = await User.findOne({ email: 'resend@example.com' }).select('+verificationToken +verificationTokenExpires');
+      expect(user.verificationToken).toBeDefined();
+      expect(new Date(user.verificationTokenExpires).getTime()).toBeGreaterThan(Date.now());
+    });
+
+    it('should throw an error if user is already verified', async () => {
+      const userData = { name: 'Verified User', email: 'verified@example.com', password: 'password123' };
+      const { verificationToken } = await AuthService.registerUser(userData);
+      await AuthService.verifyUserEmail(verificationToken);
+
+      await expect(AuthService.resendVerificationToken('verified@example.com')).rejects.toThrow('Account is already verified. Please log in.');
+    });
+
+    it('should throw an error if user is not found', async () => {
+      await expect(AuthService.resendVerificationToken('notfound@example.com')).rejects.toThrow('User not found please sign Up');
+    });
+  });
 });
+

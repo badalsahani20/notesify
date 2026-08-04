@@ -246,7 +246,7 @@ Notesify can be run locally. You will need:
 - A Cloudinary account
 - API keys for Groq, Google Gemini, and OpenRouter
 
-Full setup instructions are available in the [GitHub repository](https://github.com/badalsahani20/fullstack-notes-app).
+Full setup instructions are available in the [GitHub repository](https://github.com/badalsahani20/notesify).
 
 ---
 

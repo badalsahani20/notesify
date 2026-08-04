@@ -62,6 +62,21 @@ export const verifyEmail = catchAsync(async (req, res) => {
   });
 });
 
+export const resendVerification = catchAsync(async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ message: "Please provide your email address" });
+  }
+
+  await AuthService.resendVerificationToken(email);
+
+  res.status(200).json({
+    success: true,
+    message: "A new verification email has been sent. Please check your inbox.",
+  });
+});
+
+
 export const loginUser = catchAsync(async (req, res, next) => {
   const { email, password } = req.body;
   if (!email || !password) {
