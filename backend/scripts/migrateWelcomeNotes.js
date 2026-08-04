@@ -11,7 +11,11 @@ dotenv.config({ path: path.join(__dirname, "../.env") });
 async function migrate() {
   try {
     console.log("Connecting to MongoDB...");
-    await mongoose.connect(process.env.DB_URI);
+    const mongoUri = process.env.MONGO_URI || process.env.DB_URI;
+    if (!mongoUri) {
+      throw new Error("Neither MONGO_URI nor DB_URI is set in .env");
+    }
+    await mongoose.connect(mongoUri);
     console.log("Connected successfully.");
 
     const welcomeNote = getWelcomeNote();

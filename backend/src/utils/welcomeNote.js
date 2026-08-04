@@ -1,77 +1,166 @@
 export const getWelcomeNote = () => ({
   title: "Welcome to Notesify! 🚀",
   content: `
-    <h1>Wait, You Actually Signed Up? 🦄</h1>
-    <p>Look at you, all ready to organize your life. I'm <strong>Notesify</strong>, and since you're here, I guess we're best friends now. <em>(Sorry, Netflix, you've been replaced.)</em></p>
+<h1>👋 Wait, You Actually Signed Up?</h1>
+<p>Look at you—already getting your life together.</p>
+<p>I'm <strong>Notesify</strong>, and since you're here... I guess we're friends now. <em>(Sorry, Netflix.)</em></p>
+<p>This note isn't just here to say hello—it's your playground. Almost everything below is meant to be clicked, selected, or experimented with.</p>
 
-    <p><mark data-color="#fef08a"><strong>Breaking the Fourth Wall:</strong> This note is basically a tech demo disguised as a greeting. Sneaky, right?</mark></p>
+<hr />
 
-    <p><em>"Yeah, I'm just a totally ordinary, boring line of text... or am I? Select me and hit that <strong>Highlighter</strong> icon in the menu. Go on, give me some color. I look better in blue anyway."</em></p>
+<h1>🎯 Rookie Mission</h1>
+<p>Complete these tiny challenges to learn your way around.</p>
+<ul data-type="taskList">
+  <li data-type="taskItem" data-checked="false"><p>Create your first notebook</p></li>
+  <li data-type="taskItem" data-checked="false"><p>Create another note</p></li>
+  <li data-type="taskItem" data-checked="false"><p>Highlight the blue sentence below</p></li>
+  <li data-type="taskItem" data-checked="false"><p>Move this note into a notebook using drag &amp; drop</p></li>
+  <li data-type="taskItem" data-checked="false"><p>Open Iris and ask her a question</p></li>
+  <li data-type="taskItem" data-checked="false"><p>Press <strong>Ctrl + K</strong> and search for <strong>Pizza</strong></p></li>
+</ul>
+<p>You'll know most of Notesify before you even realize it.</p>
 
-    <h3>1. The "Boring Admin" Checklist 📋</h3>
-    <ul data-type="taskList">
-        <li data-type="taskItem" data-checked="false"><p>Create a <strong>Notebook</strong> (Because chaos is only cool in movies)</p></li>
-        <li data-type="taskItem" data-checked="false"><p>Try <u>Drag-and-Drop</u> to move this note into a folder 🖱️</p></li>
-        <li data-type="taskItem" data-checked="false"><p>Use <code>Ctrl + K</code> or the search bar to find your 3 AM ideas</p></li>
-        <li data-type="taskItem" data-checked="true"><p>Read this masterpiece of an onboarding note</p></li>
-    </ul>
+<hr />
 
-    <h3>2. Nerdy Stuff (Skip if you're too cool) 💻</h3>
-    <p>For the code-monkeys among us, we have high-fidelity syntax highlighting. It makes even bad code look like a masterpiece:</p>
-    <pre><code class="language-javascript">// This code does absolutely nothing, but look how pretty it is
-function breakTheFourthWall() {
-  const userMood = "Inspired";
-  console.log("I can see you through the screen. Nice shirt!");
-  return { status: "Mind Blown", tools: ["Iris", "Tables", "Pizza"] };
+<h1>🎨 Your First Experiment</h1>
+<blockquote><p><strong>"I'm just an ordinary line of text... or am I?"</strong></p></blockquote>
+<p>Select this sentence.</p>
+<p>Click the <strong>Highlighter</strong> button.</p>
+<p>Give me your favorite color.</p>
+<p>Congratulations—you've already customized your first note.</p>
+
+<hr />
+
+<h1>✨ Meet Iris</h1>
+<p>Iris is more than an AI chatbot—she's your personal study companion.</p>
+<p>Select any paragraph in this note and click <strong>Ask Iris</strong>. No copy-pasting required.</p>
+<p>She can explain concepts, summarize notes, improve writing, generate Mermaid diagrams, debug code, and even build complete study material.</p>
+
+<h3>📝 Generate Study Notes</h3>
+<p>Choose exactly how you want your notes to be written.</p>
+
+<p><strong>📚 Study Structure</strong></p>
+<ul>
+  <li><p>Detailed Structured Notes</p></li>
+  <li><p>Revision Crash Sheet</p></li>
+  <li><p>Concept + Intuition Mode</p></li>
+  <li><p>Interview Prep Notes</p></li>
+</ul>
+
+<p><strong>🎙️ Explanation Tone</strong></p>
+<ul>
+  <li><p>Academic</p></li>
+  <li><p>Technical / Precise</p></li>
+  <li><p>Beginner-Friendly</p></li>
+  <li><p>Simple / Analogy-Rich</p></li>
+  <li><p>Exam-Oriented</p></li>
+  <li><p>Q&amp;A Style</p></li>
+</ul>
+
+<p><strong>📏 Study Depth</strong></p>
+<ul>
+  <li><p>Quick Revision</p></li>
+  <li><p>Standard</p></li>
+  <li><p>Deep Dive</p></li>
+</ul>
+
+<pre><code class="language-mermaid">flowchart LR
+    A[📄 Raw Notes]
+    --> B[📚 Structure]
+    --> C[🎙️ Tone]
+    --> D[📏 Depth]
+    --> E[✨ Study Notes]</code></pre>
+
+<h3>🎓 Study Mode</h3>
+<p>Finished reading?</p>
+<p>Open <strong>Study Mode</strong> from the top-right corner.</p>
+<p>Iris instantly turns your notes into:</p>
+<ul>
+  <li><p>✅ Multiple Choice Questions</p></li>
+  <li><p>✅ True / False Quizzes</p></li>
+  <li><p>✅ Flashcards</p></li>
+</ul>
+
+<pre><code class="language-mermaid">flowchart LR
+    A[📖 Read Notes]
+    --> B[🎓 Study Mode]
+    --> C[📝 MCQs]
+    B --> D[✔️ True / False]
+    B --> E[🗂️ Flashcards]</code></pre>
+
+<hr />
+
+<h1>🧠 Ideas Look Better Visually</h1>
+<p>Turn messy thoughts into clear diagrams.</p>
+<pre><code class="language-mermaid">mindmap
+  root((Notesify))
+    Notes
+      Rich Text
+      Code
+      Tables
+    AI
+      Study Notes
+      Quizzes
+      Flashcards
+      Mermaid
+    Organization
+      Notebooks
+      Search</code></pre>
+
+<hr />
+
+<h1>💻 Pretty Code Deserves Pretty Colors</h1>
+<pre><code class="language-javascript">function breakTheFourthWall() {
+  console.log("Nice shirt, by the way.");
+
+  return {
+    status: "Mind Blown",
+    companion: "Iris"
+  };
 }</code></pre>
 
-    <h3>3. Me vs. The Other Guys 📊</h3>
-    <p>Let's be real, you've tried others. Here's why you're staying here:</p>
-    <table>
-      <tbody>
-        <tr>
-          <th>Category</th>
-          <th>Those "Other" Apps</th>
-          <th>Notesify (The GOAT)</th>
-        </tr>
-        <tr>
-          <td>Style</td>
-          <td>Corporate Beige</td>
-          <td>Pure Aesthetic Bliss</td>
-        </tr>
-        <tr>
-          <td>AI Braingraph</td>
-          <td>"I don't know her"</td>
-          <td>Iris (She's a genius)</td>
-        </tr>
-        <tr>
-          <td>Vibe Check</td>
-          <td>📉 0%</td>
-          <td>📈 1000%</td>
-        </tr>
-      </tbody>
-    </table>
+<hr />
 
-    <h3>4. My Imaginary Friend, Iris ✨</h3>
-    <blockquote>
-      "I'm not saying I'm a superhero, but have you ever seen me and Batman in the same room?"
-    </blockquote>
-    <p>On your right, there's a panel. That's <strong>Iris</strong>. She’s like a Jarvis, but with better jokes. Ask her to:</p>
-    <ul>
-      <li><em>"Turn this mess into a Mermaid flowchart"</em></li>
-      <li><em>"Visualize my lack of productivity with a Bar Chart"</em></li>
-      <li><em>"Explain why my code is failing (again)"</em></li>
-    </ul>
+<h1>📊 Tables Work Too</h1>
+<table>
+  <thead>
+    <tr>
+      <th>Feature</th>
+      <th>Why You'll Love It</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Rich Notes</td>
+      <td>Beautiful formatting without the hassle</td>
+    </tr>
+    <tr>
+      <td>Iris AI</td>
+      <td>Study notes, summaries, explanations &amp; diagrams</td>
+    </tr>
+    <tr>
+      <td>Study Mode</td>
+      <td>MCQs, Flashcards &amp; True/False quizzes</td>
+    </tr>
+    <tr>
+      <td>Mermaid</td>
+      <td>Visualize ideas in seconds</td>
+    </tr>
+    <tr>
+      <td>Search</td>
+      <td>Find anything instantly</td>
+    </tr>
+  </tbody>
+</table>
 
-    <h3>5. AI Superpowers (No Wand Required) 🔮</h3>
-    <p>We've crammed some serious AI magic into this app because, let's face it, we couldn't help ourselves. Here's how to put Iris to work:</p>
-    <ul>
-      <li><strong>Ask Iris on Selection:</strong> Select any text and click <strong>Ask Iris</strong> in the bubble menu. Boom! The side panel flies open, captures your selection (with line numbers, because we're fancy like that), and pre-fills the prompt for you. No copy-pasting required. Slices through dense reading like dual katanas. ⚔️</li>
-      <li><strong>Editor AI Actions:</strong> Spot that glowing Sparkles button in the bottom toolbar? That's <strong>AI Actions</strong>. One tap and Iris can improve your writing, generate a summary, fix up the grammar, or just keep the momentum going when inspiration decides to take a coffee break. 🪄</li>
-      <li><strong>Interactive Quizzes:</strong> Type <em>"Test my knowledge"</em> or <em>"Make a quiz"</em> in the Iris panel. She'll cook up multiple-choice questions right inside the chat — weirdly fun, suspiciously effective. 🧠</li>
-      <li><strong>Distraction-Free Study Mode:</strong> Hit the <strong>Study</strong> button in the top-right header. Sidebars vanish, clutter disappears, and suddenly you're the most focused person in the room. Iris stays with you, obviously. 🎯</li>
-    </ul>
+<hr />
 
-    <p>Now go on, delete this note and write something that'll change the world. Or just a list of cat names. I don't judge. <strong>Happy Note-Taking!</strong></p>
+<h1>🚀 You're Ready</h1>
+<p>You've already explored rich text, code blocks, tables, Mermaid diagrams, Study Mode, and met Iris.</p>
+<p>Feel free to keep this note around while you're exploring—you can always delete it later.</p>
+<p>Now go build something awesome.</p>
+<p>Or a list of cat names.</p>
+<p>Both are valid.</p>
+<p>Happy note-taking. ✨</p>
   `,
 });
