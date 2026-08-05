@@ -202,12 +202,24 @@ export function escapeHtmlTags(text: string): string {
 }
 
 /**
+ * Strips completed and in-flight <think> or <thought> tags from streamed content.
+ */
+export function stripThoughtTags(text: string): string {
+  if (!text) return "";
+  // Strip complete <think>...</think> or <thought>...</thought> tags
+  let cleaned = text.replace(/<(think|thought)>[\s\S]*?<\/(think|thought)>/gi, "");
+  // Strip in-flight opening <think> or <thought> tag up to end of text while streaming
+  cleaned = cleaned.replace(/<(think|thought)>[\s\S]*$/gi, "");
+  return cleaned.trimStart();
+}
+
+/**
  * Applies all streaming sanitizations in the correct sequence.
  */
 export function sanitizeStream(text: string): string {
   if (!text) return "";
   
-  let sanitized = text;
+  let sanitized = stripThoughtTags(text);
   
   // 1. Escape `<` and `>` to prevent Markdown parser from stripping them
   sanitized = escapeHtmlTags(sanitized);

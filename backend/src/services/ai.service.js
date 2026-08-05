@@ -60,7 +60,7 @@ export const executeOpenRouter = async (
   modelId,
   messages,
   stream = false,
-  includeReasoning = false, // Default to false for token safety
+  includeReasoning = null, // Default to auto-detect based on model
   maxTokens = 5000,
   tools = null,
 ) => {
@@ -72,19 +72,30 @@ export const executeOpenRouter = async (
 
   if (!apiKey) throw new Error("No OpenRouter or Qwen API Key found");
 
+  const isReasoningModel =
+    modelId.toLowerCase().includes("r1") ||
+    modelId.toLowerCase().includes("reason") ||
+    modelId.toLowerCase().includes("gpt-oss") ||
+    modelId.toLowerCase().includes("deepseek") ||
+    modelId.toLowerCase().includes("ling-2.6");
+
+  const shouldEnableReasoning =
+    includeReasoning === true ||
+    (includeReasoning !== false && isReasoningModel);
+
   const bodyPayload = {
     model: modelId,
     messages: messages,
     stream: stream,
     max_tokens: maxTokens,
-    include_reasoning: includeReasoning, // Top-level flag for many providers
+    include_reasoning: shouldEnableReasoning, // Top-level flag for many providers
   };
 
   if (tools) {
     bodyPayload.tools = tools;
   }
 
-  if (isQwenModel || !includeReasoning) {
+  if (isQwenModel || !shouldEnableReasoning) {
     bodyPayload.reasoning = { effort: "none", exclude: true };
   } else {
     bodyPayload.reasoning = { effort: "medium", exclude: false };

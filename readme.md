@@ -55,8 +55,8 @@ AI suggestions (Improve, Summarize, Grammar) are cached in MongoDB using a SHA-2
 ### Token-Aware Conversation Management
 Chat history beyond 40 messages triggers an automatic AI summarization task, compressing the conversation into a rolling "Context Snapshot." Old messages are purged, the snapshot is injected into the system prompt — preserving conversational memory without blowing token limits.
 
-### Long-Term AI Memory (Vector Search)
-Notesify features an asynchronous, self-cleaning Long-Term Memory architecture. After 15 minutes of chat inactivity, a background cron job (`Mutex`-locked for safety) extracts distinct facts and preferences from the user's session. These memories are converted into 768-dimensional embeddings via OpenRouter (`thenlper/gte-base`) and stored in a MongoDB Atlas Vector Search index. When the user returns, highly relevant semantic memories (Cosine Similarity >= 0.75) are automatically retrieved and injected into the AI's context.
+### Long-Term AI Memory & Vector Search
+Notesify features an interactive, real-time Long-Term Memory architecture powered by MongoDB Atlas Vector Search. During conversation, Iris AI dynamically detects persistent facts, user preferences, goals, and projects, invoking the native `save_memory` function tool. Memories are converted into 768-dimensional embeddings via OpenRouter (`thenlper/gte-base`) and stored in a MongoDB Atlas Vector Search index (`memory_vector_index`) with automatic deduplication (similarity > 0.95) and a 1,000-memory cap. On subsequent queries, vector search automatically retrieves relevant semantic memories (Cosine Similarity >= 0.75) alongside notes vector search (`notes_vector_index`), injecting them directly into the AI system prompt.
 
 ### Hybrid Search
 MongoDB full-text indexing provides high-relevance ranking via linguistic scores. If indexed search returns no results (partial words, special characters), the system falls back to indexed case-insensitive regex — guaranteeing zero zero-result searches.
