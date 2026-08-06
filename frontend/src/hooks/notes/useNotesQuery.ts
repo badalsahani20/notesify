@@ -1,16 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
-import api from "@/lib/api";
 import type { Note } from "@/store/useNoteStore";
 import { useQueryClient } from "@tanstack/react-query";
+import { noteRepository } from "@/repositories";
+import api from "@/lib/api";
 
 {/* ["notes"] → active notes
 ["notes", "archive"] → archived
 ["notes", "trash"] → deleted */}
 
 const fetchNotes = async (): Promise<Note[]> => {
-    const res = await api.get("/notes/");
-    const data = res.data.notes || res.data;
-    return Array.isArray(data) ? data : [];
+    const notes = await noteRepository.getNotes();
+    return notes;
 }
 
 export const useNotesQuery = () => {
@@ -23,8 +23,8 @@ export const useNotesQuery = () => {
 };
 
 export const fetchNote = async (noteId: string): Promise<Note> => {
-    const res = await api.get(`/notes/${noteId}`);
-    return res.data.note || res.data;
+    const note = await noteRepository.getNote(noteId);
+    return note;
 }
 
 export const useNoteQuery = (noteId: string) => {
@@ -64,8 +64,8 @@ export const useArchivedQuery = (enabled = true) => {
     return useQuery({
         queryKey: ["notes", "archive"],
         queryFn: async () => {
-            const res = await api.get("/notes/archive");
-            return res.data.notes || res.data;
+            const notes = await noteRepository.getArchivedNotes();
+            return notes;
         },
         enabled,
         staleTime: 1000 * 60 * 5, // 5 minutes

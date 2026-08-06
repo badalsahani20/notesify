@@ -1,7 +1,8 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import api from "@/lib/api";
 import type { Note } from "@/store/useNoteStore";
 import { toast } from "sonner";
+import { noteRepository } from "@/repositories";
+import api from "@/lib/api";
 
 // Tracks pending title-refresh timers per noteId so autosave doesn't stack them
 const titleRefreshTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -26,29 +27,6 @@ const removeNoteFromList = (list: Note[], noteId: string) =>
 const addNoteToList = (list: Note[], note: Note) =>
     sortNotes([note, ...removeNoteFromList(list, note._id)]);
 
-const withVersionRetry = async (
-    requestFn: (version: number) => Promise<any>,
-    initialVersion: number,
-    maxRetries = 3
-) => {
-    let currentVersion = initialVersion;
-    let retries = 0;
-    
-    while (true) {
-        try {
-            const res = await requestFn(currentVersion);
-            return res.data?.updatedNote || res.data?.note || res.data || res;
-        } catch (error: any) {
-            if (error?.response?.status === 409 && error?.response?.data?.serverVersion && retries < maxRetries) {
-                currentVersion = error.response.data.serverVersion.version;
-                retries++;
-                continue;
-            }
-            throw error;
-        }
-    }
-};
-
 const scheduleAutoTitleSync = (
     queryClient: ReturnType<typeof useQueryClient>,
     noteId: string,
@@ -64,18 +42,17 @@ const scheduleAutoTitleSync = (
 
     const timer = setTimeout(async () => {
         try {
-            const res = await api.get(`/notes/${noteId}`);
-            const latestNote = res.data.note || res.data;
+            const note = await noteRepository.getNote(noteId);
 
-            if (!latestNote?._id) {
+            if (!note?._id) {
                 titleRefreshTimers.delete(noteId);
                 return;
             }
 
-            queryClient.setQueryData(["note", noteId], latestNote);
-            queryClient.setQueryData(["notes"], (old: Note[] = []) => updateNoteInList(old, latestNote));
+            queryClient.setQueryData(["note", noteId], note);
+            queryClient.setQueryData(["notes"], (old: Note[] = []) => updateNoteInList(old, note));
 
-            if (DEFAULT_TITLES.has(latestNote.title)) {
+            if (DEFAULT_TITLES.has(note.title)) {
                 scheduleAutoTitleSync(queryClient, noteId, attempt + 1);
                 return;
             }
@@ -97,12 +74,8 @@ export const useCreateNoteMutation = () => {
     return useMutation({
         mutationFn: async (params: { folderId?: string | null; title?: string; content?: string } = {}) => {
             const { folderId = null, title = "Untitled Note", content = "" } = params;
-            const res = await api.post("/notes/", {
-                title,
-                content,
-                folder: folderId,
-            });
-            return res.data.note || res.data;
+            const note = await noteRepository.createNote({ folderId, title, content });
+            return note;
         },
 
         onSuccess: (newNote) => {
@@ -125,7 +98,7 @@ export const useDeleteNoteMutation = () => {
 
     return useMutation({
         mutationFn: async ({ noteId, version }: { noteId: string, version: number }) => {
-            await api.delete(`/notes/${noteId}`, { data: { version } });
+            await noteRepository.deleteNote(noteId, version);
         },
         onMutate: async ({ noteId }) => {
             await queryClient.cancelQueries({ queryKey: ["notes"] });
@@ -163,10 +136,7 @@ export const useUpdateNoteMutation = () => {
 
     return useMutation({
         mutationFn: async ({ noteId, updates, version }: { noteId: string, updates: Partial<Note>, version: number }) => {
-            return withVersionRetry(
-                (v) => api.put(`/notes/${noteId}`, { ...updates, version: v }),
-                version
-            );
+            return await noteRepository.updateNote(noteId, updates, version);
         },
         onMutate: async ({ noteId, updates }) => {
             await queryClient.cancelQueries({ queryKey: ["notes"] });
@@ -209,10 +179,7 @@ export const useTogglePinMutation = () => {
 
     return useMutation({
         mutationFn: async ({ noteId, version }: { noteId: string, version: number }) => {
-            return withVersionRetry(
-                (v) => api.patch(`/notes/${noteId}/pin`, { version: v }),
-                version
-            );
+            return await noteRepository.togglePin(noteId, version);
         },
         onMutate: async ({ noteId }) => {
             await queryClient.cancelQueries({ queryKey: ["notes"] });
@@ -263,10 +230,7 @@ export const useToggleArchiveMutation = () => {
 
     return useMutation({
         mutationFn: async ({ noteId, version }: { noteId: string; version: number }) => {
-            return withVersionRetry(
-                (v) => api.patch(`/notes/${noteId}/archive`, { version: v }),
-                version
-            );
+            return await noteRepository.toggleArchive(noteId, version);
         },
         onMutate: async ({ noteId }) => {
             await queryClient.cancelQueries({ queryKey: ["notes"] });

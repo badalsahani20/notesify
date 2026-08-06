@@ -1,6 +1,6 @@
 import { create  } from "zustand";
 import type { AxiosError } from "axios";
-import api from "@/lib/api";
+import { folderRepository } from "@/repositories";
 
 export interface Folder {
     _id: string;
@@ -41,8 +41,8 @@ export const useFolderStore = create<FolderState>((set, get) => ({
         }
         set({ loading: true, error: null });
         try {
-            const res = await api.get('/folders');
-            set({ folders: res.data, fetchedAt: Date.now(), hasFetched: true });
+            const folders = await folderRepository.getFolders();
+            set({ folders, fetchedAt: Date.now(), hasFetched: true });
         } catch (err) {
             set({ error: "Failed to fetch folders", hasFetched: true });
             console.error("Failed to fetch folders", err);
@@ -54,8 +54,7 @@ export const useFolderStore = create<FolderState>((set, get) => ({
     addFolder: async (name: string) => {
         try {
             set({ error: null });
-            const res = await api.post('/folders', { name });
-            const folder = res.data.folder as Folder | undefined;
+            const folder = await folderRepository.createFolder(name);
             if (!folder) {
                 set({ error: "Error creating folder" });
                 return null;
@@ -75,12 +74,7 @@ export const useFolderStore = create<FolderState>((set, get) => ({
 
         try {
             set({ error: null });
-            const res = await api.put(`/folders/${id}`, {
-                ...updates,
-                version: currentFolder.version,
-            });
-
-            const updatedFolder = res.data.folder;
+            const updatedFolder = await folderRepository.updateFolder(id, updates, currentFolder.version);
             if (!updatedFolder) return;
 
             set({
@@ -103,9 +97,7 @@ export const useFolderStore = create<FolderState>((set, get) => ({
 
         try {
             set({ error: null });
-            await api.delete(`/folders/${id}`, {
-                data: { version: folderToDelete.version },
-            });
+            await folderRepository.deleteFolder(id, folderToDelete.version);
 
             set({
                 folders: get().folders.filter((folder) => folder._id !== id),
