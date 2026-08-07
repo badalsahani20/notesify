@@ -48,6 +48,51 @@ export const GlobalChatCompose = ({
   const [fileAccept, setFileAccept] = useState("image/*,.pdf");
   const [lightboxOpen, setLightboxOpen] = useState(false);
 
+  // Handle paste image from clipboard
+  useEffect(() => {
+    const handlePaste = (e: Event) => {
+      const clipboardEvent = e as ClipboardEvent;
+      const clipboardItems = clipboardEvent.clipboardData?.items;
+      if (!clipboardItems) return;
+
+      for (let i = 0; i < clipboardItems.length; i++) {
+        const item = clipboardItems[i];
+        if (item.type.startsWith("image/")) {
+          const file = item.getAsFile();
+          if (!file) continue;
+
+          if (file.size > 15 * 1024 * 1024) {
+            toast.error("Pasted image must be less than 15 MB");
+            continue;
+          }
+
+          clipboardEvent.preventDefault(); // Prevent pasting the image filename/metadata as text
+
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            if (event.target?.result) {
+              setAttachedImage(event.target.result as string);
+              toast.success("Image attached from clipboard!");
+            }
+          };
+          reader.readAsDataURL(file);
+          break; // Only attach the first image if multiple are pasted
+        }
+      }
+    };
+
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.addEventListener("paste", handlePaste);
+    }
+
+    return () => {
+      if (textarea) {
+        textarea.removeEventListener("paste", handlePaste);
+      }
+    };
+  }, [textareaRef, setAttachedImage]);
+
   // Close lightbox on Escape
   useEffect(() => {
     if (!lightboxOpen) return;

@@ -528,6 +528,15 @@ const streamAiResponse = async (stream, res, noteFetched, userId) => {
                   saveMemory(userId, args).catch(console.error);
               });
               res.write(`data: ${JSON.stringify({ type: "tool_call", tool: "save_memory" })}\n\n`);
+              
+              // Register the tool call in toolCalls so it gets saved to the session database
+              toolCalls.push({ tool: "save_memory", category: args.category, content: args.content });
+
+              // Fallback: If the model didn't stream any text before calling the tool, generate a friendly reply
+              if (!finalReply.trim()) {
+                  finalReply = `Got it! I've saved that to my memory: "${args.content}"`;
+                  res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: finalReply } }] })}\n\n`);
+              }
           }
       } catch (err) {
           console.error(`Failed to parse save_memory arguments: ${err.message}. Raw args:`, memoryToolArgs);
