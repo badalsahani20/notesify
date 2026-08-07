@@ -2,7 +2,7 @@ import type { IFolderRepository } from "../interfaces/IFolderRepository";
 import type { Folder } from "@/store/useFolderStore";
 import * as foldersApi from "@/api/folders";
 
-export class ApiFolderRepository implements IFolderRepository {
+export class RemoteFolderDataSource implements IFolderRepository {
   async getFolders(): Promise<Folder[]> {
     const res = await foldersApi.getFolders();
     return Array.isArray(res.data) ? res.data : [];
@@ -10,7 +10,7 @@ export class ApiFolderRepository implements IFolderRepository {
 
   async createFolder(name: string): Promise<Folder> {
     const res = await foldersApi.createFolder(name);
-    return res.data;
+    return res.data.folder;
   }
 
   async updateFolder(
@@ -19,7 +19,7 @@ export class ApiFolderRepository implements IFolderRepository {
     version: number
   ): Promise<Folder> {
     const res = await foldersApi.updateFolder(id, updates, version);
-    return res.data;
+    return res.data.folder;
   }
 
   async deleteFolder(id: string, version: number): Promise<void> {

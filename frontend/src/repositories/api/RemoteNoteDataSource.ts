@@ -25,7 +25,7 @@ const withVersionRetry = async (
     }
 };
 
-export class ApiNoteRepository implements INoteRepository {
+export class RemoteNoteDataSource implements INoteRepository {
     async getNotes(): Promise<Note[]> {
         const res = await notesApi.getNotes();
         const data = res.data.notes || res.data;
@@ -38,7 +38,7 @@ export class ApiNoteRepository implements INoteRepository {
         return res.data.note || res.data;
     }
 
-    async createNote(data: {folderId?: string | null; title: string; content?: string }): Promise<Note>{
+    async createNote(data: {folderId?: string | null; title?: string; content?: string }): Promise<Note>{
         const res = await notesApi.createNote(data);
         return res.data.note || res.data;
     }
