@@ -28,6 +28,7 @@ export interface TrashFolder {
   pinned: boolean;
   isDeleted: boolean;
   updatedAt: string;
+  createdAt: string;
 }
 
 interface NoteState {

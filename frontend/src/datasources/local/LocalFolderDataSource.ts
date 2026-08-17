@@ -17,5 +17,8 @@ export class LocalFolderDataSource {
     async delete(id: string): Promise<void> {
         await db.folders.delete(id);
     }
-    
+
+    async getById(id: string): Promise<Folder | undefined> {
+        return db.folders.get(id);
+    }
 }

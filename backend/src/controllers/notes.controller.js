@@ -145,8 +145,9 @@ export const getArchivedNotes = catchAsync(async (req, res) => {
 });
 
 export const createNote = catchAsync(async (req, res) => {
-    const { content, title, color, folder, createdAt} = req.body;
+    const { _id, content, title, color, folder, createdAt} = req.body;
     const note = await NoteService.createNewNote(req.user._id, {
+      _id,
       content: sanitizeNoteHtml(content),
       title,
       color,

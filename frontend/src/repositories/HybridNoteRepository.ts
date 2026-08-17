@@ -2,6 +2,8 @@ import type { INoteRepository } from "./interfaces/INoteRepository";
 import type { Note } from "@/store/useNoteStore";
 import type { LocalNoteDataSource } from "@/datasources/local/LocalNoteDataSource";
 import type { RemoteNoteDataSource } from "./api/RemoteNoteDataSource";
+import { db } from "@/database/database";
+import { generateObjectId } from "@/utils/generateObjectId";
 
 export class HybridNoteRepository implements INoteRepository {
     private localDB: LocalNoteDataSource;
@@ -39,15 +41,62 @@ export class HybridNoteRepository implements INoteRepository {
         return remoteNote;
     }
 
-    async createNote(data: {folderId?: string | null; title?: string; content?: string }): Promise<Note>{
-        const newNote = await this.remoteAPI.createNote(data);
-        await this.localDB.save(newNote);
-        return newNote;
+    async createNote(data: { _id?: string; folderId?: string | null; title?: string; content?: string }): Promise<Note> {
+        const tempId = generateObjectId();
+                const newNote: Note = {
+                    _id: tempId,
+                    title: data.title || "Untitled Note",
+                    content: data.content || "",
+                    folder: data.folderId || null,
+                    color: "bg-white",
+                    pinned: false,
+                    isArchived: false,
+                    isDeleted: false,
+                    version: 1,
+                    updatedAt: new Date().toISOString(),
+                    lastAccessedAt: new Date().toISOString(),
+                    
+                }
+        
+                await db.transaction('rw', [db.notes, db.syncQueue], async () => {
+                    await db.notes.put(newNote);
+                    await db.syncQueue.add({
+                        action: "CREATE",
+                        entity: "note",
+                        entityId: tempId,
+                        payload: { ...data, _id: tempId },
+                        timestamp: Date.now()
+                    });
+                });
+        
+                this.remoteAPI.createNote({ ...data, _id: tempId });
+        
+                return newNote;
     }
 
     async updateNote(id: string, updates: Partial<Note>, version: number): Promise<Note> {
-        const updatedNote = await this.remoteAPI.updateNote(id, updates, version);
-        await this.localDB.save(updatedNote);
+        const current = await this.localDB.getById(id);
+        if(!current) throw new Error("Note not found locally");
+
+        const updatedNote = {
+            ...current,
+            ...updates,
+            version: version + 1,
+            updatedAt: new Date().toISOString()
+        };
+
+        await db.transaction('rw', [db.notes, db.syncQueue], async () => {
+            await db.notes.put(updatedNote);
+            await db.syncQueue.add({
+                action: "UPDATE",
+                entity: "note",
+                entityId: id,
+                payload: { updates, version },
+                timestamp: Date.now()
+            });
+        });
+
+        this.remoteAPI.updateNote(id, updates, version).catch(console.error);
         return updatedNote;
     }
 
@@ -58,19 +107,31 @@ export class HybridNoteRepository implements INoteRepository {
     }
 
     async togglePin(id: string, version: number): Promise<Note> {
-        const updatedNote = await this.remoteAPI.togglePin(id, version);
-        await this.localDB.save(updatedNote);
-        return updatedNote;
+        const current = await this.localDB.getById(id);
+        if(!current) throw new Error("Note not found locally");
+
+        return this.updateNote(id, { pinned: !current.pinned}, version);
     }
 
     async toggleArchive(id: string, version: number): Promise<Note> {
-        const updatedNote = await this.remoteAPI.toggleArchive(id, version);
-        await this.localDB.save(updatedNote);
-        return updatedNote;
+        const current = await this.localDB.getById(id);
+        if(!current) throw new Error("Note not found locally");
+
+        return this.updateNote(id, { isArchived: !current.isArchived }, version);
     }
 
     async deleteNote(id: string, version: number): Promise<void> {
-        await this.remoteAPI.deleteNote(id, version);
-        await this.localDB.delete(id);
+        await db.transaction('rw', [db.notes, db.syncQueue], async () => {
+            await db.notes.delete(id);
+            await db.syncQueue.add({
+                action: "DELETE",
+                entity: "note",
+                entityId: id,
+                payload: { version },
+                timestamp: Date.now()
+            });
+        });
+
+        this.remoteAPI.deleteNote(id, version).catch(console.error);
     }
 }

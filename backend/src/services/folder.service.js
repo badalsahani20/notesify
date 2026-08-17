@@ -1,7 +1,7 @@
 import Folder from "../models/folder.model.js";
 import Notes from "../models/notes.model.js";
 export const createFolder = async (userData) => {
-  const { userId, name, color } = userData;
+  const { _id, userId, name, color } = userData;
 
   //Check for duplicates
   const existingFolder = await Folder.findOne({
@@ -16,6 +16,7 @@ export const createFolder = async (userData) => {
 
   //Create folder
   return await Folder.create({
+    _id,
     user: userId,
     name: name.trim(),
     color,

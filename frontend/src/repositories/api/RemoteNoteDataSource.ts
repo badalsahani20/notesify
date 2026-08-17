@@ -38,7 +38,7 @@ export class RemoteNoteDataSource implements INoteRepository {
         return res.data.note || res.data;
     }
 
-    async createNote(data: {folderId?: string | null; title?: string; content?: string }): Promise<Note>{
+    async createNote(data: {_id?: string; folderId?: string | null; title?: string; content?: string }): Promise<Note>{
         const res = await notesApi.createNote(data);
         return res.data.note || res.data;
     }

@@ -3,14 +3,14 @@ import catchAsync from "../utils/catchAsync.js";
 import { redis } from "../../config/redis.js";
 
 export const createFolder = catchAsync(async (req, res) => {
-
-   const { name, color, version, createdAt } = req.body;
+   const { _id, name, color, version, createdAt } = req.body;
 
    if(!name || name.trim() === "") {
     return res.status(400).json({message: "Folder name is required"});
    }
 
     const folder = await FolderService.createFolder({
+      _id,
       userId: req.user._id,
       name,
       color,

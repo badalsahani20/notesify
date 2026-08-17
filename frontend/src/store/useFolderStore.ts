@@ -10,6 +10,7 @@ export interface Folder {
     pinned?: boolean;
     isDeleted: boolean;
     updatedAt: string;
+    createdAt: string;
 }
 
 interface FolderState {
@@ -54,7 +55,7 @@ export const useFolderStore = create<FolderState>((set, get) => ({
     addFolder: async (name: string) => {
         try {
             set({ error: null });
-            const folder = await folderRepository.createFolder(name);
+            const folder = await folderRepository.createFolder({ name });
             if (!folder) {
                 set({ error: "Error creating folder" });
                 return null;
