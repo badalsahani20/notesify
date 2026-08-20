@@ -205,8 +205,10 @@ export const updateNote = catchAsync(async (req, res) => {
   
   if(result.conflict) {
     return res.status(409).json({
+      error: "VERSION_CONFLICT",
       message: "Conflict detected",
-      serverVersion: result.serverNote,
+      serverVersion: result.serverNote.version,
+      serverState: result.serverNote,
     });
   }
 

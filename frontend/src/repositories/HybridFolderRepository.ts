@@ -56,7 +56,6 @@ export class HybridFolderRepository implements IFolderRepository {
             });
         });
 
-        this.remoteAPI.createFolder({ ...data, _id: tempid }).catch(console.error);
         return newFolder;
     }
 
@@ -81,7 +80,6 @@ export class HybridFolderRepository implements IFolderRepository {
             });
         });
 
-        this.remoteAPI.updateFolder(id, updates, version);
         return updatedFolder;
     }
 
@@ -97,6 +95,5 @@ export class HybridFolderRepository implements IFolderRepository {
             });
         });
 
-        this.remoteAPI.deleteFolder(id, version).catch(console.error);
     }
 }

@@ -13,24 +13,24 @@ export interface SyncOperation {
     timestamp: number;
 }
 
-export interface ConflictLog {
+export interface ConflictRecord {
     id?: number;
     entity: "note" | "folder";
-    action: "UPDATE" | "DELETE";
     entityId: string;
+    action: "CREATE" | "UPDATE" | "DELETE";
+    operation: SyncOperation; // The exact failed operation
+    reason: "VERSION_CONFLICT" | "PERMANENT_FAILURE";
     localVersion: number;
-    remoteVersion: number;
-    localState: unknown;
-    serverState: unknown;
+    serverVersion?: number;
+    serverState?: any;
     timestamp: number;
-    resolved: boolean;
 }
 
 export class NotesDatabase extends Dexie {
     notes!: Dexie.Table<Note, string>;
     folders!: Dexie.Table<Folder, string>;
     syncQueue!: Dexie.Table<SyncOperation, number>;
-    conflictLog!: Dexie.Table<ConflictLog, number>;
+    conflictLog!: Dexie.Table<ConflictRecord, number>;
 
     constructor() {
         super("NotesifyDB");

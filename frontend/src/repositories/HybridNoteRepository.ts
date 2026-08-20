@@ -69,8 +69,6 @@ export class HybridNoteRepository implements INoteRepository {
                     });
                 });
         
-                this.remoteAPI.createNote({ ...data, _id: tempId });
-        
                 return newNote;
     }
 
@@ -95,8 +93,6 @@ export class HybridNoteRepository implements INoteRepository {
                 timestamp: Date.now()
             });
         });
-
-        this.remoteAPI.updateNote(id, updates, version).catch(console.error);
         return updatedNote;
     }
 
@@ -131,7 +127,5 @@ export class HybridNoteRepository implements INoteRepository {
                 timestamp: Date.now()
             });
         });
-
-        this.remoteAPI.deleteNote(id, version).catch(console.error);
     }
 }

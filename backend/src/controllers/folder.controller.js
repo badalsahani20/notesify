@@ -86,8 +86,10 @@ export const updateFolder = catchAsync(async (req, res) => {
     //version conflict
     if(result.conflict) {
       return res.status(409).json({
+        error: "VERSION_CONFLICT",
         message: "Conflict detected: Folder was updated on another device",
-        serverFolder: result.serverFolder,
+        serverFolder: result.serverFolder.version,
+        serverState: result.serverFolder
       });
     }
 
