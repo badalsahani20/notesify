@@ -6,6 +6,7 @@ import api from "@/lib/api";
 
 // Tracks pending title-refresh timers per noteId so autosave doesn't stack them
 const titleRefreshTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const onlineReconnectListeners = new Map<string, () => void>();
 const DEFAULT_TITLES = new Set(["Untitled Note", "Untitled"]);
 const AUTO_TITLE_POLL_INTERVAL_MS = 2000;
 const AUTO_TITLE_POLL_MAX_ATTEMPTS = 6;
@@ -42,22 +43,61 @@ const scheduleAutoTitleSync = (
 
     const timer = setTimeout(async () => {
         try {
-            const note = await noteRepository.getNote(noteId);
+            const { db } = await import("@/database/database");
+            const notesApi = await import("@/api/notes");
+            const { noteRepository } = await import("@/repositories");
+            const { stripHtml } = await import("@/utils/stripHtml");
 
-            if (!note?._id) {
+            const localNote = await db.notes.get(noteId);
+            if (!localNote || !DEFAULT_TITLES.has(localNote.title) || !localNote.content) {
                 titleRefreshTimers.delete(noteId);
                 return;
             }
 
-            queryClient.setQueryData(["note", noteId], note);
-            queryClient.setQueryData(["notes"], (old: Note[] = []) => updateNoteInList(old, note));
-
-            if (DEFAULT_TITLES.has(note.title)) {
+            const plainContent = stripHtml(localNote.content).trim();
+            if (plainContent.length < 15) {
                 scheduleAutoTitleSync(queryClient, noteId, attempt + 1);
                 return;
             }
 
-            titleRefreshTimers.delete(noteId);
+            // If offline, wait for reconnect event then auto-generate title!
+            if (!navigator.onLine) {
+                const existingListener = onlineReconnectListeners.get(noteId);
+                if (existingListener) {
+                    window.removeEventListener("online", existingListener);
+                }
+
+                const handleOnlineReconnect = () => {
+                    onlineReconnectListeners.delete(noteId);
+                    scheduleAutoTitleSync(queryClient, noteId, 0);
+                };
+                
+                onlineReconnectListeners.set(noteId, handleOnlineReconnect);
+                window.addEventListener("online", handleOnlineReconnect, { once: true });
+                titleRefreshTimers.delete(noteId);
+                return;
+            }
+
+            // Direct online title request from backend service
+            const res = await notesApi.generateTitle(localNote.content);
+            const generatedTitle = res.data?.title;
+
+            if (generatedTitle && !DEFAULT_TITLES.has(generatedTitle)) {
+                // Update local note in Dexie & React Query cache
+                const updatedNote = await noteRepository.updateNote(
+                    noteId,
+                    { title: generatedTitle },
+                    localNote.version
+                );
+
+                queryClient.setQueryData(["note", noteId], updatedNote);
+                queryClient.setQueryData(["notes"], (old: Note[] = []) => updateNoteInList(old, updatedNote));
+
+                titleRefreshTimers.delete(noteId);
+                return;
+            }
+
+            scheduleAutoTitleSync(queryClient, noteId, attempt + 1);
         } catch (error) {
             console.error("Failed to sync AI title:", error);
             titleRefreshTimers.delete(noteId);

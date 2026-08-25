@@ -225,7 +225,7 @@ const executeGemini = async (messages, stream = false) => {
   }
 };
 
-const executeGroq = async (messages, stream = false) => {
+export const executeGroq = async (messages, stream = false) => {
   ensureGroqApiKey();
 
   if (stream) {
@@ -1253,63 +1253,7 @@ export const chatWithAi = async ({
   };
 };
 
-export const generateTitle = async (text) => {
-  const source = text?.trim() || "New chat";
-  const fallbackTitle = source
-    .replace(/\s+/g, " ")
-    .replace(/^["'`*_#\s]+|["'`*_#\s]+$/g, "")
-    .slice(0, 54)
-    .trim();
-
-  const titleMessages = [
-    {
-      role: "system",
-      content:
-        "Generate a short title (3-6 words) for this conversation. Be specific to the actual topic discussed. Do NOT use generic phrases like 'Chat Session' or 'User Inquiry'. No quotes, no markdown, no punctuation at the end. Return ONLY the title.",
-    },
-    {
-      role: "user",
-      content: `${source.slice(0, 1500)}\n\nTitle:`,
-    },
-  ];
-
-  let rawTitle = "";
-  try {
-    rawTitle = await executeGroq(titleMessages);
-  } catch (groqErr) {
-    console.warn(
-      "⚠️ generateTitle: Groq failed, falling back to OpenRouter:",
-      groqErr.message,
-    );
-    try {
-      rawTitle = await executeOpenRouter(
-        QUICK_MODEL,
-        titleMessages,
-        false,
-        false,
-      );
-    } catch (orErr) {
-      console.error("❌ generateTitle: all models failed:", orErr.message);
-      return fallbackTitle || "New Chat";
-    }
-  }
-
-  const title = rawTitle
-    .replace(/```[\s\S]*?```/g, "")
-    .replace(/^title\s*:\s*/i, "")
-    .replace(/^["'`*_#\s]+|["'`*_#\s]+$/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-
-  if (
-    !title ||
-    /generate|descriptive|content|input|task|return only|no quotes/i.test(title)
-  ) {
-    return fallbackTitle || "New Chat";
-  }
-
-  return title.slice(0, 54);
-};
+export { generateTitle } from "./title.service.js";
 
 export const getDynamicPrompts = async () => {
   try {

@@ -44,3 +44,7 @@ export async function moveNote(noteId: string, folderId: string | null, version:
 export async function toggleShare(noteId: string, isShared: boolean, expiresAt?: string | null) {
     return api.post(`/notes/${noteId}/share`, { isShared, expiresAt });
 }
+
+export async function generateTitle(content: string) {
+    return api.post("/notes/generate-title", { content });
+}

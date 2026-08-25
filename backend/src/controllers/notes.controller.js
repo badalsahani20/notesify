@@ -3,7 +3,7 @@ import catchAsync from "../utils/catchAsync.js";
 import mongoose from "mongoose";
 import { redis } from "../../config/redis.js";
 import { sanitizeNoteHtml } from "../utils/sanitizeNoteHtml.js";
-import { generateTitle } from "../services/ai.service.js";
+import { generateTitleFromText } from "../services/title.service.js";
 import Notes from "../models/notes.model.js";
 import { stripHtml } from "../utils/stripHtml.js";
 import { generateEmbedding } from "../services/embeddingService.js";
@@ -48,10 +48,12 @@ const queueAutoTitleGeneration = (note, userId) => {
     return;
   }
 
-  generateTitle(plainText)
-    .then(async (title) => {
-      const normalizedTitle = title?.trim();
-      if (!normalizedTitle) {
+  // Pure function contract: Input content -> Output title string.
+  // The caller (controller) handles updating the database model.
+  generateTitleFromText(plainText)
+    .then(async (generatedTitle) => {
+      const normalizedTitle = generatedTitle?.trim();
+      if (!normalizedTitle || DEFAULT_NOTE_TITLES.includes(normalizedTitle)) {
         return;
       }
 
@@ -71,6 +73,21 @@ const queueAutoTitleGeneration = (note, userId) => {
     })
     .catch((err) => console.error("[AutoTitle] failed:", err));
 };
+
+export const generateNoteTitleController = catchAsync(async (req, res) => {
+  const { content } = req.body;
+  const plainText = stripHtml(content || "").trim();
+
+  if (plainText.length < 15) {
+    return res.status(400).json({ message: "Content too short for title generation" });
+  }
+
+  // Pure function call: Input content -> Output title
+  const title = await generateTitleFromText(plainText);
+  const normalizedTitle = title?.trim() || "Untitled Note";
+
+  return res.status(200).json({ title: normalizedTitle });
+});
 
 export const getAllNotes = catchAsync(async (req, res) => {
     const userId = req.user._id;

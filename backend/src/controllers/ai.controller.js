@@ -3,11 +3,11 @@ import User from "../models/user.model.js";
 import Notes from "../models/notes.model.js";
 import AiAssistCache from "../models/aiAssistCache.model.js";
 import catchAsync from "../utils/catchAsync.js";
+import { generateTitle } from "../services/title.service.js";
 import {
   checkGrammar,
   chatWithAi,
   runAiAssist,
-  generateTitle,
   getDynamicPrompts,
   performWebSearch,
   crawlUrl,
