@@ -44,8 +44,9 @@ const NoteEditor = () => {
   const createdNoteIdRef = useRef<string | null>(null);
   const [isGenerateNotesOpen, setIsGenerateNotesOpen] = useState(false);
 
-  const cachedNote = noteId ? queryClient.getQueryData<any>(["note", noteId]) : undefined;
-  const note = isNew
+  const activeNoteId = (isNew && createdNoteIdRef.current) ? createdNoteIdRef.current : noteId;
+  const cachedNote = activeNoteId ? queryClient.getQueryData<any>(["note", activeNoteId]) : undefined;
+  const note = (isNew && !createdNoteIdRef.current)
     ? { _id: "new", title: "Untitled Note", content: "", folder: folderId, pinned: false, isArchived: false, version: 1, updatedAt: new Date().toISOString() } as any
     : (fetchedNote || cachedNote);
 
@@ -146,9 +147,9 @@ const NoteEditor = () => {
     return <EmptyEditorState />;
   }
 
-  const editorKey = (isNew || (note?._id && note._id === createdNoteIdRef.current)) 
+  const editorKey = (isNew || noteId === "new" || (createdNoteIdRef.current && (noteId === createdNoteIdRef.current || note?._id === createdNoteIdRef.current))) 
     ? "stable-new-note-editor" 
-    : note?._id;
+    : `editor-${noteId}`;
 
   const editorPane = (
     <AnimatePresence mode="wait" initial={false}>

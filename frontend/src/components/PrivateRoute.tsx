@@ -10,11 +10,15 @@ const PrivateRoute = () => {
     return <WelcomeLoader />;
   }
 
-  if (!user || !accessToken) {
+  // Online: requires valid user + accessToken
+  // Offline: allows local workspace bootstrap if user profile is available locally
+  const isAuthenticated = Boolean(user && (accessToken || !navigator.onLine));
+
+  if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
 
-  if (!user.isVerified) {
+  if (user && !user.isVerified) {
     return <Navigate to="/verify-email" replace />;
   }
 

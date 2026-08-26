@@ -396,6 +396,13 @@ const TipTap = ({ noteId, content, onChange, onEditorReady, aiChat, editable = t
   };
 
   useEffect(() => {
+    console.log("[NoteLifecycle] EDITOR MOUNT", noteId || "new");
+    return () => {
+      console.log("[NoteLifecycle] EDITOR UNMOUNT", noteId || "new");
+    };
+  }, []);
+
+  useEffect(() => {
     if (!onEditorReady) return;
     onEditorReady(editor ?? null);
     return () => onEditorReady(null);

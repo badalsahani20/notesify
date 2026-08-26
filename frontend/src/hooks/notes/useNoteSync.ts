@@ -38,6 +38,17 @@ export const useNoteSync = ({
     }
   }, [isNew]);
 
+  const isCreatingRef = useRef(false);
+  const pendingContentRef = useRef<string | null>(null);
+
+  // Reset refs ONLY when navigating to a fresh new note session
+  useEffect(() => {
+    if (isNew && !createdNoteIdRef.current) {
+      isCreatingRef.current = false;
+      pendingContentRef.current = null;
+    }
+  }, [isNew, createdNoteIdRef]);
+
   const noteRef = useRef(note);
   useEffect(() => {
     noteRef.current = note;
@@ -47,11 +58,13 @@ export const useNoteSync = ({
     () =>
       debounce((id: string, content: string) => {
         const latestNote = noteRef.current;
-        if (latestNote && latestNote._id === id && id !== "new") {
+        const currentVersion = (latestNote && latestNote._id === id) ? latestNote.version : 1;
+        if (id && id !== "new") {
+          console.log("[NoteLifecycle] UPDATE", id);
           updateNoteAsync({
             noteId: id,
             updates: { content },
-            version: latestNote.version,
+            version: currentVersion,
           }).catch(() => {});
         }
       }, 1000),
@@ -93,7 +106,8 @@ export const useNoteSync = ({
   }, [isNew, note?._id, note?.title]);
 
   const handleCreateOnEdit = useCallback(async (initialTitle: string, initialContent: string) => {
-    if (isCreating) return null;
+    if (isCreatingRef.current || createdNoteIdRef.current) return null;
+    isCreatingRef.current = true;
     setIsCreating(true);
     try {
       const newNote = await createNoteAsync({
@@ -102,27 +116,51 @@ export const useNoteSync = ({
         folderId: folderId
       });
       if (newNote?._id) {
+        console.log("[NoteLifecycle] CREATE", newNote._id);
         createdNoteIdRef.current = newNote._id;
         setLazyCreatedNoteId(newNote._id);
         const path = folderId ? `/folders/${folderId}/note/${newNote._id}` : `/note/${newNote._id}`;
+        console.log("[NoteLifecycle] NAVIGATE", newNote._id);
         navigate(`${path}${location.search}`, { replace: true });
+
+        // Flush any typing buffered while CREATE was in flight
+        if (pendingContentRef.current !== null) {
+          const bufferedHtml = pendingContentRef.current;
+          pendingContentRef.current = null;
+          debouncedUpdate(newNote._id, bufferedHtml);
+        }
+
         return newNote;
       }
     } catch (err) {
       console.error("Lazy creation failed:", err);
+      isCreatingRef.current = false;
     } finally {
       setIsCreating(false);
     }
     return null;
-  }, [createNoteAsync, folderId, isCreating, location.search, navigate, createdNoteIdRef]);
+  }, [createNoteAsync, folderId, location.search, navigate, createdNoteIdRef, debouncedUpdate]);
 
   const handleContentChange = useCallback((html: string) => {
+    // 1. If note was already created during this session (even if route params haven't re-rendered yet)
+    if (createdNoteIdRef.current) {
+      debouncedUpdate(createdNoteIdRef.current, html);
+      return;
+    }
+
+    // 2. If CREATE is in flight, buffer the latest HTML string (zero keystroke loss)
+    if (isCreatingRef.current) {
+      pendingContentRef.current = html;
+      return;
+    }
+
+    // 3. First keypress on a new note
     if (isNew) {
       handleCreateOnEdit(draftTitle, html);
-    } else if (note) {
+    } else if (note && note._id !== "new") {
       debouncedUpdate(note._id, html);
     }
-  }, [isNew, note, draftTitle, handleCreateOnEdit, debouncedUpdate]);
+  }, [isNew, note, draftTitle, handleCreateOnEdit, debouncedUpdate, createdNoteIdRef]);
 
   const commitTitle = useCallback(() => {
     if (!note) return;
