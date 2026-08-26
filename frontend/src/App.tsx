@@ -4,14 +4,12 @@ import MainLayout from "./components/MainLayout";
 import { Toaster } from "sonner";
 import PrivateRoute from "./components/PrivateRoute";
 import AuthLayout from "./components/AuthLayout";
-
-import { SyncService } from "./services/SyncService";
-
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import VerifyEmailPage from "./pages/VerifyEmailPage";
+import { WebSyncTriggers } from "./services/WebSyncTriggers";
 
 // Lazy-loaded components
 const NoteEditor = lazy(() => import("./pages/NoteEditor"));
@@ -29,16 +27,11 @@ import WelcomeLoader from "./components/ui/WelcomeLoader";
 const RouteLoader = () => <WelcomeLoader />;
 
 function App() {
-  useEffect(() => {
-    // 1. Startup Sync (Catches operations from previous sessions)
-    SyncService.processQueue();
-
-    // 2. Network reconnect Sync
-    const handleOnline = () => SyncService.processQueue();
-    window.addEventListener("online", handleOnline);
-    
-    return () => window.removeEventListener("online", handleOnline);
+    useEffect(() => {
+    WebSyncTriggers.start();
+    return () => WebSyncTriggers.stop();
   }, []);
+
 
   return (
     <>
