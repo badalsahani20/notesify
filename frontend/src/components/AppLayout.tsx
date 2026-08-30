@@ -86,6 +86,9 @@ const AppLayout = ({
       const target = event.target as HTMLElement | null;
       if (
         target?.closest(".folders-drawer-desktop") ||
+        // A native drag starts with pointerdown. Keep the drawer mounted so
+        // the drag can travel from a note card to a folder drop target.
+        target?.closest("[draggable='true']") ||
         target?.closest(".nav-action-btn") ||
         target?.closest("[data-radix-popper-content-wrapper]") ||
         target?.closest("[data-slot='dialog-overlay']") ||

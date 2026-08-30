@@ -16,13 +16,61 @@ export class HybridNoteRepository implements INoteRepository {
         this.localDB = localDB;
         this.remoteAPI = remoteAPI;
     }
+    async restoreNote(id: string): Promise<Note> {
+        const current = await this.localDB.getById(id);
+        if(!current) {
+            throw new Error("Note not found locally");
+        }
+
+        const restoredNote: Note = {
+            ...current,
+            isDeleted: false,
+            version: current.version + 1,
+            updatedAt: new Date().toISOString(),
+        };
+
+        await db.transaction("rw", [db.notes, db.syncQueue], async () => {
+            await db.notes.put(restoredNote);
+
+            await db.syncQueue.add({
+                action: "UPDATE",
+                entity: "note",
+                entityId: id,
+                payload: {
+                    updates: { isDeleted: false },
+                    version: current.version,
+                },
+                timestamp: Date.now(),
+            });
+        });
+        return restoredNote;
+    }
+
+    async permanentlyDeleteNote(id: string): Promise<void> {
+        await db.transaction("rw", [db.notes, db.syncQueue], async () => {
+            await db.notes.delete(id);
+
+
+            await db.syncQueue.add({
+                action: "HARD_DELETE_NOTE",
+                entity: "note",
+                entityId: id,
+                payload: {},
+                timestamp: Date.now(),
+            });
+        });
+    }
 
     async getNotes(): Promise<Note[]> {
-        const localNotes = await this.localDB.getAll();
+        const localNotes = (await this.localDB.getAll()).filter(
+            note => !note.isDeleted && !note.isArchived,
+        );
 
         if (localNotes.length > 0) {
             return localNotes;
         }
+
+        if (!navigator.onLine) return [];
 
         const remoteNotes = await this.remoteAPI.getNotes();
         await this.localDB.saveMany(remoteNotes);
@@ -97,7 +145,27 @@ export class HybridNoteRepository implements INoteRepository {
     }
 
     async getArchivedNotes(): Promise<Note[]> {
+        const localNotes = (await this.localDB.getAll()).filter(
+            note => !note.isDeleted && note.isArchived,
+        );
+
+        if (localNotes.length > 0 || !navigator.onLine) {
+            return localNotes;
+        }
+
         const remoteNotes = await this.remoteAPI.getArchivedNotes();
+        await this.localDB.saveMany(remoteNotes);
+        return remoteNotes;
+    }
+
+    async getTrashedNotes(): Promise<Note[]> {
+        const localNotes = (await this.localDB.getAll()).filter(note => note.isDeleted);
+
+        if (localNotes.length > 0 || !navigator.onLine) {
+            return localNotes;
+        }
+
+        const remoteNotes = await this.remoteAPI.getTrashedNotes();
         await this.localDB.saveMany(remoteNotes);
         return remoteNotes;
     }

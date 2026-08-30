@@ -1,6 +1,7 @@
 import type { Folder } from "@/store/useFolderStore";
 import { cn } from "@/lib/utils";
 import { Notebook, RotateCcw, Trash2, X } from "lucide-react";
+import { getFolderColor } from "@/utils/folderColors";
 
 type FolderCardProps = {
   folder?: Folder;
@@ -16,6 +17,7 @@ const FolderCard = ({ folder, isActive, onClick, onDelete, onRestore, onPermanen
   if (!folder) return null;
 
   const initial = folder.name?.charAt(0)?.toUpperCase() ?? "N";
+  const folderColor = getFolderColor(folder.color);
 
   return (
     <div
@@ -28,11 +30,14 @@ const FolderCard = ({ folder, isActive, onClick, onDelete, onRestore, onPermanen
         isTrashView && "cursor-default opacity-80 border-dashed"
       )}
     >
-      <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-zinc-200 shadow-inner">
-        <span className="text-sm font-bold opacity-70 tracking-tighter">{initial}</span>
+      <div
+        className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 text-zinc-200 shadow-inner"
+        style={{ backgroundColor: `${folderColor}22`, color: folderColor }}
+      >
+        <span className="text-sm font-bold opacity-90 tracking-tighter">{initial}</span>
       </div>
       <div className="flex items-center gap-2">
-        <Notebook size={14} className={cn("text-zinc-400", isTrashView && "text-zinc-500")} />
+        <Notebook size={14} style={{ color: folderColor }} className={cn(isTrashView && "opacity-60")} />
         <h3 className={cn("truncate text-sm font-semibold text-zinc-100", isTrashView && "text-zinc-400")}>{folder.name || "Untitled"}</h3>
       </div>
       {isTrashView ? (

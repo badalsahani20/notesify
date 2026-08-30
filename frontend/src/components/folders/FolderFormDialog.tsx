@@ -5,30 +5,39 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { FolderOpen, Loader2 } from "lucide-react";
+import { FOLDER_COLORS, type FolderColor } from "@/utils/folderColors";
 
 type FolderFormDialogProps = {
   open: boolean;
   mode: "create" | "rename";
   initialValue?: string;
+  initialColor?: string;
   isSaving: boolean;
   onClose: () => void;
-  onSubmit: (name: string) => Promise<void>;
+  onSubmit: (name: string, color: FolderColor) => Promise<void>;
 };
 
 export const FolderFormDialog = ({
   open,
   mode,
   initialValue = "",
+  initialColor = "slate",
   isSaving,
   onClose,
   onSubmit,
 }: FolderFormDialogProps) => {
   const [name, setName] = useState(initialValue);
+  const [color, setColor] = useState<FolderColor>(
+    (FOLDER_COLORS.some((item) => item.value === initialColor) ? initialColor : "slate") as FolderColor,
+  );
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (open) {
       setName(initialValue);
+      setColor(
+        (FOLDER_COLORS.some((item) => item.value === initialColor) ? initialColor : "slate") as FolderColor,
+      );
       setTimeout(() => inputRef.current?.focus(), 80);
     }
   }, [initialValue, open]);
@@ -38,7 +47,7 @@ export const FolderFormDialog = ({
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!trimmedName || isSaving) return;
-    await onSubmit(trimmedName);
+    await onSubmit(trimmedName, color);
   };
 
   return (
@@ -95,6 +104,27 @@ export const FolderFormDialog = ({
               }}
               className="w-full h-10 px-3.5 rounded-xl bg-[var(--surface-ghost)] border border-[var(--divider)] text-[13px] text-[var(--text-strong)] placeholder-[var(--muted-text)] outline-none focus:border-indigo-500/60 focus:ring-1 focus:ring-indigo-500/30 transition-all"
             />
+          </div>
+
+          <div className="space-y-2">
+            <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--muted-text)]">
+              Notebook color
+            </span>
+            <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Notebook color">
+              {FOLDER_COLORS.map((item) => (
+                <button
+                  key={item.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={color === item.value}
+                  aria-label={item.label}
+                  title={item.label}
+                  onClick={() => setColor(item.value)}
+                  className={`h-7 w-7 rounded-full border-2 transition-transform hover:scale-110 ${color === item.value ? "border-white scale-110 ring-2 ring-indigo-400/50" : "border-white/10"}`}
+                  style={{ backgroundColor: item.hex }}
+                />
+              ))}
+            </div>
           </div>
 
           <DialogFooter className="gap-2 sm:justify-end pt-0">

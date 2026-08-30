@@ -31,11 +31,11 @@ export const requestSessionRefresh = async () => {
           {},
           config
         )
-        .then((res) => {
+        .then(async (res) => {
           const { user, accessToken, refreshToken } = res.data;
           // If a new refresh token is issued and we're on desktop, save it securely
           if (!!(window as any).electronAPI?.auth && refreshToken) {
-            (window as any).electronAPI.auth.setRefreshToken(refreshToken).catch(console.error);
+            await (window as any).electronAPI.auth.setRefreshToken(refreshToken);
           }
           useAuthStore.getState().setAuth(user, accessToken);
           return accessToken;
@@ -102,10 +102,18 @@ api.interceptors.request.use(async (config) => {
   if (!token && !isAuthRoute(config.url)) {
     try {
       token = await requestSessionRefresh();
-    } catch {
-      clearAllLocalState();
-      if (!isPublicPage()) window.location.href = "/login";
-      throw createAuthError(config);
+    } catch (refreshErr) {
+      const status = (refreshErr as { response?: { status?: number } })?.response?.status;
+
+      // Only an explicit auth rejection means the session is invalid. Keep
+      // local data and the sync queue intact during offline/server failures.
+      if ([401, 403].includes(status ?? 0)) {
+        clearAllLocalState();
+        if (!isPublicPage()) window.location.href = "/login";
+        throw createAuthError(config);
+      }
+
+      throw refreshErr;
     }
   }
 
@@ -136,8 +144,14 @@ api.interceptors.response.use(
         originalRequest.headers.Authorization = `Bearer ${newToken}`;
         return api(originalRequest);
       } catch (refreshErr) {
-        clearAllLocalState();
-        if (!isPublicPage()) window.location.href = "/login";
+        const status = (refreshErr as { response?: { status?: number } })?.response?.status;
+
+        // Network errors and 5xx responses are recoverable. Do not log the
+        // user out or delete offline data unless refresh was rejected as auth.
+        if ([401, 403].includes(status ?? 0)) {
+          clearAllLocalState();
+          if (!isPublicPage()) window.location.href = "/login";
+        }
         return Promise.reject(refreshErr);
       }
     }

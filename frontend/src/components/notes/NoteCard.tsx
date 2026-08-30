@@ -80,8 +80,9 @@ const NoteCard = ({
       onClick={onClick}
       onMouseEnter={() => handleHoverStart(note._id)}
       onMouseLeave={handleHoverEnd}
-      draggable
-      onDragStart={(e: any) => {
+      draggable={!isTrashView}
+      onDragStart={(e: React.DragEvent<HTMLElement>) => {
+        if (isTrashView) return;
         e.dataTransfer.setData("application/notesify-note", JSON.stringify({ 
           noteId: note._id, 
           version: note.version 
@@ -90,6 +91,7 @@ const NoteCard = ({
       }}
       className={cn(
         "note-list-row group",
+        !isTrashView && "cursor-grab active:cursor-grabbing",
         isActive && "note-list-row-active",
         isTrashView && "cursor-default opacity-80"
       )}

@@ -4,6 +4,7 @@ import type { LocalFolderDataSource } from "@/datasources/local/LocalFolderDataS
 import type { RemoteFolderDataSource } from "./api/RemoteFolderDataSource";
 import { db } from "@/database/database";
 import { generateObjectId } from "@/utils/generateObjectId";
+import type { FolderColor } from "@/utils/folderColors";
 
 
 export class HybridFolderRepository implements IFolderRepository {
@@ -32,13 +33,13 @@ export class HybridFolderRepository implements IFolderRepository {
         return remoteFolders;
     }
 
-    async createFolder(data: {_id?: string; name: string; }): Promise<Folder> {
+    async createFolder(data: {_id?: string; name: string; color?: FolderColor }): Promise<Folder> {
         const tempid = generateObjectId();
 
         const newFolder: Folder = {
             _id: tempid,
             name: data.name,
-            color: "bg-gray-100", // default color
+            color: data.color || "slate",
             version: 1,
             isDeleted: false,
             updatedAt: new Date().toISOString(),
@@ -51,7 +52,9 @@ export class HybridFolderRepository implements IFolderRepository {
                 action: "CREATE",
                 entity: "folder",
                 entityId: tempid,
-                payload: { ...data, tempid },
+                // Preserve the client-generated id on the server so the
+                // queued folder remains the same record after synchronization.
+                payload: { ...data, _id: tempid },
                 timestamp: Date.now(),
             });
         });

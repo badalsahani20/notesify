@@ -1,5 +1,6 @@
 import { SyncCoordinator } from "./SyncCoordinator";
 import { queryClient } from "@/lib/queryClient";
+import { useFolderStore } from "@/store/useFolderStore";
 
 class WebSyncTriggersManager {
     private isStarted: boolean = false;
@@ -14,6 +15,10 @@ class WebSyncTriggersManager {
         if (changed) {
             // 1. Invalidate current tab's React Query cache
             this.invalidateNotes();
+
+            // Folder data lives in Zustand, so refresh it explicitly after
+            // the sync engine updates Dexie.
+            await useFolderStore.getState().refreshFolders();
 
             // 2. Broadcast to other open browser tabs
             if (this.broadcastChannel) {

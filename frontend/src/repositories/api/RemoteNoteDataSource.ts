@@ -1,6 +1,7 @@
 import type { INoteRepository } from "@/repositories/interfaces/INoteRepository";
 import type { Note } from "@/store/useNoteStore";
 import * as notesApi from "@/api/notes";
+import api from "@/lib/api";
 
 const withVersionRetry = async (
     requestFn: (version: number) => Promise<any>,
@@ -53,10 +54,25 @@ export class RemoteNoteDataSource implements INoteRepository {
         );
     }
 
-    async getArchivedNotes(): Promise<Note[]> {
+  async getArchivedNotes(): Promise<Note[]> {
         const res = await notesApi.getArchivedNotes();
         const data = res.data.notes || res.data;
-        return Array.isArray(data) ? data : [];
+    return Array.isArray(data) ? data : [];
+  }
+
+  async getTrashedNotes(): Promise<Note[]> {
+    const res = await api.get("/trash/");
+    const data = res.data;
+    return Array.isArray(data?.notes) ? data.notes : [];
+  }
+
+  async permanentlyDeleteNote(id: string): Promise<void> {
+    await api.delete(`/trash/note/${id}`);
+  }
+
+  async restoreNote(id: string): Promise<Note> {
+        const res = await api.patch(`/trash/restore/note/${id}`);
+        return res.data.note || res.data;
     }
 
     async togglePin(id: string, version: number) : Promise<Note> {

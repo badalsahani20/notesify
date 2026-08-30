@@ -340,8 +340,7 @@ export const useRestoreNoteMutation = () => {
 
     return useMutation({
         mutationFn: async (noteId: string) => {
-            const res = await api.patch(`/trash/restore/note/${noteId}`);
-            return res.data.note || res.data;
+            return await noteRepository.restoreNote(noteId);
         },
 
         onMutate: async (noteId) => {
@@ -396,7 +395,7 @@ export const usePermanentDeleteNoteMutation = () => {
 
     return useMutation({
         mutationFn: async (noteId: string) => {
-            await api.delete(`/trash/note/${noteId}`);
+            await noteRepository.permanentlyDeleteNote(noteId);
         },
         onMutate: async (noteId) => {
             await queryClient.cancelQueries({ queryKey: ["notes", "trash"] });
@@ -498,11 +497,8 @@ export const useMoveNoteToFolderMutation = () => {
 
     return useMutation({
         mutationFn: async ({ noteId, folderId, version }: { noteId: string; folderId: string | null; version: number }) => {
-            const res = await api.put(`/notes/${noteId}`, {
-                folder: folderId,
-                version,
-            });
-            return res.data.updatedNote || res.data.note || res.data;
+            // Keep drag/drop local-first and let the sync queue handle offline moves.
+            return noteRepository.updateNote(noteId, { folder: folderId }, version);
         },
         onSuccess: (updatedNote, { noteId }) => {
             queryClient.setQueryData(["note", noteId], updatedNote);

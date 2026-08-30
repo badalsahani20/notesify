@@ -6,7 +6,7 @@ import type { Folder } from "@/store/useFolderStore";
 
 export interface SyncOperation {
     id?: number;
-    action: "CREATE" | "UPDATE" | "DELETE";
+    action: "CREATE" | "UPDATE" | "DELETE" | "HARD_DELETE_NOTE";
     entity: "note" | "folder";
     entityId: string;
     payload: unknown;
@@ -17,7 +17,7 @@ export interface ConflictRecord {
     id?: number;
     entity: "note" | "folder";
     entityId: string;
-    action: "CREATE" | "UPDATE" | "DELETE";
+    action: "CREATE" | "UPDATE" | "DELETE" | "HARD_DELETE_NOTE";
     operation: SyncOperation; // The exact failed operation
     reason: "VERSION_CONFLICT" | "PERMANENT_FAILURE";
     localVersion: number;

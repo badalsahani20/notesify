@@ -8,7 +8,7 @@ export class RemoteFolderDataSource implements IFolderRepository {
     return Array.isArray(res.data) ? res.data : [];
   }
 
-  async createFolder(data: {_id?: string; name: string; }): Promise<Folder> {
+  async createFolder(data: {_id?: string; name: string; color?: string }): Promise<Folder> {
     const res = await foldersApi.createFolder(data);
     return res.data.folder;
   }

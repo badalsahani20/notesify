@@ -82,11 +82,19 @@ class SyncEngine {
                 break;
             case "UPDATE":
                 // Requires the version to be in the payload!
-                await remoteNotes.updateNote(operation.entityId, payload, payload.version);
+                await remoteNotes.updateNote(
+                    operation.entityId,
+                    payload.updates ?? payload,
+                    payload.version,
+                );
                 break;
             case "DELETE":
                 // Requires the version to be in the payload!
                 await remoteNotes.deleteNote(operation.entityId, payload.version);
+                break;
+
+            case "HARD_DELETE_NOTE":
+                await remoteNotes.permanentlyDeleteNote(operation.entityId);
                 break;
         }
     }
@@ -97,42 +105,69 @@ class SyncEngine {
         this.isPulling = true;
         let hasChanges = false;
         try {
+            const pendingOperations = await db.syncQueue.toArray();
+            const pendingNoteIds = new Set(
+                pendingOperations.filter(op => op.entity === "note").map(op => op.entityId),
+            );
+            const pendingFolderIds = new Set(
+                pendingOperations.filter(op => op.entity === "folder").map(op => op.entityId),
+            );
+
             const remoteNotesApi = await this.getRemoteNotes();
             const remoteNotes = await remoteNotesApi.getNotes();
-            if(!Array.isArray(remoteNotes)) return false;
+            const archivedNotes = await remoteNotesApi.getArchivedNotes();
+            const trashedNotes = await remoteNotesApi.getTrashedNotes();
+            if(Array.isArray(remoteNotes)) {
+                const allRemoteNotes = [
+                    ...remoteNotes,
+                    ...(Array.isArray(archivedNotes) ? archivedNotes : []),
+                    ...(Array.isArray(trashedNotes) ? trashedNotes : []),
+                ];
+                const remoteNoteIds = new Set(allRemoteNotes.map(note => note._id));
 
-            const pendingOperations = await db.syncQueue.toArray();
-            const pendingIds = new Set(pendingOperations.map(op => op.entityId));
-            const remoteIds = new Set(remoteNotes.map(note => note._id));
+                for(const remoteNote of allRemoteNotes) {
+                    if(!remoteNote?._id || pendingNoteIds.has(remoteNote._id)) continue;
 
-            for(const remoteNote of remoteNotes) {
-                if(!remoteNote?._id) continue;
-                //Skip if local note has unsynced pending edits/creation/deletion
-                if(pendingIds.has(remoteNote._id)) {
-                    continue;
-                }
-
-                const localNote = await db.notes.get(remoteNote._id);
-
-                //Update Dexie if local note doesn't exist or remote version is newer
-                if(!localNote || (remoteNote.version && remoteNote.version > (localNote.version || 0))) {
-                    await db.notes.put(remoteNote);
-                    hasChanges = true;
-                }
-            }
-
-            const allLocalNotes = await db.notes.toArray();
-            for(const localNote of allLocalNotes) {
-                if (!remoteIds.has(localNote._id)) {
-                    if(pendingIds.has(localNote._id)) {
-                        continue;
+                    const localNote = await db.notes.get(remoteNote._id);
+                    if(!localNote || (remoteNote.version && remoteNote.version > (localNote.version || 0))) {
+                        await db.notes.put(remoteNote);
+                        hasChanges = true;
                     }
-                    
-                    await db.notes.delete(localNote._id);
-                    hasChanges = true;
+                }
+
+                const allLocalNotes = await db.notes.toArray();
+                for(const localNote of allLocalNotes) {
+                    if (!remoteNoteIds.has(localNote._id) && !pendingNoteIds.has(localNote._id)) {
+                        await db.notes.delete(localNote._id);
+                        hasChanges = true;
+                    }
                 }
             }
-            
+
+            const remoteFoldersApi = await this.getRemoteFolders();
+            const remoteFolders = await remoteFoldersApi.getFolders();
+            if(Array.isArray(remoteFolders)) {
+                const remoteFolderIds = new Set(remoteFolders.map(folder => folder._id));
+
+                for(const remoteFolder of remoteFolders) {
+                    if(!remoteFolder?._id || pendingFolderIds.has(remoteFolder._id)) continue;
+
+                    const localFolder = await db.folders.get(remoteFolder._id);
+                    if(!localFolder || (remoteFolder.version && remoteFolder.version > (localFolder.version || 0))) {
+                        await db.folders.put(remoteFolder);
+                        hasChanges = true;
+                    }
+                }
+
+                const allLocalFolders = await db.folders.toArray();
+                for(const localFolder of allLocalFolders) {
+                    if (!remoteFolderIds.has(localFolder._id) && !pendingFolderIds.has(localFolder._id)) {
+                        await db.folders.delete(localFolder._id);
+                        hasChanges = true;
+                    }
+                }
+            }
+
             return hasChanges;
         } catch (error) {
             console.warn("[SyncEngine] pullServerChanges warning:", error);
@@ -150,7 +185,11 @@ class SyncEngine {
                 await remoteFolders.createFolder(payload);
                 break;
             case "UPDATE":
-                await remoteFolders.updateFolder(operation.entityId, payload, payload.version);
+                await remoteFolders.updateFolder(
+                    operation.entityId,
+                    payload.updates ?? payload,
+                    payload.version,
+                );
                 break;
             case "DELETE":
                 await remoteFolders.deleteFolder(operation.entityId, payload.version);

@@ -1,6 +1,7 @@
 import { create  } from "zustand";
 import type { AxiosError } from "axios";
 import { folderRepository } from "@/repositories";
+import type { FolderColor } from "@/utils/folderColors";
 
 export interface Folder {
     _id: string;
@@ -21,7 +22,8 @@ interface FolderState {
     error: string | null;
     activeFolderId: string | null;
     fetchFolders: () => Promise<void>;
-    addFolder: (name: string) => Promise<Folder | null>;
+    refreshFolders: () => Promise<void>;
+    addFolder: (name: string, color?: FolderColor) => Promise<Folder | null>;
     updateFolder: (id: string, updates: Partial<Pick<Folder, "name" | "color">>) => Promise<void>;
     deleteFolder: (id: string) => Promise<void>;
     setActiveFolder: (id: string | null) => void;
@@ -52,10 +54,20 @@ export const useFolderStore = create<FolderState>((set, get) => ({
         }
     },
 
-    addFolder: async (name: string) => {
+    refreshFolders: async () => {
+        try {
+            const folders = await folderRepository.getFolders();
+            set({ folders, fetchedAt: Date.now(), hasFetched: true, error: null });
+        } catch (err) {
+            set({ error: "Failed to refresh folders" });
+            console.error("Failed to refresh folders", err);
+        }
+    },
+
+    addFolder: async (name: string, color: FolderColor = "slate") => {
         try {
             set({ error: null });
-            const folder = await folderRepository.createFolder({ name });
+            const folder = await folderRepository.createFolder({ name, color });
             if (!folder) {
                 set({ error: "Error creating folder" });
                 return null;

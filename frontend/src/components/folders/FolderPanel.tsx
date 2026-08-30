@@ -3,10 +3,11 @@ import {
   ChevronDown,
   ChevronRight,
   FileText,
-  MoreHorizontal,
   Pencil,
   Plus,
   Trash2,
+  Search,
+  X,
 } from "lucide-react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -14,13 +15,7 @@ import type { Folder as FolderType } from "@/store/useFolderStore";
 import { useFolderTree } from "@/hooks/notes/useFolderTree";
 import { useFolderStore } from "@/store/useFolderStore";
 import { useQueryClient } from "@tanstack/react-query";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { useMoveNoteToFolderMutation } from "@/hooks/notes/useNotesMutations";
+import { useMoveNoteToFolderMutation, useCreateNoteMutation } from "@/hooks/notes/useNotesMutations";
 import { FolderFormDialog } from "./FolderFormDialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,6 +29,7 @@ import {
 import { getFolderIcon } from "@/utils/getFolderIcons";
 import { type IconComponent } from "@/utils/getFolderIcons";
 import { FolderPanelSkeleton } from "@/components/ui/folderPanelSkeleton";
+import { getFolderColor, type FolderColor } from "@/utils/folderColors";
 
 const TopLink = ({
   label,
@@ -50,6 +46,21 @@ const TopLink = ({
   onClick: () => void;
   onDrop?: (noteId: string, version: number) => void;
 }) => {
+  const [isOver, setIsOver] = useState(false);
+
+  const readDropPayload = (event: React.DragEvent<HTMLButtonElement>) => {
+    const data = event.dataTransfer.getData("application/notesify-note");
+    if (!data) return null;
+
+    try {
+      const payload = JSON.parse(data) as { noteId?: unknown; version?: unknown };
+      if (typeof payload.noteId !== "string" || typeof payload.version !== "number") return null;
+      return { noteId: payload.noteId, version: payload.version };
+    } catch {
+      return null;
+    }
+  };
+
   return (
     <button
       type="button"
@@ -58,17 +69,21 @@ const TopLink = ({
         if (onDrop) {
           e.preventDefault();
           e.dataTransfer.dropEffect = "move";
+          setIsOver(true);
         }
       }}
+      onDragLeave={() => setIsOver(false)}
       onDrop={(e) => {
+        setIsOver(false);
         if (!onDrop) return;
-        const data = e.dataTransfer.getData("application/notesify-note");
-        if (data) {
-          const { noteId, version } = JSON.parse(data);
-          onDrop(noteId, version);
-        }
+        const payload = readDropPayload(e);
+        if (payload) onDrop(payload.noteId, payload.version);
       }}
-      className={`sidebar-link-row cursor-pointer ${active ? "sidebar-link-row-active" : ""}`}
+      className={cn(
+        "sidebar-link-row cursor-pointer transition-all duration-150",
+        active && "sidebar-link-row-active",
+        isOver && "bg-indigo-500/15 border border-indigo-500/50 scale-[1.02] shadow-md ring-1 ring-indigo-500/40"
+      )}
     >
       <span className="sidebar-link-main" title={label}>
         <Icon size={17} className={`sidebar-link-icon ${active ? "sidebar-link-icon-active" : ""}`} />
@@ -88,6 +103,7 @@ const FolderRow = ({
   onClick,
   onRename,
   onDelete,
+  onCreateNote,
   onDrop,
 }: {
   folder: FolderType;
@@ -98,6 +114,7 @@ const FolderRow = ({
   onClick: () => void;
   onRename: () => void;
   onDelete: () => void;
+  onCreateNote?: () => void;
   onDrop: (noteId: string, version: number) => void;
 }) => {
   const Icon = getFolderIcon(folder.name);
@@ -106,9 +123,9 @@ const FolderRow = ({
   return (
     <div
       className={cn(
-        "sidebar-tree-row sidebar-tree-row-item group",
+        "sidebar-tree-row sidebar-tree-row-item group transition-all duration-150 relative",
         active && "sidebar-tree-row-active",
-        isOver && "bg-[var(--active-surface)] ring-1 ring-[var(--accent-strong)]"
+        isOver && "bg-indigo-500/15 border border-indigo-500/50 scale-[1.02] shadow-md ring-1 ring-indigo-500/40"
       )}
       onDragOver={(e) => {
         e.preventDefault();
@@ -119,13 +136,16 @@ const FolderRow = ({
       onDrop={(e) => {
         setIsOver(false);
         const data = e.dataTransfer.getData("application/notesify-note");
-        if (data) {
+        if (!data) return;
+        try {
           const { noteId, version } = JSON.parse(data);
-          onDrop(noteId, version);
+          if (noteId && typeof version === "number") onDrop(noteId, version);
+        } catch {
+          // Ignore malformed drag payloads instead of breaking the sidebar.
         }
       }}
     >
-      <button type="button" onClick={onClick} className="flex min-w-0 flex-1 items-center justify-between">
+      <button type="button" onClick={onClick} className="flex min-w-0 flex-1 items-center justify-between pr-1">
         <span className="sidebar-link-main cursor-pointer">
           <span
             className="sidebar-folder-chevron cursor-pointer"
@@ -136,44 +156,65 @@ const FolderRow = ({
           >
             {expanded ? <ChevronDown size={15} className="text-[var(--muted-text)]" /> : <ChevronRight size={15} className="text-[var(--muted-text)]" />}
           </span>
-          <Icon size={17} className={`sidebar-link-icon ${active ? "sidebar-link-icon-active" : ""}`} />
-          <span title={folder.name} className={`sidebar-link-label truncate ${active ? "sidebar-link-label-active" : ""}`}>{folder.name}</span>
+          <span
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-white/10 transition-transform group-hover:scale-105"
+            style={{
+              backgroundColor: `${getFolderColor(folder.color)}22`,
+              color: getFolderColor(folder.color),
+            }}
+            title={`Drop notes into ${folder.name}`}
+          >
+            <Icon
+              size={16}
+              className={active ? "sidebar-link-icon-active" : "sidebar-link-icon"}
+            />
+          </span>
+          <span title={`Drop notes into ${folder.name}`} className={`sidebar-link-label truncate ${active ? "sidebar-link-label-active" : ""}`}>{folder.name}</span>
         </span>
-        <span className="sidebar-count-pill">{count}</span>
+        <span className="sidebar-count-pill group-hover:hidden transition-all">{count}</span>
       </button>
 
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
+      {/* Hover Quick Actions */}
+      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity pl-1">
+        {onCreateNote && (
           <button
             type="button"
-            className={`folder-row-menu-trigger ${active ? "folder-row-menu-trigger-visible" : ""}`}
-            aria-label={`Folder actions for ${folder.name}`}
-            onClick={(event) => event.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onCreateNote();
+            }}
+            className="p-1 rounded hover:bg-white/10 text-[var(--muted-text)] hover:text-[var(--text-strong)] transition-colors"
+            title="New note in folder"
+            aria-label={`Create new note in ${folder.name}`}
           >
-            <MoreHorizontal size={14} />
+            <Plus size={14} />
           </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent 
-          align="end" 
-          className="w-40"
-          onCloseAutoFocus={(e) => e.preventDefault()}
+        )}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onRename();
+          }}
+          className="p-1 rounded hover:bg-white/10 text-[var(--muted-text)] hover:text-[var(--text-strong)] transition-colors"
+          title="Rename folder"
+          aria-label={`Rename ${folder.name}`}
         >
-          <DropdownMenuItem
-            className="cursor-pointer"
-            onSelect={() => onRename()}
-          >
-            <Pencil size={14} />
-            Rename
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            className="cursor-pointer text-red-500 focus:text-red-500"
-            onSelect={() => onDelete()}
-          >
-            <Trash2 size={14} />
-            Delete
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+          <Pencil size={14} />
+        </button>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+          className="p-1 rounded hover:bg-white/10 text-red-400 hover:text-red-300 transition-colors"
+          title="Delete folder"
+          aria-label={`Delete ${folder.name}`}
+        >
+          <Trash2 size={14} />
+        </button>
+      </div>
     </div>
   );
 };
@@ -241,12 +282,14 @@ const FoldersPanel = () => {
   const { addFolder, updateFolder, deleteFolder, loading: foldersLoading } = useFolderStore();
 
   const queryClient = useQueryClient();
+  const [searchQuery, setSearchQuery] = useState("");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [renameTarget, setRenameTarget] = useState<FolderType | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<FolderType | null>(null);
   const [isSavingFolder, setIsSavingFolder] = useState(false);
   const [isDeletingFolder, setIsDeletingFolder] = useState(false);
   const { mutate: moveNote } = useMoveNoteToFolderMutation();
+  const { mutateAsync: createNote } = useCreateNoteMutation();
 
   const {
     allNotes,
@@ -260,15 +303,30 @@ const FoldersPanel = () => {
     isNotesLoading,
   } = useFolderTree();
 
+  const filteredFolders = searchQuery.trim()
+    ? sortedFolders.filter((f) => f.name.toLowerCase().includes(searchQuery.trim().toLowerCase()))
+    : sortedFolders;
+
+  const handleCreateNoteInFolder = async (targetFolderId: string) => {
+    try {
+      const newNote = await createNote({ folderId: targetFolderId });
+      if (newNote?._id) {
+        navigate(`/folders/${targetFolderId}/note/${newNote._id}`);
+      }
+    } catch (err) {
+      console.error("Failed to create note in folder:", err);
+    }
+  };
+
   const isFavoritesRoute = location.pathname.startsWith("/favorites");
   const isArchiveRoute = location.pathname.startsWith("/archive");
   const isTrashRoute = location.pathname.startsWith("/trash");
   const isAllNotesRoute = !folderId && !isFavoritesRoute && !isArchiveRoute && !isTrashRoute;
 
-  const handleCreateFolder = async (name: string) => {
+  const handleCreateFolder = async (name: string, color: FolderColor) => {
     setIsSavingFolder(true);
     try {
-      const folder = await addFolder(name);
+      const folder = await addFolder(name, color);
       if (folder?._id) {
         setIsCreateDialogOpen(false);
         navigate(`/folders/${folder._id}`);
@@ -286,15 +344,15 @@ const FoldersPanel = () => {
     setDeleteTarget(folder);
   };
 
-  const submitRenameFolder = async (name: string) => {
-    if (!renameTarget || name === renameTarget.name) {
+  const submitRenameFolder = async (name: string, color: FolderColor) => {
+    if (!renameTarget || (name === renameTarget.name && color === renameTarget.color)) {
       setRenameTarget(null);
       return;
     }
 
     setIsSavingFolder(true);
     try {
-      await updateFolder(renameTarget._id, { name });
+      await updateFolder(renameTarget._id, { name, color });
       setRenameTarget(null);
     } finally {
       setIsSavingFolder(false);
@@ -357,18 +415,44 @@ const FoldersPanel = () => {
               </button>
             </div>
 
+            {foldersOpen && (
+              <div className="px-1 py-1 mt-1">
+                <div className="relative flex items-center">
+                  <Search size={13} className="absolute left-2 text-[var(--muted-text)] pointer-events-none" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search folders..."
+                    className="w-full bg-[var(--surface-ghost)] border border-[var(--divider)] rounded-md pl-7 pr-6 py-1 text-xs text-[var(--text-strong)] placeholder:text-[var(--muted-text)] focus:outline-none focus:border-[var(--accent-strong)] transition-colors"
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery("")}
+                      className="absolute right-2 text-[var(--muted-text)] hover:text-[var(--text-strong)]"
+                      aria-label="Clear folder search"
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
             {(foldersLoading && sortedFolders.length === 0) || isNotesLoading ? (
               <div className="mt-3">
                 <FolderPanelSkeleton />
               </div>
             ) : foldersOpen ? (
-              <div className="mt-3 space-y-1">
-                {sortedFolders.map((folder) => {
-                  const expanded = expandedFolders[folder._id] ?? false;
-                  const folderNotes = notesByFolder[folder._id] ?? [];
+              <div className="mt-2 space-y-1">
+                {filteredFolders.length > 0 ? (
+                  filteredFolders.map((folder) => {
+                    const expanded = expandedFolders[folder._id] ?? false;
+                    const folderNotes = notesByFolder[folder._id] ?? [];
 
-                  return (
-                    <div key={folder._id} className="space-y-1">
+                    return (
+                      <div key={folder._id} className="space-y-1">
                         <FolderRow
                           folder={folder}
                           count={countsByFolder.get(folder._id) ?? 0}
@@ -378,28 +462,32 @@ const FoldersPanel = () => {
                           onClick={() => navigate(noteId ? `/folders/${folder._id}/note/${noteId}` : `/folders/${folder._id}`)}
                           onRename={() => void handleRenameFolder(folder)}
                           onDelete={() => void handleDeleteFolder(folder)}
+                          onCreateNote={() => void handleCreateNoteInFolder(folder._id)}
                           onDrop={(id, ver) => moveNote({ noteId: id, folderId: folder._id, version: ver })}
                         />
 
-                      <div className={`sidebar-folder-children ${expanded ? "sidebar-folder-children-open" : ""}`}>
-                        <div className="sidebar-folder-children-inner space-y-1">
-                          {folderNotes.length > 0 ? (
-                            folderNotes.map((note) => (
-                              <NoteChildRow
-                                key={note._id}
-                                title={note.title}
-                                active={noteId === note._id}
-                                onClick={() => navigate(`/folders/${folder._id}/note/${note._id}`)}
-                              />
-                            ))
-                          ) : (
-                            <div className="sidebar-empty-folder">0 notes</div>
-                          )}
+                        <div className={`sidebar-folder-children ${expanded ? "sidebar-folder-children-open" : ""}`}>
+                          <div className="sidebar-folder-children-inner space-y-1 border-l border-zinc-800/80 hover:border-zinc-700/80 ml-3.5 pl-2 transition-colors">
+                            {folderNotes.length > 0 ? (
+                              folderNotes.map((note) => (
+                                <NoteChildRow
+                                  key={note._id}
+                                  title={note.title}
+                                  active={noteId === note._id}
+                                  onClick={() => navigate(`/folders/${folder._id}/note/${note._id}`)}
+                                />
+                              ))
+                            ) : (
+                              <div className="sidebar-empty-folder text-xs text-[var(--muted-text)] py-1 pl-2">0 notes</div>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                ) : (
+                  <div className="text-xs text-[var(--muted-text)] px-3 py-2 text-center">No folders found</div>
+                )}
               </div>
             ) : null}
           </div>
@@ -418,6 +506,7 @@ const FoldersPanel = () => {
         open={renameTarget !== null}
         mode="rename"
         initialValue={renameTarget?.name ?? ""}
+        initialColor={renameTarget?.color}
         isSaving={isSavingFolder}
         onClose={() => setRenameTarget(null)}
         onSubmit={submitRenameFolder}

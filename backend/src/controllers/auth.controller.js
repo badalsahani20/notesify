@@ -144,7 +144,9 @@ export const getShowcaseUsers = catchAsync(async (req, res, next) => {
 
 
 export const refreshToken = catchAsync(async (req, res, next) => {
-  const clientRefreshToken = req.cookies.refreshToken ?? req.get("X-Refresh-Token");
+  // Desktop clients send the current rotated token explicitly. Prefer it over
+  // a potentially stale browser cookie when both are present.
+  const clientRefreshToken = req.get("X-Refresh-Token") ?? req.cookies.refreshToken;
 
   const { accessToken, refreshToken, user } = await AuthService.refreshAccessToken(clientRefreshToken);
 
@@ -153,6 +155,8 @@ export const refreshToken = catchAsync(async (req, res, next) => {
   res.status(200).json({
     success: true,
     accessToken,
+    // Desktop clients persist the rotated token in secure storage.
+    refreshToken,
     user: {
       id: user._id,
       name: user.name,

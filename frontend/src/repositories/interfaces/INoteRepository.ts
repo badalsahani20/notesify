@@ -7,6 +7,9 @@ export interface INoteRepository {
     updateNote(id: string, updates: Partial<Note>, version: number): Promise<Note>;
     deleteNote(id: string, version: number): Promise<void>;
     getArchivedNotes(): Promise<Note[]>;
+    getTrashedNotes(): Promise<Note[]>;
     togglePin(id: string, version: number): Promise<Note>;
+    permanentlyDeleteNote(id: string): Promise<void>;
+    restoreNote(id: string): Promise<Note>;
     toggleArchive(id: string, version: number): Promise<Note>;
 }

@@ -112,6 +112,62 @@ export const GlobalChatMessages = ({
   const [userHasScrolledUp, setUserHasScrolledUp] = useState(false);
   const lastMessageCount = useRef(messages.length);
 
+  const [selectionToolbar, setSelectionToolbar] = useState<{
+    text: string;
+    top: number;
+    left: number;
+  } | null>(null);
+
+  const handleSelectionCheck = () => {
+    const selection = window.getSelection();
+    if (!selection || selection.isCollapsed) {
+      setSelectionToolbar(null);
+      return;
+    }
+
+    const selectedText = selection.toString().trim();
+    if (!selectedText || selectedText.length < 2) {
+      setSelectionToolbar(null);
+      return;
+    }
+
+    const containerEl = scrollContainerRef.current;
+    if (!containerEl) return;
+
+    try {
+      const range = selection.getRangeAt(0);
+      if (!containerEl.contains(range.commonAncestorContainer)) {
+        setSelectionToolbar(null);
+        return;
+      }
+
+      const rect = range.getBoundingClientRect();
+      const containerRect = containerEl.getBoundingClientRect();
+
+      const top = rect.top - containerRect.top + containerEl.scrollTop - 42;
+      const left = rect.left - containerRect.left + rect.width / 2;
+
+      setSelectionToolbar({
+        text: selectedText,
+        top: Math.max(10, top),
+        left: Math.max(60, Math.min(containerRect.width - 60, left)),
+      });
+    } catch {
+      setSelectionToolbar(null);
+    }
+  };
+
+  useEffect(() => {
+    const onSelectionChange = () => {
+      handleSelectionCheck();
+    };
+
+    document.addEventListener("selectionchange", onSelectionChange);
+    return () => {
+      document.removeEventListener("selectionchange", onSelectionChange);
+    };
+  }, []);
+
   // Re-enable auto-scroll on new messages
   useEffect(() => {
     if (messages.length > lastMessageCount.current || isSending) {
@@ -149,10 +205,48 @@ export const GlobalChatMessages = ({
 
   return (
     <div
-      className={`gc-messages custom-scrollbar${fullWidthAssistant ? " gc-messages-fullwidth-assistant" : ""}`}
+      className={`gc-messages custom-scrollbar relative${fullWidthAssistant ? " gc-messages-fullwidth-assistant" : ""}`}
       ref={scrollContainerRef}
       onScroll={handleScroll}
+      onMouseUp={handleSelectionCheck}
     >
+      {/* Floating Selection Toolbar Popover */}
+      {selectionToolbar && (
+        <div
+          className="absolute z-50 transform -translate-x-1/2 flex items-center bg-[#1c1c22] border border-white/20 shadow-2xl rounded-full p-1 text-xs text-white transition-all duration-150 animate-in fade-in zoom-in-95"
+          style={{ top: `${selectionToolbar.top}px`, left: `${selectionToolbar.left}px` }}
+          onMouseDown={(e) => e.preventDefault()}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              const textToAsk = selectionToolbar.text;
+              setSelectionToolbar(null);
+              window.getSelection()?.removeAllRanges();
+              sendMessage(`Ask Iris about: "${textToAsk}"`);
+            }}
+            className="flex items-center gap-1.5 px-3 py-1 rounded-full hover:bg-white/10 text-white font-medium transition-colors cursor-pointer"
+          >
+            <div className="iris-orb shrink-0" style={{ width: "12px", height: "12px", borderWidth: "1px", boxShadow: "none" }} />
+            <span>Ask Iris</span>
+          </button>
+          
+          <div className="h-3.5 w-[1px] bg-white/20 my-auto" />
+
+          <button
+            type="button"
+            onClick={() => {
+              const textToAsk = selectionToolbar.text;
+              setSelectionToolbar(null);
+              window.getSelection()?.removeAllRanges();
+              sendMessage(`Elaborate on: "${textToAsk}"`);
+            }}
+            className="flex items-center gap-1.5 px-3 py-1 rounded-full hover:bg-white/10 text-white/80 hover:text-white transition-colors cursor-pointer"
+          >
+            <span>Elaborate</span>
+          </button>
+        </div>
+      )}
       {messagesLoading ? (
         <div className="gc-loading-wrap">
           <div className="gc-loading-dot" style={{ animationDelay: "0ms" }} />
@@ -254,7 +348,22 @@ export const GlobalChatMessages = ({
                       )}
 
                       {/* 3. Message content (Bottom) */}
-                      <div className="gc-markdown max-w-full">
+                      <div
+                        className="gc-markdown max-w-full focus:outline-none"
+                        contentEditable={true}
+                        suppressContentEditableWarning={true}
+                        spellCheck={false}
+                        autoCorrect="off"
+                        data-ms-editor="false"
+                        onBeforeInput={(e) => e.preventDefault()}
+                        onKeyDown={(e) => {
+                          if (!(e.ctrlKey || e.metaKey)) {
+                            e.preventDefault();
+                          }
+                        }}
+                        onDrop={(e) => e.preventDefault()}
+                        onPaste={(e) => e.preventDefault()}
+                      >
                         <IrisMessageBody
                           segments={msg.segments ?? parseIrisResponse(displayText)}
                           onAnswer={sendMessage}

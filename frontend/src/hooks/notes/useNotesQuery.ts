@@ -3,6 +3,7 @@ import type { Note } from "@/store/useNoteStore";
 import { useQueryClient } from "@tanstack/react-query";
 import { noteRepository } from "@/repositories";
 import api from "@/lib/api";
+import { db } from "@/database/database";
 
 {/* ["notes"] → active notes
 ["notes", "archive"] → archived
@@ -49,9 +50,14 @@ export const useTrashQuery = (enabled = true) => {
     return useQuery({
         queryKey: ["notes", "trash"],
         queryFn: async () => {
-            const res = await api.get("/trash/");
-            // res.data contains { notes, folders }
-            return res.data;
+            if (navigator.onLine) {
+                const res = await api.get("/trash/");
+                return res.data;
+            }
+
+            const notes = await noteRepository.getTrashedNotes();
+            const folders = (await db.folders.toArray()).filter(folder => folder.isDeleted);
+            return { notes, folders };
         },
         enabled,
         staleTime: 1000 * 60 * 5, // 5 minutes

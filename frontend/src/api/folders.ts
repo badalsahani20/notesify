@@ -4,7 +4,7 @@ export const getFolders = async () => {
     return api.get('/folders');
 }
 
-export const createFolder = async (data: {_id?: string; name: string; }) => {
+export const createFolder = async (data: {_id?: string; name: string; color?: string }) => {
     return api.post('/folders', data);
 }
 
