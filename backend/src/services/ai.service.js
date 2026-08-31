@@ -14,9 +14,9 @@ const model = genAI.getGenerativeModel({ model: "gemma-4-26b-a4b-it" });
 export const PRIMARY_MODEL = "deepseek/deepseek-v4-flash";
 export const TEACHING_MODELS = [
   "inclusionai/ling-2.6-1t",
-  "deepseek/deepseek-v4-flash"
+  "deepseek/deepseek-v4-flash",
 ];
-export const DEFAULT_CHAT_MODEL = "qwen/qwen3.7-flash";
+export const DEFAULT_CHAT_MODEL = "z-ai/glm-5.3-flash";
 export const QUICK_MODEL = "inclusionai/ling-2.6-flash";
 export const COMPLEX_ANALYSIS_MODEL = "inclusionai/ling-2.6-1t";
 export const VISUALIZATION_MODEL = "qwen/qwen3.7-flash";
@@ -77,6 +77,7 @@ export const executeOpenRouter = async (
     modelId.toLowerCase().includes("reason") ||
     modelId.toLowerCase().includes("gpt-oss") ||
     modelId.toLowerCase().includes("deepseek") ||
+    modelId.toLowerCase().includes("glm") ||
     modelId.toLowerCase().includes("ling-2.6");
 
   const shouldEnableReasoning =
@@ -88,18 +89,20 @@ export const executeOpenRouter = async (
     messages: messages,
     stream: stream,
     max_tokens: maxTokens,
-    include_reasoning: shouldEnableReasoning, // Top-level flag for many providers
   };
+
+  if (shouldEnableReasoning || isReasoningModel) {
+    bodyPayload.include_reasoning = true;
+    bodyPayload.reasoning = { effort: "medium" };
+  }
 
   if (tools) {
     bodyPayload.tools = tools;
   }
 
-  if (isQwenModel || !shouldEnableReasoning) {
-    bodyPayload.reasoning = { effort: "none", exclude: true };
-  } else {
-    bodyPayload.reasoning = { effort: "medium", exclude: false };
-  }
+  console.log(
+    `🤖 [OpenRouter] Executing model: "${modelId}" | Stream: ${stream} | Reasoning: ${shouldEnableReasoning} | Tools: ${tools?.map(t => t.type || t.function?.name).join(", ") || "none"}`,
+  );
 
   const response = await fetch(
     "https://openrouter.ai/api/v1/chat/completions",
@@ -117,13 +120,17 @@ export const executeOpenRouter = async (
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
+    console.warn(`❌ [OpenRouter] Model "${modelId}" returned ${response.status}:`, JSON.stringify(errorData));
     throw new Error(
       `OpenRouter returned ${response.status}: ${JSON.stringify(errorData)}`,
     );
   }
 
   //If streaming return the raw response body
-  if (stream) return response.body;
+  if (stream) {
+    console.log(`✅ [OpenRouter] Stream connected successfully for model: "${modelId}"`);
+    return response.body;
+  }
 
   const data = await response.json();
 
@@ -133,6 +140,7 @@ export const executeOpenRouter = async (
   const content = choice?.message?.content;
 
   if (data.error) {
+    console.warn(`❌ [OpenRouter] Model "${modelId}" error:`, data.error);
     throw new Error(
       `OpenRouter model error: ${data.error.message ?? JSON.stringify(data.error)}`,
     );
@@ -146,11 +154,13 @@ export const executeOpenRouter = async (
     content.startsWith("Error") &&
     content.includes("model output error")
   ) {
+    console.warn(`❌ [OpenRouter] Model "${modelId}" output error string detected`);
     throw new Error(
       `Model output error (${modelId}): ${content.slice(0, 300)}`,
     );
   }
 
+  console.log(`✅ [OpenRouter] Successfully generated response via model: "${modelId}"`);
   return content;
 };
 
@@ -225,8 +235,15 @@ const executeGemini = async (messages, stream = false) => {
   }
 };
 
-export const executeGroq = async (messages, stream = false) => {
+export const executeGroq = async (
+  messages,
+  stream = false,
+  modelName = null,
+) => {
   ensureGroqApiKey();
+  const selectedModel = modelName || FALLBACK_MODEL;
+
+  console.log(`⚡ [Groq] Executing model: "${selectedModel}" | Stream: ${stream}`);
 
   if (stream) {
     const response = await fetch(
@@ -238,7 +255,7 @@ export const executeGroq = async (messages, stream = false) => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: FALLBACK_MODEL,
+          model: selectedModel,
           messages: messages,
           stream: true,
         }),
@@ -247,11 +264,13 @@ export const executeGroq = async (messages, stream = false) => {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
+      console.warn(`❌ [Groq] Model "${selectedModel}" returned ${response.status}:`, JSON.stringify(errorData));
       throw new Error(
         `Groq returned ${response.status}: ${JSON.stringify(errorData)}`,
       );
     }
 
+    console.log(`✅ [Groq] Stream connected successfully for model: "${selectedModel}"`);
     return response.body;
   }
 
@@ -259,9 +278,10 @@ export const executeGroq = async (messages, stream = false) => {
     throw new Error("Groq client not properly initialized");
 
   const response = await client.chat.completions.create({
-    model: FALLBACK_MODEL,
+    model: selectedModel,
     messages: messages,
   });
+  console.log(`✅ [Groq] Successfully generated response via model: "${selectedModel}"`);
   return response.choices[0].message.content;
 };
 
@@ -274,11 +294,7 @@ const generateContentWithFallback = async (prompt, stream = true) => {
   // 1) OpenRouter (preferred for `ling`)
   if (getOpenRouterApiKey()) {
     try {
-      return await executeOpenRouter(
-        NOTES_GENERATION_MODEL,
-        message,
-        stream,
-      );
+      return await executeOpenRouter(NOTES_GENERATION_MODEL, message, stream);
     } catch (err) {
       errors.push(`${NOTES_GENERATION_MODEL} failed: ${err.message}`);
       console.warn(
@@ -301,11 +317,7 @@ const generateContentWithFallback = async (prompt, stream = true) => {
   // 3) QWEN (via OpenRouter when QWEN_API is present)
   if (process.env.QWEN_API) {
     try {
-      return await executeOpenRouter(
-        VISUALIZATION_MODEL,
-        message,
-        stream,
-      );
+      return await executeOpenRouter(VISUALIZATION_MODEL, message, stream);
     } catch (err) {
       errors.push(`${VISUALIZATION_MODEL}/OpenRouter failed: ${err.message}`);
       console.warn(
@@ -337,21 +349,20 @@ export const classifyChatIntent = (
   imageBase64 = null,
   history = [],
   noteContext = "",
-  pdfContext = ""
+  pdfContext = "",
+  chatMode = "casual",
 ) => {
   const msg = message.toLowerCase();
 
-  // 1. VISUAL CONVO (Strictly for actual attached images/vision tasks)
-  const hasAttachedImage =
-    imageBase64 ||
-    history.some(
-      (h) => typeof h.content === "string" && h.content.includes("[Attached Image]"),
-    );
+  // 1. VISUAL CONVO (Strictly for current message with attached image)
+  const hasAttachedImage = !!imageBase64;
   if (hasAttachedImage) return VISUALIZATION_MODEL;
 
   // Calculate total context size (history + note + pdf + active message)
   const historyText = history
-    .map((h) => (typeof h.content === "string" ? h.content : JSON.stringify(h.content)))
+    .map((h) =>
+      typeof h.content === "string" ? h.content : JSON.stringify(h.content),
+    )
     .join(" ");
   const totalContextLength =
     (noteContext?.length || 0) +
@@ -359,7 +370,7 @@ export const classifyChatIntent = (
     historyText.length +
     message.length;
 
-  // 2. LARGE CONTEXT OVERRIDE (Safe fallback to DeepSeek when context exceeds 30,000 characters)
+  // 2. LARGE CONTEXT OVERRIDE (Safe fallback to DeepSeek when context exceeds 150,000 characters)
   if (totalContextLength > 150000) {
     console.log(
       `📦 Large context detected (${totalContextLength} characters). Overriding routing to use ${PRIMARY_MODEL} (DeepSeek).`,
@@ -369,26 +380,38 @@ export const classifyChatIntent = (
 
   // 3. DIAGRAMS / GRAPHS / CHARTS (Route text diagram requests to DeepSeek since it generates structural markdown/Mermaid best)
   const isDiagramOrGraph =
-    /\b(diagram|chart|graph|flowchart|wireframe|mockup|screenshot|visualize|architecture|workflow|sequence diagram|erd|uml|mindmap|tree)\b/.test(msg);
+    /\b(diagram|chart|graph|flowchart|wireframe|mockup|screenshot|visualize|architecture|workflow|sequence diagram|erd|uml|mindmap|tree)\b/.test(
+      msg,
+    );
   if (isDiagramOrGraph) return PRIMARY_MODEL;
 
-  // 4. COMPLEX_ANALYSIS / RING (High parameter complexity / precision focus - Tech, Math, Science, and Humanities)
+  // 4. TEACHING & STUDY MODE (Primary route when chatMode is 'study' or educational intent detected)
+  const isTeachingKeyword =
+    /\b(explain|teach|tutorial|how to|why does|concept|explain the difference|step by step|study help|tutor|what is|describe|example|problem|solve|understand|definition|guide|summary|lesson|learn)\b/.test(
+      msg,
+    );
+
+  if (chatMode === "study" || isTeachingKeyword) {
+    const isComplexTeaching =
+      msg.length > 250 ||
+      /\b(advanced|complex|architecture|algorithm|system|optimize|scale|theory|difference between|under the hood|internals|lifecycle|deep|derivation|proof|physics|chemistry|biology|calculus)\b/.test(
+        msg,
+      );
+    const chosenModel = isComplexTeaching
+      ? TEACHING_MODELS[0]
+      : TEACHING_MODELS[1];
+    console.log(
+      `🎓 [Teaching Mode Active] Routing to Teaching Model: ${chosenModel}`,
+    );
+    return chosenModel;
+  }
+
+  // 5. COMPLEX_ANALYSIS / RING (High parameter complexity / precision focus)
   const isComplex =
-    /\b(analyze|audit|evaluate|critique|proof|compare and contrast|contradiction|complex|debug|optimize|performance|algorithm|refactor|solve|derive|theorem|hypothesis|synthesis|mechanism|pathway|thesis|deconstruct|assess|physics|chemistry|biology|calculus)\b/.test(
+    /\b(analyze|audit|evaluate|critique|proof|compare and contrast|contradiction|complex|debug|optimize|performance|algorithm|refactor|solve|derive|theorem|hypothesis|synthesis|mechanism|pathway|thesis|deconstruct|assess)\b/.test(
       msg,
     );
   if (isComplex) return COMPLEX_ANALYSIS_MODEL;
-
-  // 5. TEACHING (Explanations, tutorials, concept learning)
-  const isTeaching =
-    /\b(explain|teach|tutorial|how to|why does|concept|explain the difference|step by step|study help|tutor)\b/.test(
-      msg,
-    );
-  if (isTeaching) {
-    // Intelligently route teaching requests based on complexity
-    const isComplexTeaching = msg.length > 300 || /\b(advanced|complex|architecture|algorithm|system|optimize|scale|theory|difference between|under the hood|internals|lifecycle)\b/.test(msg);
-    return isComplexTeaching ? TEACHING_MODELS[0] : TEACHING_MODELS[1];
-  }
 
   // Default chat model
   return DEFAULT_CHAT_MODEL;
@@ -439,13 +462,11 @@ const getAiReply = async (
   // --- TIER 1: OPENROUTER (PRIMARY - DYNAMIC INTENT BASED) ---
   if (getOpenRouterApiKey()) {
     try {
-      const isVisualConvo =
-        imageBase64 ||
-        history.some(
-          (h) => typeof h.content === "string" && h.content.includes("[Attached Image]"),
-        );
-      
-      const activeModel = selectedModel || (isVisualConvo ? VISUALIZATION_MODEL : DEFAULT_CHAT_MODEL);
+      const isVisualConvo = !!imageBase64;
+
+      const activeModel =
+        selectedModel ||
+        (isVisualConvo ? VISUALIZATION_MODEL : DEFAULT_CHAT_MODEL);
       console.log(`🔥 Attempting Primary Model: ${activeModel}`);
 
       // All three models support thinking/reasoning
@@ -587,11 +608,13 @@ export const performWebSearch = async (query) => {
     });
     const data = await response.json();
     if (!data.results) return "No results found";
-    
+
     // Use only the first user message + first assistant reply for clean, focused title generation.
     // Avoids noise from system prompts, tool calls, or image blobs that bloat the context.
     const firstUser = sessionToUpdate.messages.find((m) => m.role === "user");
-    const firstAssistant = sessionToUpdate.messages.find((m) => m.role === "assistant");
+    const firstAssistant = sessionToUpdate.messages.find(
+      (m) => m.role === "assistant",
+    );
     const titleContext = [
       firstUser ? `User: ${firstUser.content}` : "",
       firstAssistant ? `Assistant: ${firstAssistant.content}` : "",
@@ -1051,7 +1074,7 @@ export const chatWithAi = async ({
   pdfContext = "",
   imageBase64 = null,
   stream = false,
-  systemPrompt = "", 
+  systemPrompt = "",
   useReasoning = false,
   enableWeb = true,
   chatMode = "study",
@@ -1152,6 +1175,7 @@ export const chatWithAi = async ({
     trimmedHistory,
     safeNoteContext,
     safePdfContext,
+    chatMode,
   );
 
   const isVisual = selectedModel === VISUALIZATION_MODEL;
@@ -1170,7 +1194,7 @@ export const chatWithAi = async ({
 
   const combinedSystemPrompt = [
     basePrompt,
-    systemPrompt, 
+    systemPrompt,
     webBlock,
     noteBlock,
     pdfBlock,
@@ -1180,23 +1204,41 @@ export const chatWithAi = async ({
     .join("\n\n");
 
   const finalTools = tools ? [...tools] : [];
-  if (enableWeb) {
-    finalTools.push({ type: "openrouter:web_search" }, { type: "openrouter:web_fetch" });
+  const needsWebTools = enableWeb || mightNeedWeb(finalMessage);
+  if (needsWebTools) {
+    finalTools.push(
+      { type: "openrouter:web_search" },
+      { type: "openrouter:web_fetch" },
+    );
   }
   finalTools.push({
     type: "function",
     function: {
       name: "save_memory",
-      description: "Save a fact, preference, or goal about the user to their long-term memory. Only use this when the user explicitly asks you to remember something, or if they share an important, persistent fact about themselves. CRITICAL: Before calling this tool, you MUST write a short introductory conversational message (e.g. 'Got it! I will remember that.'). After calling the tool, DO NOT output any more text.",
+      description:
+        "Save a fact, preference, or goal about the user to their long-term memory. Only use this when the user explicitly asks you to remember something, or if they share an important, persistent fact about themselves. CRITICAL: Before calling this tool, you MUST write a short introductory conversational message (e.g. 'Got it! I will remember that.'). After calling the tool, DO NOT output any more text.",
       parameters: {
         type: "object",
         properties: {
-          category: { type: "string", enum: ["PROFILE", "PREFERENCE", "GOAL", "PROJECT", "SKILL", "OTHER"] },
-          content: { type: "string", description: "The concise fact to remember" }
+          category: {
+            type: "string",
+            enum: [
+              "PROFILE",
+              "PREFERENCE",
+              "GOAL",
+              "PROJECT",
+              "SKILL",
+              "OTHER",
+            ],
+          },
+          content: {
+            type: "string",
+            description: "The concise fact to remember",
+          },
         },
-        required: ["category", "content"]
-      }
-    }
+        required: ["category", "content"],
+      },
+    },
   });
 
   const reply = await getAiReply(
@@ -1402,7 +1444,6 @@ const P_VIZ = `Use visualizations only when they genuinely help. Format: [IRIS_V
 - chart: JSON data for charts. math: LaTeX formulas.
 - Bar chart example: [IRIS_VIZ type="mermaid" title="My Chart"]\nxychart-beta\n    title "My Chart"\n    x-axis ["A", "B", "C"]\n    y-axis "Count" 0 --> 10\n    bar [2, 5, 8]\n[/IRIS_VIZ]`;
 
-
 const P_WEB_PROMPT = `Web Search Recommendation:
 - If the user asks for latest news, documentation, or current/real-time information, and the Web Search tool is disabled, you MUST kindly and clearly ask the user to turn on the Web Search tool (using the toggle in the UI) so you can fetch up-to-date and accurate information to help them.
 - If the user asks something new or you do not have sufficient information or ideas to answer, kindly ask the user to turn on the Web Search tool.`;
@@ -1418,16 +1459,15 @@ const buildIrisPrompt = ({
     msg,
   );
 
-  const wantsWeb = !enableWeb && (
-    /latest|news|current|recent|docs|documentation|search|look up|google|weather|price|stock|update|today/i.test(msg) ||
-    /who is|how to install|version of|what happened/i.test(msg)
-  );
+  const wantsWeb =
+    !enableWeb &&
+    (/latest|news|current|recent|docs|documentation|search|look up|google|weather|price|stock|update|today/i.test(
+      msg,
+    ) ||
+      /who is|how to install|version of|what happened/i.test(msg));
 
   // Core capabilities based on mode
-  const parts = [
-    P_BASE,
-    chatMode === "study" ? P_STUDY : P_CASUAL
-  ];
+  const parts = [P_BASE, chatMode === "study" ? P_STUDY : P_CASUAL];
 
   if (wantsViz) parts.push(P_VIZ);
   if (wantsWeb) parts.push(P_WEB_PROMPT);

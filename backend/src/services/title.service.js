@@ -71,13 +71,13 @@ export const generateTitleFromText = async (text) => {
   // 2. Fall back to Groq if Gemini wasn't available or failed
   if (!rawTitle && process.env.GROQ_API_KEY) {
     try {
-      rawTitle = await executeGroq(titleMessages);
+      rawTitle = await executeGroq(titleMessages, false, "openai/gpt-oss-120b");
       if (rawTitle) {
-        successfulProvider = "Groq LLaMA";
+        successfulProvider = "Groq (openai/gpt-oss-120b)";
       }
     } catch (groqErr) {
       console.warn(
-        "❌ [TitleService] Provider [Groq LLaMA] failed:",
+        "❌ [TitleService] Provider [Groq (openai/gpt-oss-120b)] failed:",
         groqErr.message,
       );
     }

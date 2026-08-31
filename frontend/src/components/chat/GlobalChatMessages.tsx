@@ -1,5 +1,5 @@
 import "katex/dist/katex.min.css";
-import { ChevronRight, FileText, Search, Globe, Check, Copy } from "lucide-react";
+import { ChevronRight, ChevronDown, FileText, Search, Globe, Check, Copy } from "lucide-react";
 import { GlobalChatEmptyState } from "@/components/chat/GlobalChatEmptyState";
 import type { Message } from "@/components/ai/types";
 import IrisMessageBody from "./IrisMessageBody";
@@ -108,9 +108,42 @@ export const GlobalChatMessages = ({
   useReasoning = true,
 }: GlobalChatMessagesProps) => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [expandedUserMessages, setExpandedUserMessages] = useState<Set<string>>(new Set());
+  const [expandedUserMessageHeights, setExpandedUserMessageHeights] = useState<Record<string, number>>({});
+  const [longUserMessageIds, setLongUserMessageIds] = useState<Set<string>>(new Set());
+  const userMessageRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [userHasScrolledUp, setUserHasScrolledUp] = useState(false);
   const lastMessageCount = useRef(messages.length);
+
+  // Detect wrapping as well as explicit newlines so long prompts collapse at
+  // the same visual height regardless of the viewport width.
+  useEffect(() => {
+    const nextLongMessageIds = new Set<string>();
+    messages.forEach((message) => {
+      if (message.role !== "user") return;
+      const element = userMessageRefs.current[message.id];
+      if (!element) return;
+
+      const lineHeight = Number.parseFloat(window.getComputedStyle(element).lineHeight);
+      const collapsedHeight = (Number.isFinite(lineHeight) ? lineHeight : 26) * 6;
+      if (element.scrollHeight > collapsedHeight + 2) {
+        nextLongMessageIds.add(message.id);
+      }
+    });
+    setLongUserMessageIds(nextLongMessageIds);
+  }, [messages]);
+
+  // Measure the natural height after expanding so the CSS transition animates
+  // to the real endpoint instead of an oversized max-height.
+  useEffect(() => {
+    const nextHeights: Record<string, number> = {};
+    expandedUserMessages.forEach((messageId) => {
+      const element = userMessageRefs.current[messageId];
+      if (element) nextHeights[messageId] = element.scrollHeight;
+    });
+    setExpandedUserMessageHeights(nextHeights);
+  }, [expandedUserMessages, messages]);
 
   const [selectionToolbar, setSelectionToolbar] = useState<{
     text: string;
@@ -136,7 +169,11 @@ export const GlobalChatMessages = ({
 
     try {
       const range = selection.getRangeAt(0);
-      if (!containerEl.contains(range.commonAncestorContainer)) {
+      const ancestorNode = range.commonAncestorContainer.nodeType === Node.TEXT_NODE
+        ? range.commonAncestorContainer.parentElement
+        : range.commonAncestorContainer;
+
+      if (!ancestorNode || !containerEl.contains(ancestorNode)) {
         setSelectionToolbar(null);
         return;
       }
@@ -203,6 +240,12 @@ export const GlobalChatMessages = ({
     }, 2000);
   };
 
+  const handleSelectionAction = (promptPrefix: string, text: string) => {
+    setSelectionToolbar(null);
+    window.getSelection()?.removeAllRanges();
+    sendMessage(`${promptPrefix}: "${text}"`);
+  };
+
   return (
     <div
       className={`gc-messages custom-scrollbar relative${fullWidthAssistant ? " gc-messages-fullwidth-assistant" : ""}`}
@@ -219,12 +262,7 @@ export const GlobalChatMessages = ({
         >
           <button
             type="button"
-            onClick={() => {
-              const textToAsk = selectionToolbar.text;
-              setSelectionToolbar(null);
-              window.getSelection()?.removeAllRanges();
-              sendMessage(`Ask Iris about: "${textToAsk}"`);
-            }}
+            onClick={() => handleSelectionAction("Ask Iris about", selectionToolbar.text)}
             className="flex items-center gap-1.5 px-3 py-1 rounded-full hover:bg-white/10 text-white font-medium transition-colors cursor-pointer"
           >
             <div className="iris-orb shrink-0" style={{ width: "12px", height: "12px", borderWidth: "1px", boxShadow: "none" }} />
@@ -235,15 +273,20 @@ export const GlobalChatMessages = ({
 
           <button
             type="button"
-            onClick={() => {
-              const textToAsk = selectionToolbar.text;
-              setSelectionToolbar(null);
-              window.getSelection()?.removeAllRanges();
-              sendMessage(`Elaborate on: "${textToAsk}"`);
-            }}
+            onClick={() => handleSelectionAction("Elaborate on", selectionToolbar.text)}
             className="flex items-center gap-1.5 px-3 py-1 rounded-full hover:bg-white/10 text-white/80 hover:text-white transition-colors cursor-pointer"
           >
             <span>Elaborate</span>
+          </button>
+
+          <div className="h-3.5 w-[1px] bg-white/20 my-auto" />
+
+          <button
+            type="button"
+            onClick={() => handleSelectionAction("Simplify", selectionToolbar.text)}
+            className="flex items-center gap-1.5 px-3 py-1 rounded-full hover:bg-white/10 text-white/80 hover:text-white transition-colors cursor-pointer"
+          >
+            <span>Simplify</span>
           </button>
         </div>
       )}
@@ -421,7 +464,43 @@ export const GlobalChatMessages = ({
                       <img src={msg.imageUrl} alt="Uploaded attachment" className="gc-user-image" />
                     </a>
                   )}
-                  {msg.text && <div>{msg.text}</div>}
+                  {msg.text && (() => {
+                    const isLong = longUserMessageIds.has(msg.id);
+                    const isExpanded = expandedUserMessages.has(msg.id);
+
+                    return (
+                      <>
+                        <div
+                          ref={(element) => {
+                            userMessageRefs.current[msg.id] = element;
+                          }}
+                          style={isExpanded
+                            ? { maxHeight: `${expandedUserMessageHeights[msg.id] ?? 165}px` }
+                            : undefined}
+                          className={`gc-user-message-content whitespace-pre-wrap${isLong ? (isExpanded ? " gc-user-message-content-expanded" : " gc-user-message-content-collapsed") : ""}`}
+                        >
+                          {msg.text}
+                        </div>
+                        {isLong && (
+                          <button
+                            type="button"
+                            className="gc-user-message-toggle"
+                            onClick={() => setExpandedUserMessages((current) => {
+                              const next = new Set(current);
+                              if (next.has(msg.id)) next.delete(msg.id);
+                              else next.add(msg.id);
+                              return next;
+                            })}
+                          >
+                            <span>{isExpanded ? "Show less" : "Show more"}</span>
+                            <span className={`gc-user-message-toggle-icon${isExpanded ? " gc-user-message-toggle-icon-expanded" : ""}`}>
+                              <ChevronDown size={15} />
+                            </span>
+                          </button>
+                        )}
+                      </>
+                    );
+                  })()}
 
                   {/* Hover Copy Button */}
                   {msg.text && (

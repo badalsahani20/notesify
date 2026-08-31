@@ -15,6 +15,10 @@ interface PanelState {
   /** Editor AI Assistant panel. */
   isAiPanelOpen: boolean;
   setAiPanelOpen: (open: boolean) => void;
+
+  /** Global Search Command Palette modal. */
+  isSearchOpen: boolean;
+  setSearchOpen: (open: boolean) => void;
 }
 
 export const usePanelStore = create<PanelState>((set) => ({
@@ -29,4 +33,7 @@ export const usePanelStore = create<PanelState>((set) => ({
 
   isAiPanelOpen: false,
   setAiPanelOpen: (open) => set({ isAiPanelOpen: open }),
+
+  isSearchOpen: false,
+  setSearchOpen: (open) => set({ isSearchOpen: open }),
 }));

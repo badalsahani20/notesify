@@ -69,7 +69,7 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
   imageDisabled: false,
   useReasoning: false, 
   useWebSearch: false,
-  chatMode: "study",
+  chatMode: "casual",
 
   fetchSessions: async () => {
     set({ sessionsLoading: true });

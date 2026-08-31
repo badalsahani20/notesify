@@ -1,62 +1,59 @@
-"use client";
-
-import { useEffect, useRef, useCallback } from "react";
-import { useState } from "react";
-import { cn } from "@/lib/utils";
-import {
+import React, { useRef, useEffect, useCallback, useState } from "react";
+import { 
+    ArrowUpIcon, 
+    Paperclip, 
+    Command, 
+    XIcon, 
+    LoaderIcon,
     FileText,
     BrainCircuit,
-    Search,
-    ArrowUpIcon,
-    Paperclip,
-    XIcon,
-    LoaderIcon,
-    Command,
+    Search
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import * as React from "react"
+import { cn } from "@/lib/utils";
 
 interface UseAutoResizeTextareaProps {
     minHeight: number;
     maxHeight?: number;
+    value?: string;
+    textareaRef?: React.RefObject<HTMLTextAreaElement | null>;
 }
 
 function useAutoResizeTextarea({
-    minHeight,
-    maxHeight,
+    minHeight = 52,
+    maxHeight = 200,
+    value,
+    textareaRef: externalRef,
 }: UseAutoResizeTextareaProps) {
-    const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const internalRef = useRef<HTMLTextAreaElement>(null);
+    const textareaRef = externalRef || internalRef;
 
     const adjustHeight = useCallback(
         (reset?: boolean) => {
             const textarea = textareaRef.current;
             if (!textarea) return;
 
-            if (reset) {
+            if (reset || !textarea.value) {
                 textarea.style.height = `${minHeight}px`;
+                textarea.style.overflowY = "hidden";
                 return;
             }
 
-            textarea.style.height = `${minHeight}px`;
-            const newHeight = Math.max(
-                minHeight,
-                Math.min(
-                    textarea.scrollHeight,
-                    maxHeight ?? Number.POSITIVE_INFINITY
-                )
-            );
+            // Reset to 0px temporarily to calculate accurate content scrollHeight
+            textarea.style.height = "0px";
+            const scrollHeight = textarea.scrollHeight;
+            const limit = maxHeight ?? 200;
+            const nextHeight = Math.max(minHeight, Math.min(scrollHeight, limit));
 
-            textarea.style.height = `${newHeight}px`;
+            textarea.style.height = `${nextHeight}px`;
+            textarea.style.overflowY = scrollHeight > limit ? "auto" : "hidden";
         },
-        [minHeight, maxHeight]
+        [minHeight, maxHeight, textareaRef]
     );
 
     useEffect(() => {
-        const textarea = textareaRef.current;
-        if (textarea) {
-            textarea.style.height = `${minHeight}px`;
-        }
-    }, [minHeight]);
+        adjustHeight();
+    }, [adjustHeight, value]);
 
     useEffect(() => {
         const handleResize = () => adjustHeight();
@@ -83,52 +80,24 @@ interface TextareaProps
 
 const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
   ({ className, containerClassName, showRing = true, ...props }, ref) => {
-    const [isFocused, setIsFocused] = React.useState(false);
-    
     return (
-      <div className={cn(
-        "relative",
-        containerClassName
-      )}>
+      <div className={cn("relative w-full", containerClassName)}>
         <textarea
           className={cn(
-            "flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm",
-            "transition-all duration-200 ease-in-out",
-            "placeholder:text-muted-foreground",
+            "w-full rounded-md bg-transparent px-3 py-2 text-sm text-white/90",
+            "placeholder:text-white/30",
             "disabled:cursor-not-allowed disabled:opacity-50",
-            showRing ? "focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0" : "",
+            showRing ? "focus-visible:outline-none focus-visible:ring-0" : "",
             className
           )}
           ref={ref}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
           {...props}
         />
-        
-        {showRing && isFocused && (
-          <motion.span 
-            className="absolute inset-0 rounded-md pointer-events-none ring-2 ring-offset-0 ring-violet-500/30"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-          />
-        )}
-
-        {props.onChange && (
-          <div 
-            className="absolute bottom-2 right-2 opacity-0 w-2 h-2 bg-violet-500 rounded-full"
-            style={{
-              animation: 'none',
-            }}
-            id="textarea-ripple"
-          />
-        )}
       </div>
-    )
+    );
   }
-)
-Textarea.displayName = "Textarea"
+);
+Textarea.displayName = "Textarea";
 
 export interface AnimatedAIChatProps {
   value: string;
@@ -139,7 +108,7 @@ export interface AnimatedAIChatProps {
   onStop?: () => void;
   attachments?: React.ReactNode;
   extraActionButtons?: React.ReactNode;
-  textareaRef?: React.RefObject<HTMLTextAreaElement>;
+  textareaRef?: React.RefObject<HTMLTextAreaElement | null>;
   placeholder?: string;
   showHeading?: boolean;
   commands?: CommandSuggestion[];
@@ -149,7 +118,7 @@ export function AnimatedAIChat({
   value,
   onChange,
   onSubmit,
-  isTyping,
+  isTyping = false,
   onAttachClick,
   onStop,
   attachments,
@@ -161,13 +130,13 @@ export function AnimatedAIChat({
 }: AnimatedAIChatProps) {
     const [activeSuggestion, setActiveSuggestion] = useState<number>(-1);
     const [showCommandPalette, setShowCommandPalette] = useState(false);
-    const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
-    const { textareaRef: internalTextareaRef, adjustHeight } = useAutoResizeTextarea({
-        minHeight: 60,
+
+    const { textareaRef, adjustHeight } = useAutoResizeTextarea({
+        minHeight: 52,
         maxHeight: 200,
+        value,
+        textareaRef: externalTextareaRef,
     });
-    const textareaRef = (externalTextareaRef as any) || internalTextareaRef;
-    const [inputFocused, setInputFocused] = useState(false);
     const commandPaletteRef = useRef<HTMLDivElement>(null);
 
     const defaultCommands: CommandSuggestion[] = [
@@ -188,48 +157,26 @@ export function AnimatedAIChat({
             label: "Search", 
             description: "Search globally across all notes", 
             prefix: "/search" 
-        },
+        }
     ];
 
     const commandSuggestions = commands || defaultCommands;
 
     useEffect(() => {
-        if (value.startsWith('/') && !value.includes(' ')) {
+        if (value.startsWith('/')) {
             setShowCommandPalette(true);
-            
-            const matchingSuggestionIndex = commandSuggestions.findIndex(
-                (cmd) => cmd.prefix.startsWith(value)
-            );
-            
-            if (matchingSuggestionIndex >= 0) {
-                setActiveSuggestion(matchingSuggestionIndex);
-            } else {
-                setActiveSuggestion(-1);
-            }
         } else {
             setShowCommandPalette(false);
         }
     }, [value]);
 
     useEffect(() => {
-        const handleMouseMove = (e: MouseEvent) => {
-            setMousePosition({ x: e.clientX, y: e.clientY });
-        };
-
-        window.addEventListener('mousemove', handleMouseMove);
-        return () => {
-            window.removeEventListener('mousemove', handleMouseMove);
-        };
-    }, []);
-
-    useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            const target = event.target as Node;
-            const commandButton = document.querySelector('[data-command-button]');
-            
-            if (commandPaletteRef.current && 
-                !commandPaletteRef.current.contains(target) && 
-                !commandButton?.contains(target)) {
+            if (
+                commandPaletteRef.current && 
+                !commandPaletteRef.current.contains(event.target as Node) &&
+                !(event.target as HTMLElement).closest('[data-command-button]')
+            ) {
                 setShowCommandPalette(false);
             }
         };
@@ -252,7 +199,7 @@ export function AnimatedAIChat({
                 setActiveSuggestion(prev => 
                     prev > 0 ? prev - 1 : commandSuggestions.length - 1
                 );
-            } else if (e.key === 'Tab' || e.key === 'Enter') {
+            } else if (e.key === 'Tab' || (e.key === 'Enter' && activeSuggestion >= 0)) {
                 e.preventDefault();
                 if (activeSuggestion >= 0) {
                     const selectedCommand = commandSuggestions[activeSuggestion];
@@ -334,7 +281,7 @@ export function AnimatedAIChat({
                     )}
 
                     <motion.div 
-                        className="relative backdrop-blur-2xl bg-white/[0.02] rounded-2xl border border-white/[0.05] shadow-2xl"
+                        className="relative backdrop-blur-2xl bg-[#14141a]/90 rounded-xl border border-white/10 shadow-2xl p-2.5 space-y-2"
                         initial={{ scale: 0.98 }}
                         animate={{ scale: 1 }}
                         transition={{ delay: 0.1 }}
@@ -378,7 +325,7 @@ export function AnimatedAIChat({
                             )}
                         </AnimatePresence>
 
-                        <div className="p-4 pb-0">
+                        <div className="px-1 pt-0.5">
                             <Textarea
                                 ref={textareaRef}
                                 value={value}
@@ -387,48 +334,43 @@ export function AnimatedAIChat({
                                     adjustHeight();
                                 }}
                                 onKeyDown={handleKeyDown}
-                                onFocus={() => setInputFocused(true)}
-                                onBlur={() => setInputFocused(false)}
                                 placeholder={placeholder}
                                 containerClassName="w-full"
                                 className={cn(
-                                    "w-full px-2 py-2",
+                                    "w-full px-2 py-1.5",
                                     "resize-none",
                                     "bg-transparent",
                                     "border-none",
-                                    "text-white/90 text-sm",
+                                    "text-white/90 text-sm leading-relaxed",
                                     "focus:outline-none",
-                                    "placeholder:text-white/20",
-                                    "min-h-[60px]"
+                                    "placeholder:text-white/30",
+                                    "min-h-[52px]",
+                                    "max-h-[200px]",
+                                    "max-sm:max-h-[160px]",
+                                    "custom-scrollbar"
                                 )}
-                                style={{
-                                    overflow: "hidden",
-                                }}
                                 showRing={false}
                             />
                         </div>
 
                         {attachments && (
-                            <div className="px-4 pb-2">
+                            <div className="px-2 pb-1">
                                 {attachments}
                             </div>
                         )}
 
-                        <div className="p-3 border-t border-white/[0.05] flex items-center justify-between gap-4">
-                            <div className="flex items-center gap-2">
+                        <div className="pt-2 border-t border-white/[0.06] flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-1.5 flex-wrap">
                                 {onAttachClick && (
                                     <motion.button
                                         type="button"
                                         onClick={onAttachClick}
                                         whileTap={{ scale: 0.94 }}
-                                        className="p-2 text-white/40 hover:text-white/90 rounded-lg transition-colors relative group"
-                                        title="Attach file"
+                                        className="px-2.5 py-1 text-white/50 hover:text-white hover:bg-white/10 rounded-md transition-colors flex items-center gap-1.5 text-xs font-medium cursor-pointer relative group"
+                                        title="Attach file (image or PDF)"
                                     >
-                                        <Paperclip className="w-4 h-4" />
-                                        <motion.span
-                                            className="absolute inset-0 bg-white/[0.05] rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
-                                            layoutId="button-highlight"
-                                        />
+                                        <Paperclip className="w-3.5 h-3.5" />
+                                        <span>Attach</span>
                                     </motion.button>
                                 )}
                                 <motion.button
@@ -440,19 +382,16 @@ export function AnimatedAIChat({
                                     }}
                                     whileTap={{ scale: 0.94 }}
                                     className={cn(
-                                        "p-2 text-white/40 hover:text-white/90 rounded-lg transition-colors relative group",
+                                        "px-2.5 py-1 text-white/50 hover:text-white hover:bg-white/10 rounded-md transition-colors flex items-center gap-1.5 text-xs font-medium cursor-pointer relative group",
                                         showCommandPalette && "bg-white/10 text-white/90"
                                     )}
-                                    title="Commands"
+                                    title="Quick AI Commands"
                                 >
-                                    <Command className="w-4 h-4" />
-                                    <motion.span
-                                        className="absolute inset-0 bg-white/[0.05] rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
-                                        layoutId="button-highlight"
-                                    />
+                                    <Command className="w-3.5 h-3.5" />
+                                    <span>Tools</span>
                                 </motion.button>
-                                
-                                <div className="h-4 w-px bg-white/10 mx-1"></div>
+
+                                <div className="h-3.5 w-px bg-white/10 mx-0.5"></div>
                                 {extraActionButtons}
                             </div>
                             
@@ -462,7 +401,7 @@ export function AnimatedAIChat({
                                     onClick={onStop}
                                     whileHover={{ scale: 1.05 }}
                                     whileTap={{ scale: 0.95 }}
-                                    className="p-2 rounded-lg text-white hover:text-red-400 bg-white/5 hover:bg-red-400/10 transition-colors"
+                                    className="p-1.5 rounded-lg text-white hover:text-red-400 bg-white/5 hover:bg-red-400/10 transition-colors"
                                     title="Stop generating"
                                 >
                                     <XIcon className="w-4 h-4" />
@@ -471,16 +410,16 @@ export function AnimatedAIChat({
                                 <motion.button
                                     type="button"
                                     onClick={handleSendMessage}
-                                    whileHover={{ scale: 1.01 }}
-                                    whileTap={{ scale: 0.98 }}
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.95 }}
                                     disabled={isTyping || (!value.trim() && !attachments)}
                                     className={cn(
-                                        "px-4 py-2 rounded-lg text-sm font-medium transition-all",
-                                        "flex items-center gap-2",
+                                        "w-8 h-8 rounded-lg transition-all flex items-center justify-center cursor-pointer shrink-0",
                                         value.trim() || attachments
-                                            ? "bg-white text-[#0A0A0B] shadow-lg shadow-white/10"
-                                            : "bg-white/[0.05] text-white/40"
+                                            ? "bg-white text-black shadow-md hover:bg-white/90"
+                                            : "bg-white/5 text-white/30 cursor-not-allowed"
                                     )}
+                                    title="Send message"
                                 >
                                     {isTyping ? (
                                         <LoaderIcon className="w-4 h-4 animate-[spin_2s_linear_infinite]" />
@@ -493,41 +432,6 @@ export function AnimatedAIChat({
                     </motion.div>
                 </motion.div>
             </div>
-
-
-
-            {inputFocused && showHeading && (
-                <motion.div 
-                    className="fixed w-[50rem] h-[50rem] rounded-full pointer-events-none z-0 opacity-[0.02] bg-gradient-to-r from-violet-500 via-fuchsia-500 to-indigo-500 blur-[96px]"
-                    animate={{
-                        x: mousePosition.x - 400,
-                        y: mousePosition.y - 400,
-                    }}
-                    transition={{
-                        type: "spring",
-                        damping: 25,
-                        stiffness: 150,
-                        mass: 0.5,
-                    }}
-                />
-            )}
         </div>
     );
 }
-
-
-
-const rippleKeyframes = `
-@keyframes ripple {
-  0% { transform: scale(0.5); opacity: 0.6; }
-  100% { transform: scale(2); opacity: 0; }
-}
-`;
-
-if (typeof document !== 'undefined') {
-    const style = document.createElement('style');
-    style.innerHTML = rippleKeyframes;
-    document.head.appendChild(style);
-}
-
-

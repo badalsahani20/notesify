@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import type { ReactNode, RefObject } from "react";
-import { X, FileText, Lightbulb, Globe, Search, BrainCircuit, MessageSquare } from "lucide-react";
+import { X, FileText, Lightbulb, Globe, Search, BrainCircuit, GraduationCap } from "lucide-react";
 import { toast } from "sonner";
 import { AnimatedAIChat } from "@/components/ui/animated-ai-chat";
 import { motion } from "framer-motion";
@@ -166,14 +166,29 @@ export const GlobalChatCompose = ({
   const renderExtraButtons = () => {
     return (
       <>
+        <button
+          type="button"
+          onClick={() => {
+            const nextMode = chatMode === "study" ? "casual" : "study";
+            setChatMode(nextMode);
+            toast.success(`Switched to ${nextMode === "study" ? "Study" : "Casual"} Mode`);
+          }}
+          className={`px-2.5 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer text-xs font-medium ${chatMode === "study" ? 'text-primary bg-primary/10 border border-primary/20' : 'text-white/40 hover:text-white/90 hover:bg-white/5'}`}
+          title={chatMode === "study" ? "Study Mode Active — Teaching models enabled" : "Enable Study Mode"}
+        >
+          <GraduationCap className="w-3.5 h-3.5" />
+          <span>Study</span>
+        </button>
+
         {setUseWebSearch && (
           <button
             type="button"
             onClick={() => setUseWebSearch(!useWebSearch)}
-            className={`p-2 rounded-lg transition-colors flex items-center justify-center ${useWebSearch ? 'text-primary bg-primary/10' : 'text-white/40 hover:text-white/90'}`}
-            title={useWebSearch ? "Disable Web Search" : "Enable Web Search"}
+            className={`px-2.5 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer text-xs font-medium ${useWebSearch ? 'text-primary bg-primary/10 border border-primary/20' : 'text-white/40 hover:text-white/90 hover:bg-white/5'}`}
+            title={useWebSearch ? "Web Search Enabled — Iris searches real-time web sources" : "Enable Web Search"}
           >
-            <Globe className="w-4 h-4" />
+            <Globe className="w-3.5 h-3.5" />
+            <span>Web</span>
           </button>
         )}
         
@@ -181,10 +196,11 @@ export const GlobalChatCompose = ({
           <button
             type="button"
             onClick={() => setUseReasoning(!useReasoning)}
-            className={`p-2 rounded-lg transition-colors flex items-center justify-center ${useReasoning ? 'text-primary bg-primary/10' : 'text-white/40 hover:text-white/90'}`}
-            title={useReasoning ? "Disable Thinking" : "Enable Thinking"}
+            className={`px-2.5 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer text-xs font-medium ${useReasoning ? 'text-primary bg-primary/10 border border-primary/20' : 'text-white/40 hover:text-white/90 hover:bg-white/5'}`}
+            title={useReasoning ? "Thinking Enabled — Iris performs deep step-by-step reasoning" : "Enable Thinking"}
           >
-            <Lightbulb className="w-4 h-4" />
+            <Lightbulb className="w-3.5 h-3.5" />
+            <span>Thinking</span>
           </button>
         )}
       </>
@@ -223,16 +239,6 @@ export const GlobalChatCompose = ({
         }}
         extraActionButtons={renderExtraButtons()}
         commands={[
-          {
-            icon: chatMode === "study" ? <MessageSquare className="w-4 h-4" /> : <BrainCircuit className="w-4 h-4" />,
-            label: chatMode === "study" ? "Switch to Casual Chat" : "Switch to Study Mode",
-            description: `Currently in ${chatMode} mode`,
-            prefix: chatMode === "study" ? "/casual" : "/study",
-            onSelect: () => {
-              setChatMode(chatMode === "study" ? "casual" : "study");
-              toast.success(`Switched to ${chatMode === "study" ? "Casual" : "Study"} Mode`);
-            }
-          },
           { 
               icon: <FileText className="w-4 h-4" />, 
               label: "Summarize", 

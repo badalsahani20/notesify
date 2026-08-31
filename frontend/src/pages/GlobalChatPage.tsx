@@ -55,13 +55,14 @@ const GlobalChatPage = () => {
 
 
   const handleSend = () => {
-    const text = input.trim();
-    if (!text && !attachedImage) return;
+    // Keep the submitted Markdown exactly as authored. Only use trim() to
+    // decide whether the composer is empty; it must not rewrite the payload.
+    if (!input.trim() && !attachedImage) return;
     setInput("");
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
-    sendMessage(text, attachedImage);
+    sendMessage(input, attachedImage);
   };
 
   return (
@@ -78,7 +79,7 @@ const GlobalChatPage = () => {
       />
 
       {/* ── Main chat area ── */}
-      <div className="gc-main relative">
+      <div className="gc-main relative flex-1 flex flex-col h-full min-h-0 min-w-0 overflow-hidden">
         {/* Dim moving purplish gradient background */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
           <div className="absolute top-[10%] left-[10%] w-[300px] h-[300px] rounded-full bg-violet-600/10 blur-[80px] animate-blob-drift" style={{ animationDuration: '8s' }} />
