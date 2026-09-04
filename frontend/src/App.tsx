@@ -10,6 +10,7 @@ import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import VerifyEmailPage from "./pages/VerifyEmailPage";
 import { WebSyncTriggers } from "./services/WebSyncTriggers";
+import { useAuthStore } from "./store/useAuthStore";
 
 // Lazy-loaded components
 const NoteEditor = lazy(() => import("./pages/NoteEditor"));
@@ -27,10 +28,13 @@ import WelcomeLoader from "./components/ui/WelcomeLoader";
 const RouteLoader = () => <WelcomeLoader />;
 
 function App() {
-    useEffect(() => {
+  const authChecked = useAuthStore((state) => state.authChecked);
+
+  useEffect(() => {
+    if (!authChecked) return;
     WebSyncTriggers.start();
     return () => WebSyncTriggers.stop();
-  }, []);
+  }, [authChecked]);
 
 
   return (

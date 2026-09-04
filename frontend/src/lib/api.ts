@@ -13,6 +13,7 @@ const api = axios.create({
 });
 
 let refreshPromise: Promise<string> | null = null;
+const SESSION_REFRESH_TIMEOUT_MS = 5000;
 
 export const requestSessionRefresh = async () => {
   if (!refreshPromise) {
@@ -29,7 +30,7 @@ export const requestSessionRefresh = async () => {
         .post(
           `${import.meta.env.VITE_API_URL}/users/refresh`,
           {},
-          config
+          { ...config, timeout: SESSION_REFRESH_TIMEOUT_MS }
         )
         .then(async (res) => {
           const { user, accessToken, refreshToken } = res.data;

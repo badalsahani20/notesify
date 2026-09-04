@@ -16,15 +16,6 @@ export default defineConfig({
       output: {
         manualChunks: {
           'vendor': ['react', 'react-dom', 'react-router-dom', 'framer-motion', 'lucide-react', 'sonner'],
-          'tiptap': [
-            '@tiptap/react', 
-            '@tiptap/starter-kit', 
-            '@tiptap/extension-table', 
-            '@tiptap/extension-bubble-menu',
-            '@tiptap/extension-code-block-lowlight'
-          ],
-          'viz': ['mermaid', 'chart.js', 'katex'],
-          'lowlight': ['lowlight']
         }
       }
     },

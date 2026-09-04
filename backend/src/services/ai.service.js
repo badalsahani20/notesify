@@ -11,15 +11,16 @@ import { parseIrisResponse } from "../utils/parseIrisResponse.js";
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ model: "gemma-4-26b-a4b-it" });
 
-export const PRIMARY_MODEL = "deepseek/deepseek-v4-flash";
+export const PRIMARY_MODEL = "deepseek/deepseek-v4-flash-0731";
 export const TEACHING_MODELS = [
   "inclusionai/ling-2.6-1t",
-  "deepseek/deepseek-v4-flash",
+  "deepseek/deepseek-v4-flash-0731",
 ];
 export const DEFAULT_CHAT_MODEL = "z-ai/glm-5.3-flash";
 export const QUICK_MODEL = "inclusionai/ling-2.6-flash";
 export const COMPLEX_ANALYSIS_MODEL = "inclusionai/ling-2.6-1t";
-export const VISUALIZATION_MODEL = "qwen/qwen3.7-flash";
+export const VISUALIZATION_MODEL = "z-ai/glm-5.3-flash";
+export const VISUALIZATION_FALLBACK_MODEL = "qwen/qwen3.7-flash";
 export const NOTES_GENERATION_MODEL = "openai/gpt-oss-120b";
 
 const FALLBACK_MODEL = "llama-3.3-70b-versatile";
@@ -39,11 +40,10 @@ const getOpenRouterApiKey = () =>
 const ensureAiApiKey = () => {
   if (
     !process.env.GEMINI_API_KEY &&
-    !getOpenRouterApiKey() &&
-    !process.env.QWEN_API
+    !getOpenRouterApiKey()
   ) {
     throw new Error(
-      `No AI provider API keys configured (GEMINI, OPENROUTER, or QWEN)`,
+      `No AI provider API keys configured (GEMINI or OPENROUTER)`,
     );
   }
 };
@@ -64,13 +64,9 @@ export const executeOpenRouter = async (
   maxTokens = 5000,
   tools = null,
 ) => {
-  const isQwenModel = modelId.toLowerCase().includes("qwen");
-  const apiKey =
-    isQwenModel && process.env.QWEN_API
-      ? process.env.QWEN_API
-      : getOpenRouterApiKey();
+  const apiKey = getOpenRouterApiKey();
 
-  if (!apiKey) throw new Error("No OpenRouter or Qwen API Key found");
+  if (!apiKey) throw new Error("No OpenRouter API Key found");
 
   const isReasoningModel =
     modelId.toLowerCase().includes("r1") ||
@@ -314,8 +310,8 @@ const generateContentWithFallback = async (prompt, stream = true) => {
     }
   }
 
-  // 3) QWEN (via OpenRouter when QWEN_API is present)
-  if (process.env.QWEN_API) {
+  // 3) QWEN (via OpenRouter)
+  if (getOpenRouterApiKey()) {
     try {
       return await executeOpenRouter(VISUALIZATION_MODEL, message, stream);
     } catch (err) {
@@ -495,16 +491,17 @@ const getAiReply = async (
 
   if (getOpenRouterApiKey()) {
     try {
-      console.log(`Attempting Tier 2: OpenRouter (${PRIMARY_MODEL})`);
+      const tier2Model = isVisualConvo ? VISUALIZATION_FALLBACK_MODEL : PRIMARY_MODEL;
+      console.log(`Attempting Tier 2: OpenRouter (${tier2Model})`);
       const reply = await executeOpenRouter(
-        PRIMARY_MODEL,
+        tier2Model,
         messages,
         stream,
-        useReasoning, // DeepSeek V4 supports reasoning
+        useReasoning,
         5000,
         tools,
       );
-      console.log(`Chat answered by ${PRIMARY_MODEL} (Tier 2)`);
+      console.log(`Chat answered by ${tier2Model} (Tier 2)`);
       return reply;
     } catch (error) {
       console.warn("⚠️ TIER 2 (OpenRouter) FAILED:", error.message);

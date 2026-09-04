@@ -1,7 +1,6 @@
 import Notes from "../models/notes.model.js";
 import { getWelcomeNote } from "../utils/welcomeNote.js";
 import { nanoid } from "nanoid";
-// import { $regex } from "sift";
 // Bypasses the Mongoose pre('find') hook while matching missing fields on old docs
 const ANY_ARCHIVE_STATE = { $in: [true, false, null] };
 
@@ -29,14 +28,6 @@ export const createNewNote = async (userId, noteData) => {
 export const createWelcomeNote = async (userId) => {
     const welcomeNote = getWelcomeNote();
     return await createNewNote(userId, welcomeNote);
-};
-
-export const updateNoteById = async (noteId, userId, updateData, clientVersion) => {
-    return await Notes.findOneAndUpdate(
-        { _id: noteId, user: userId, version: clientVersion, isDeleted: { $ne: true }, isArchived: ANY_ARCHIVE_STATE },
-        { $set: updateData, $inc: {version: 1}},
-        {new: true}
-    );
 };
 
 export const updateNoteWithVersionCheck = async (

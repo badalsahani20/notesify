@@ -12,7 +12,6 @@ export const searchMemories = async (userId, queryText, precomputedEmbedding = n
         const queryEmbedding = precomputedEmbedding || await generateEmbedding(queryText);
         if (!queryEmbedding) return [];
 
-        // Atlas Vector Search aggregation pipeline
         const pipeline = [
             {
                 $vectorSearch: {
