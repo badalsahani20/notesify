@@ -1,5 +1,5 @@
 import "katex/dist/katex.min.css";
-import { ChevronRight, ChevronDown, FileText, Search, Globe, Check, Copy } from "lucide-react";
+import { ChevronRight, ChevronDown, Check, Copy, Globe } from "lucide-react";
 import { GlobalChatEmptyState } from "@/components/chat/GlobalChatEmptyState";
 import type { Message } from "@/components/ai/types";
 import IrisMessageBody from "./IrisMessageBody";
@@ -310,112 +310,168 @@ export const GlobalChatMessages = ({
           const isThinking = (msg as any).isThinking ?? false;
           const thinkingTime = (msg as any).thinkingTime as number | undefined;
           const thought = (msg as any).thought as string | undefined;
-          const toolCalls = (msg as any).toolCalls as Array<{ tool: string }> | undefined;
+          const toolCalls = (msg as any).toolCalls as Array<{ tool: string; query?: string; url?: string; citations?: any[]; quizData?: any[] }> | undefined;
+          const isWorking = (isActiveStream && (isStreaming || isSending)) || isThinking;
+
+          // Filter out active web activities for quiet telemetry
+          const webActivities = (toolCalls ?? []).filter((tc) =>
+            ["search_web", "crawl_url", "get_note_content"].includes(tc.tool)
+          );
+
+          // Extract deduplicated citations for sources list
+          const citations = (() => {
+            const list: any[] = [];
+            const seen = new Set<string>();
+            toolCalls?.forEach((tc: any) => {
+              if (tc.tool === "web_citations" && Array.isArray(tc.citations)) {
+                for (const c of tc.citations) {
+                  if (c?.url && !seen.has(c.url.trim().toLowerCase())) {
+                    seen.add(c.url.trim().toLowerCase());
+                    list.push(c);
+                  }
+                }
+              }
+            });
+            return list;
+          })();
 
           return (
             <div key={msg.id} className={`gc-msg gc-msg-${msg.role}`}>
               {msg.role === "assistant" ? (
-                <>
-                  {/* ── Pure waiting state: pill only, no bubble wrapper ── */}
-                  {isThinking && !displayText && !thought ? (
-                    toolCalls && toolCalls.filter(tc => !["search_notes", "render_quiz"].includes(tc.tool)).length > 0 ? (
-                      <div className="flex flex-col gap-2 mb-2">
-                        {toolCalls.filter(tc => !["search_notes", "render_quiz"].includes(tc.tool)).map((tc, idx) => {
-                          let label = "Working...";
-                          let icon = <Globe size={14} className="iris-search-indicator-icon" />;
-                          if (tc.tool === "search_web") {
-                            label = "Searching the web...";
-                            icon = <Search size={14} className="iris-search-indicator-icon animate-pulse" />;
-                          } else if (tc.tool === "crawl_url") {
-                            label = "Reading webpage...";
-                            icon = <Globe size={14} className="iris-search-indicator-icon animate-pulse" />;
-                          } else if (tc.tool === "get_note_content") {
-                            label = "Reading note...";
-                            icon = <FileText size={14} className="iris-search-indicator-icon animate-pulse" />;
-                          } else if (tc.tool === "save_memory") {
-                            label = "Saving to memory...";
-                            icon = <Check size={14} className="iris-search-indicator-icon animate-pulse text-emerald-500" />;
-                          }
-                          return (
-                            <div key={idx} className="iris-search-indicator-pulse">
-                              {icon}
-                              <span>{label}</span>
+                <div className="gc-msg-bubble gc-msg-bubble-ai">
+                  {/* Web Activity Telemetry (Both Active Streaming & Completed Messages) */}
+                      {(webActivities.length > 0 || citations.length > 0) && (
+                        <div className="flex flex-col gap-1.5 mb-3 pb-2.5 border-b border-white/5">
+                          {webActivities.length > 0 ? (
+                            webActivities.map((tc, idx) => {
+                              const isSearch = tc.tool === "search_web";
+                              const isCrawl = tc.tool === "crawl_url";
+                              const target = tc.query || tc.url || "";
+                              const actionLabel = isWorking
+                                ? (isSearch ? "Searching the web" : isCrawl ? "Reading webpage" : "Reading note")
+                                : (isSearch ? "Searched the web" : isCrawl ? "Read webpage" : "Read note");
+
+                              return (
+                                <div key={idx} className="flex flex-col gap-0.5">
+                                  <div className="flex items-center gap-2 text-xs text-neutral-300 font-medium">
+                                    {isWorking ? (
+                                      <span className="iris-telemetry-dot text-emerald-400" />
+                                    ) : (
+                                      <Globe className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                                    )}
+                                    <span>{actionLabel}</span>
+                                    {target && (
+                                      <span className="text-neutral-400 font-normal">
+                                        for <span className="font-mono text-neutral-200 text-[11px]">"{target}"</span>
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })
+                          ) : (
+                            <div className="flex items-center gap-2 text-xs text-neutral-300 font-medium">
+                              <Globe className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                              <span>Searched the web</span>
                             </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <ThinkingWidget isThinking={true} isReasoningOff={!useReasoning} />
-                    )
-                  ) : (
-                    <div className="gc-msg-bubble gc-msg-bubble-ai">
-                      {/* 1. Premium completed tool badges (Top) */}
-                      {toolCalls && toolCalls.filter(tc => !["search_notes", "render_quiz"].includes(tc.tool)).length > 0 && (
-                        <div className="flex flex-col gap-1.5 mb-2">
-                          {toolCalls.filter(tc => !["search_notes", "render_quiz"].includes(tc.tool)).map((tc, idx) => {
-                            let label = tc.tool;
-                            let icon = <Globe size={12} className="text-emerald-500" />;
-                            if (tc.tool === "search_web") {
-                              label = "Searched the web";
-                              icon = <Search size={12} className="text-emerald-500" />;
-                            } else if (tc.tool === "crawl_url") {
-                              label = "Read webpage";
-                              icon = <Globe size={12} className="text-emerald-500" />;
-                            } else if (tc.tool === "get_note_content") {
-                              label = "Read note";
-                              icon = <FileText size={12} className="text-emerald-500" />;
-                            } else if (tc.tool === "save_memory") {
-                              label = "Saved to memory";
-                              icon = <Check size={12} className="text-emerald-500" />;
-                            }
-                            return (
-                              <div key={idx} className="iris-search-complete-badge">
-                                <Check size={12} className="text-emerald-500" />
-                                <span className="flex items-center gap-1">
-                                  {icon}
-                                  {label}
-                                </span>
-                              </div>
-                            );
-                          })}
+                          )}
                         </div>
                       )}
 
                       {/* 2. Done badge or Active thought (Middle) */}
-                      {(thinkingTime || thought) && (
+                      {(thinkingTime || thought || (isWorking && !displayText && webActivities.length === 0)) && (
                         <ThinkingWidget
-                          isThinking={isThinking}
+                          isThinking={isThinking || (isWorking && !displayText)}
                           thinkingTime={thinkingTime}
                           thought={thought}
+                          isReasoningOff={!useReasoning}
                         />
                       )}
 
                       {/* 3. Message content (Bottom) */}
-                      <div
-                        className="gc-markdown max-w-full focus:outline-none"
-                        contentEditable={true}
-                        suppressContentEditableWarning={true}
-                        spellCheck={false}
-                        autoCorrect="off"
-                        data-ms-editor="false"
-                        onBeforeInput={(e) => e.preventDefault()}
-                        onKeyDown={(e) => {
-                          if (!(e.ctrlKey || e.metaKey)) {
-                            e.preventDefault();
-                          }
-                        }}
-                        onDrop={(e) => e.preventDefault()}
-                        onPaste={(e) => e.preventDefault()}
-                      >
-                        <IrisMessageBody
-                          segments={msg.segments ?? parseIrisResponse(displayText)}
-                          onAnswer={sendMessage}
-                        />
-                      </div>
+                      {displayText ? (
+                        <div
+                          className="gc-markdown max-w-full focus:outline-none"
+                          contentEditable={true}
+                          suppressContentEditableWarning={true}
+                          spellCheck={false}
+                          autoCorrect="off"
+                          data-ms-editor="false"
+                          onBeforeInput={(e) => e.preventDefault()}
+                          onKeyDown={(e) => {
+                            if (!(e.ctrlKey || e.metaKey)) {
+                              e.preventDefault();
+                            }
+                          }}
+                          onDrop={(e) => e.preventDefault()}
+                          onPaste={(e) => e.preventDefault()}
+                        >
+                          <IrisMessageBody
+                            segments={msg.segments ?? parseIrisResponse(displayText)}
+                            onAnswer={sendMessage}
+                          />
+                        </div>
+                      ) : isWorking && webActivities.length > 0 && !thought ? (
+                        <div className="flex items-center gap-2 text-xs text-neutral-400 py-1">
+                          <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                          <span className="italic">Scanning web sources...</span>
+                        </div>
+                      ) : null}
+
+                      {/* Sources UI (Minimal, understated, interactive links) */}
+                      {citations.length > 0 && (
+                        <div className="mt-3 pt-2.5 border-t border-white/5">
+                          <div className="text-[11px] font-medium text-neutral-400 uppercase tracking-wider mb-2">
+                            Sources
+                          </div>
+                          <div className="flex flex-wrap gap-2.5">
+                            {citations.map((c, i) => {
+                              let domain = "";
+                              try {
+                                domain = new URL(c.url).hostname.replace(/^www\./, "");
+                              } catch {
+                                domain = c.url;
+                              }
+                              const title = c.title || domain;
+                              return (
+                                <a
+                                  key={i}
+                                  href={c.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="iris-source-link group"
+                                  title={c.title || c.url}
+                                >
+                                  <img
+                                    src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`}
+                                    alt=""
+                                    className="w-3.5 h-3.5 rounded-sm shrink-0 opacity-70 group-hover:opacity-100 transition-opacity"
+                                    onError={(e) => {
+                                      (e.currentTarget as HTMLElement).style.display = "none";
+                                    }}
+                                  />
+                                  <span className="truncate max-w-[200px] text-neutral-300 group-hover:text-white transition-colors">
+                                    {title}
+                                  </span>
+                                  <span className="text-[10px] text-neutral-400 font-mono">
+                                    {domain}
+                                  </span>
+                                </a>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
 
                       {/* 4. Tools (Inline rendering) */}
                       {msg.toolCalls?.map((tc, idx) => {
-                        if (tc.tool === "search_web" || tc.tool === "crawl_url" || tc.tool === "save_memory") return null;
+                        if (
+                          tc.tool === "search_web" ||
+                          tc.tool === "crawl_url" ||
+                          tc.tool === "save_memory" ||
+                          tc.tool === "web_citations"
+                        )
+                          return null;
                         if (tc.tool === "render_quiz" && tc.quizData) {
                           return (
                             <InlineQuizManager
@@ -448,10 +504,8 @@ export const GlobalChatMessages = ({
                         </div>
                       )}
 
-                      {isActiveStream && isStreaming && <span className="gc-cursor" />}
+                      {isActiveStream && isStreaming && displayText && <span className="gc-cursor" />}
                     </div>
-                  )}
-                </>
               ) : (
                 <div className="gc-msg-bubble gc-msg-bubble-user group relative">
                   {msg.imageUrl && (

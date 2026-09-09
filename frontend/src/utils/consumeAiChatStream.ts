@@ -1,8 +1,17 @@
 import { SseStreamParser } from "@/utils/sseParser";
 
-type ToolCallEvent = {
+export type WebCitation = {
+  url: string;
+  title: string;
+  content?: string;
+};
+
+export type ToolCallEvent = {
   tool: string;
   quizData?: any;
+  query?: string;
+  url?: string;
+  citations?: WebCitation[];
 };
 
 type MetadataEvent = {
@@ -62,7 +71,13 @@ export const consumeAiChatStream = async (
       }
 
       if (data.type === "tool_call" && data.tool) {
-        onToolCall?.({ tool: data.tool, quizData: (data as any).quizData });
+        onToolCall?.({
+          tool: data.tool,
+          quizData: (data as any).quizData,
+          query: (data as any).query,
+          url: (data as any).url,
+          citations: (data as any).citations,
+        });
         continue;
       }
 

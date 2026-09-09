@@ -3,7 +3,7 @@ import { jest } from '@jest/globals';
 // Mock the AI service before importing the module under test
 jest.unstable_mockModule('../../src/services/ai.service.js', () => ({
   executeOpenRouter: jest.fn(),
-  QUICK_MODEL: 'inclusionai/ling-2.6-flash'
+  QUICK_MODEL: 'inclusionai/ling-3.0-flash'
 }));
 
 // Use dynamic import for ES module mocking

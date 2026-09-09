@@ -7,6 +7,7 @@ import { generateTitle } from "../services/title.service.js";
 import {
   checkGrammar,
   chatWithAi,
+  formatStructuredNoteContext,
   runAiAssist,
   getDynamicPrompts,
   performWebSearch,
@@ -18,8 +19,9 @@ import { stripHtml } from "../utils/stripHtml.js";
 import { parseIrisResponse } from "../utils/parseIrisResponse.js";
 import getEffectiveDailyLimit from "../utils/getEffectiveDailyLimit.js";
 import { SseStreamParser } from "../utils/sseParser.js";
-import { searchMemories } from "../services/memoryService.js";
-import { generateEmbedding } from "../services/embeddingService.js";
+import Memory from "../models/Memory.js";
+import { extractCleanSearchQuery } from "../services/ai/tools/searchQueryExtractor.js";
+import { summarizeHistory } from "../utils/summarizeHistory.js";
 
 const normalizeForHash = (text = "") => text.replace(/\s+/g, " ").trim();
 
@@ -321,7 +323,8 @@ const resolveSession = async (req) => {
   const isGlobalChat =
     !noteId &&
     typeof req.body.noteId === "undefined" &&
-    typeof req.body.noteContext === "undefined";
+    typeof req.body.noteContext === "undefined" &&
+    typeof req.body.structuredContext === "undefined";
 
   let session = null;
   let history = [];
@@ -352,7 +355,7 @@ const resolveSession = async (req) => {
     const newSession = await GlobalChatSession.create({
       user: req.user._id,
       messages: [],
-      chatMode: req.body.chatMode || "study",
+      chatMode: req.body.chatMode || "casual",
     });
     activeSessionId = newSession._id;
     activeSession = newSession;
@@ -408,7 +411,7 @@ const resolveNoteContext = async (
   req,
   { isGlobalChat, noteId, history, toolUsed },
 ) => {
-  const { noteContext: reqNoteContext, hasSelection, message, contextChanged } = req.body;
+  const { noteContext: reqNoteContext, structuredContext, hasSelection, message, contextChanged } = req.body;
   let noteContext = "";
   let noteFetched = false;
 
@@ -419,7 +422,9 @@ const resolveNoteContext = async (
   const shouldIncludeContext = !!isNoteQuery;
 
   if (shouldIncludeContext) {
-    if (reqNoteContext) {
+    if (structuredContext) {
+      noteContext = formatStructuredNoteContext(structuredContext);
+    } else if (reqNoteContext) {
       noteContext = hasSelection
         ? `[User specifically highlighted this text in their editor]:\n${reqNoteContext}`
         : `[user's current editor context]:\n${reqNoteContext}`;
@@ -450,7 +455,14 @@ const openSseConnection = (res, activeSessionId) => {
 };
 
 // Pipe OpenRouter SSE chunks to the client and accumulate the full reply
-const streamAiResponse = async (stream, res, noteFetched, userId) => {
+const streamAiResponse = async (
+  stream,
+  res,
+  noteFetched,
+  userId,
+  userMessage = "",
+  shouldSearchWeb = false
+) => {
   const decoder = new TextDecoder();
   let finalReply = "";
   const parser = new SseStreamParser();
@@ -458,7 +470,30 @@ const streamAiResponse = async (stream, res, noteFetched, userId) => {
   let memoryToolIndex = -1;
   let quizToolArgs = "";
   let quizToolIndex = -1;
+
+  // Web tools & citations tracking
+  const webSearchToolCalls = new Map(); // index -> { query, emitted, lastEmittedQuery }
+  const webFetchToolCalls = new Map(); // index -> { url, emitted, lastEmittedUrl }
+  const citationsMap = new Map(); // normalizedUrl -> { url, title, content }
   const toolCalls = [];
+
+  const cleanInitialQuery = extractCleanSearchQuery(userMessage);
+
+  // Immediately notify the client if web search is enabled for this turn
+  if (shouldSearchWeb) {
+    webSearchToolCalls.set(0, {
+      query: cleanInitialQuery,
+      emitted: true,
+      lastEmittedQuery: cleanInitialQuery,
+    });
+    res.write(
+      `data: ${JSON.stringify({
+        type: "tool_call",
+        tool: "search_web",
+        query: cleanInitialQuery,
+      })}\n\n`
+    );
+  }
 
   if (noteFetched) {
     res.write(
@@ -475,34 +510,166 @@ const streamAiResponse = async (stream, res, noteFetched, userId) => {
     for (const data of events) {
       const choice = data.choices?.[0];
 
-      // Intercept and detect tool calls delta
+      // Check if model emitted reasoning formulating a refined search query
+      if (choice?.delta?.reasoning) {
+        const r = choice.delta.reasoning;
+        const qMatch =
+          r.match(/(?:call\s+)?(?:openrouter_)?web_search.*?query\s*(?:is|as|=|:)?\s*["']([^"'\n]+)["']/i) ||
+          r.match(/query\s*:\s*["']([^"'\n]+)["']/i) ||
+          r.match(/searching\s+for\s+["']([^"'\n]+)["']/i);
+        if (qMatch && qMatch[1] && qMatch[1].trim().length > 2) {
+          const refined = qMatch[1].trim();
+          let state = webSearchToolCalls.get(0);
+          if (!state) {
+            state = { query: refined, emitted: true, lastEmittedQuery: refined };
+            webSearchToolCalls.set(0, state);
+          }
+          if (state.lastEmittedQuery !== refined) {
+            state.query = refined;
+            state.lastEmittedQuery = refined;
+            res.write(
+              `data: ${JSON.stringify({
+                type: "tool_call",
+                tool: "search_web",
+                query: refined,
+              })}\n\n`
+            );
+          }
+        }
+      }
+
+      // 1. Intercept choice annotations (citations)
+      if (choice?.delta?.annotations && Array.isArray(choice.delta.annotations)) {
+        let hasNewCitation = false;
+        for (const ann of choice.delta.annotations) {
+          if (ann?.type === "url_citation" && ann.url_citation?.url) {
+            const rawUrl = String(ann.url_citation.url).trim();
+            const normUrl = rawUrl.toLowerCase();
+            if (!citationsMap.has(normUrl)) {
+              citationsMap.set(normUrl, {
+                url: rawUrl,
+                title: ann.url_citation.title || "",
+                content: ann.url_citation.content || "",
+              });
+              hasNewCitation = true;
+            }
+          }
+        }
+        if (hasNewCitation) {
+          // If server tool executed without client delta.tool_calls, ensure search_web event was emitted
+          if (webSearchToolCalls.size === 0) {
+            const q = cleanInitialQuery || "web sources";
+            webSearchToolCalls.set(0, { query: q, emitted: true, lastEmittedQuery: q });
+            res.write(
+              `data: ${JSON.stringify({
+                type: "tool_call",
+                tool: "search_web",
+                query: q,
+              })}\n\n`
+            );
+          }
+
+          res.write(
+            `data: ${JSON.stringify({
+              type: "tool_call",
+              tool: "web_citations",
+              citations: Array.from(citationsMap.values()),
+            })}\n\n`
+          );
+        }
+      }
+
+      // 2. Intercept and detect tool calls delta
       if (choice?.delta?.tool_calls) {
         for (const tc of choice.delta.tool_calls) {
           const toolName = tc.function?.name;
+          const toolIndex = tc.index ?? 0;
+
           if (
             toolName === "openrouter:web_search" ||
-            toolName === "openrouter:web_fetch"
+            webSearchToolCalls.has(toolIndex)
           ) {
-            const normTool =
-              toolName === "openrouter:web_search" ? "search_web" : "crawl_url";
-            res.write(
-              `data: ${JSON.stringify({ type: "tool_call", tool: normTool })}\n\n`,
-            );
-          }else if(toolName === "generate_quiz"){
+            let state = webSearchToolCalls.get(toolIndex);
+            if (!state) {
+              state = { query: "", emitted: false, lastEmittedQuery: "" };
+              webSearchToolCalls.set(toolIndex, state);
+            }
+            if (tc.function?.arguments) {
+              state.query += tc.function.arguments;
+            }
+
+            let parsedQuery = "";
+            try {
+              if (state.query) {
+                const parsed = JSON.parse(state.query);
+                if (parsed.query) parsedQuery = parsed.query;
+              }
+            } catch (_) {
+              const qMatch = state.query.match(/"query"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"/);
+              if (qMatch) parsedQuery = qMatch[1];
+            }
+
+            if (!state.emitted || (parsedQuery && state.lastEmittedQuery !== parsedQuery)) {
+              state.emitted = true;
+              state.lastEmittedQuery = parsedQuery;
+              res.write(
+                `data: ${JSON.stringify({
+                  type: "tool_call",
+                  tool: "search_web",
+                  query: parsedQuery,
+                })}\n\n`,
+              );
+            }
+          } else if (
+            toolName === "openrouter:web_fetch" ||
+            webFetchToolCalls.has(toolIndex)
+          ) {
+            let state = webFetchToolCalls.get(toolIndex);
+            if (!state) {
+              state = { url: "", emitted: false, lastEmittedUrl: "" };
+              webFetchToolCalls.set(toolIndex, state);
+            }
+            if (tc.function?.arguments) {
+              state.url += tc.function.arguments;
+            }
+
+            let parsedUrl = "";
+            try {
+              if (state.url) {
+                const parsed = JSON.parse(state.url);
+                if (parsed.url) parsedUrl = parsed.url;
+              }
+            } catch (_) {
+              const uMatch = state.url.match(/"url"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"/);
+              if (uMatch) parsedUrl = uMatch[1];
+            }
+
+            if (!state.emitted || (parsedUrl && state.lastEmittedUrl !== parsedUrl)) {
+              state.emitted = true;
+              state.lastEmittedUrl = parsedUrl;
+              res.write(
+                `data: ${JSON.stringify({
+                  type: "tool_call",
+                  tool: "crawl_url",
+                  url: parsedUrl,
+                })}\n\n`,
+              );
+            }
+          } else if (toolName === "generate_quiz") {
             quizToolIndex = tc.index;
-            if(tc.function?.arguments){
+            if (tc.function?.arguments) {
               quizToolArgs += tc.function.arguments;
             }
           } else if (toolName === "save_memory") {
-              memoryToolIndex = tc.index;
-              if (tc.function?.arguments) {
-                  memoryToolArgs += tc.function.arguments;
-              }
+            memoryToolIndex = tc.index;
+            if (tc.function?.arguments) {
+              memoryToolArgs += tc.function.arguments;
+            }
           } else if (memoryToolIndex !== -1 && tc.index === memoryToolIndex) {
-              if (tc.function?.arguments) {
-                  memoryToolArgs += tc.function.arguments;
-              }
-          }else if (quizToolIndex !== -1 && tc.index === quizToolIndex) { 
+            if (tc.function?.arguments) {
+              memoryToolArgs += tc.function.arguments;
+            }
+          } else if (quizToolIndex !== -1 && tc.index === quizToolIndex) {
             if (tc.function?.arguments) quizToolArgs += tc.function.arguments;
           }
         }
@@ -517,42 +684,113 @@ const streamAiResponse = async (stream, res, noteFetched, userId) => {
     }
   }
 
+  // Record completed web search calls into toolCalls
+  for (const [_, state] of webSearchToolCalls) {
+    let finalQuery = "";
+    try {
+      if (state.query) {
+        const parsed = JSON.parse(state.query);
+        finalQuery = parsed.query || "";
+      }
+    } catch (_) {}
+    toolCalls.push({
+      tool: "search_web",
+      query: finalQuery || state.lastEmittedQuery || "",
+    });
+  }
+
+  // Record completed web fetch calls into toolCalls
+  for (const [_, state] of webFetchToolCalls) {
+    let finalUrl = "";
+    try {
+      if (state.url) {
+        const parsed = JSON.parse(state.url);
+        finalUrl = parsed.url || "";
+      }
+    } catch (_) {}
+    toolCalls.push({
+      tool: "crawl_url",
+      url: finalUrl || state.lastEmittedUrl || "",
+    });
+  }
+
+  // Record citations into toolCalls and ensure search_web is present if citations exist or web was searched
+  if (citationsMap.size > 0 || shouldSearchWeb) {
+    const finalCitations = Array.from(citationsMap.values());
+    if (finalCitations.length > 0) {
+      toolCalls.push({
+        tool: "web_citations",
+        citations: finalCitations,
+      });
+    }
+    if (!toolCalls.some((t) => t.tool === "search_web")) {
+      const q = webSearchToolCalls.get(0)?.query || cleanInitialQuery || "web sources";
+      toolCalls.push({ tool: "search_web", query: q });
+    }
+    // Emit final clean citations snapshot to client if any citations exist
+    if (finalCitations.length > 0) {
+      res.write(
+        `data: ${JSON.stringify({
+          type: "tool_call",
+          tool: "web_citations",
+          citations: finalCitations,
+        })}\n\n`
+      );
+    }
+  }
+
   // Execute memory save if triggered
   if (memoryToolIndex !== -1 && memoryToolArgs) {
-      try {
-          const args = JSON.parse(memoryToolArgs);
-          // Only save if we have both
-          if (args.category && args.content && userId) {
-              // we need to dynamically import or require saveMemory to avoid circular deps
-              import("../services/memoryService.js").then(({ saveMemory }) => {
-                  saveMemory(userId, args).catch(console.error);
-              });
-              res.write(`data: ${JSON.stringify({ type: "tool_call", tool: "save_memory" })}\n\n`);
-              
-              // Register the tool call in toolCalls so it gets saved to the session database
-              toolCalls.push({ tool: "save_memory", category: args.category, content: args.content });
+    try {
+      const args = JSON.parse(memoryToolArgs);
+      // Only save if we have both
+      if (args.category && args.content && userId) {
+        // we need to dynamically import or require saveMemory to avoid circular deps
+        import("../services/memoryService.js").then(({ saveMemory }) => {
+          saveMemory(userId, args).catch(console.error);
+        });
+        res.write(
+          `data: ${JSON.stringify({ type: "tool_call", tool: "save_memory" })}\n\n`,
+        );
 
-              // Fallback: If the model didn't stream any text before calling the tool, generate a friendly reply
-              if (!finalReply.trim()) {
-                  finalReply = `Got it! I've saved that to my memory: "${args.content}"`;
-                  res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: finalReply } }] })}\n\n`);
-              }
-          }
-      } catch (err) {
-          console.error(`Failed to parse save_memory arguments: ${err.message}. Raw args:`, memoryToolArgs);
+        // Register the tool call in toolCalls so it gets saved to the session database
+        toolCalls.push({
+          tool: "save_memory",
+          category: args.category,
+          content: args.content,
+        });
+
+        // Fallback: If the model didn't stream any text before calling the tool, generate a friendly reply
+        if (!finalReply.trim()) {
+          finalReply = `Got it! I've saved that to my memory: "${args.content}"`;
+          res.write(
+            `data: ${JSON.stringify({ choices: [{ delta: { content: finalReply } }] })}\n\n`,
+          );
+        }
       }
+    } catch (err) {
+      console.error(
+        `Failed to parse save_memory arguments: ${err.message}. Raw args:`,
+        memoryToolArgs,
+      );
+    }
   }
 
   if (quizToolIndex !== -1 && quizToolArgs) {
-      try {
-          const args = JSON.parse(quizToolArgs);
-          if (args.questions && args.questions.length > 0) {
-              res.write(`data: ${JSON.stringify({ type: "tool_call", tool: "render_quiz", quizData: args.questions })}\n\n`);
-              toolCalls.push({ tool: "render_quiz", quizData: args.questions });
-          }
-      } catch (err) {
-          console.error(`Failed to parse generate_quiz arguments: ${err.message}. Raw args:`, quizToolArgs);
+    try {
+      const args = JSON.parse(quizToolArgs);
+      if (args.questions && args.questions.length > 0) {
+        res.write(
+          `data: ${JSON.stringify({ type: "tool_call", tool: "render_quiz", quizData: args.questions })}\n\n`,
+        );
+        toolCalls.push({ tool: "render_quiz", quizData: args.questions });
       }
+    } catch (err) {
+      console.error(
+        `Failed to parse generate_quiz arguments: ${err.message}. Raw args:`,
+        quizToolArgs,
+      );
+    }
   }
 
   return { finalReply, toolCalls };
@@ -643,15 +881,33 @@ export const chatWithAiController = catchAsync(async (req, res) => {
     activeSession,
   } = sessionData;
 
-  // Session Size Guard
-  if (isGlobalChat && activeSession && activeSession.messages.length >= 100) {
-    // Force start new session
-    req.body.sessionId = undefined;
-    sessionData = await resolveSession(req);
-    history = sessionData.history;
-    sessionSummary = sessionData.summary;
-    activeSessionId = sessionData.activeSessionId;
-    activeSession = sessionData.activeSession;
+  // Context-aware history management (Large Context Window Strategy)
+  // 1. Keep approximately the last 16 messages in full (untruncated)
+  // 2. Older messages outside the recent window are consolidated into a state-preserving rolling summary
+  const RECENT_MESSAGE_COUNT = 16;
+  const SUMMARY_TRIGGER_COUNT = 24;
+
+  let effectiveHistory = history;
+
+  if (history && history.length > RECENT_MESSAGE_COUNT) {
+    const recentHistory = history.slice(-RECENT_MESSAGE_COUNT);
+    const olderMessages = history.slice(0, -RECENT_MESSAGE_COUNT);
+
+    if (history.length >= SUMMARY_TRIGGER_COUNT && olderMessages.length > 0) {
+      try {
+        const consolidatedSummary = await summarizeHistory(olderMessages, sessionSummary);
+        if (consolidatedSummary) {
+          sessionSummary = consolidatedSummary;
+          if (activeSession) {
+            activeSession.summary = consolidatedSummary;
+          }
+        }
+      } catch (sumErr) {
+        console.warn("⚠️ [ChatController] Conversation summarization failed:", sumErr.message);
+      }
+    }
+
+    effectiveHistory = recentHistory;
   }
 
   if (isGlobalChat && req.body.sessionId && !sessionData.session) {
@@ -662,15 +918,10 @@ export const chatWithAiController = catchAsync(async (req, res) => {
 
   // 2. Open SSE early so the browser isn't waiting blind
   const isStreaming = !!stream;
-  const shouldSearchWeb = enableWeb !== false; // Default to true if not provided
+  const shouldSearchWeb = enableWeb === true; // Only enable web tools when explicitly toggled on
 
   if (isStreaming) {
     openSseConnection(res, activeSessionId);
-    if (shouldSearchWeb && mightNeedWeb(message)) {
-      res.write(
-        `data: ${JSON.stringify({ type: "tool_call", tool: "search_web" })}\n\n`,
-      );
-    }
   }
 
   // 3. Note context (always fetched when relevant to note context)
@@ -679,74 +930,68 @@ export const chatWithAiController = catchAsync(async (req, res) => {
     toolUsed: null,
   });
 
-  // 4. Retrieve Memories and Notes
+  console.log("📊 [AI_TELEMETRY_BACKEND]", {
+    userId: req.user._id,
+    noteId: req.body.noteId || null,
+    hasSelection: req.body.hasSelection || false,
+    contextChanged: req.body.contextChanged || false,
+    contextLength: (noteContext || "").length,
+    noteFetched,
+    isGlobalChat: sessionData.isGlobalChat,
+    timestamp: new Date().toISOString(),
+  });
+
+  // 4. Retrieve User Facts & Memories (Direct Indexed DB Fetch, NO vector search on chat messages)
   let result;
   try {
-    let memories = [];
-    let retrievedNotesContext = "";
-    
-    if (message) {
-      try {
-        const queryEmbedding = await generateEmbedding(message);
-        
-        if (queryEmbedding) {
-          // Run both vector searches in parallel
-          const notesPipeline = [
-            {
-                $vectorSearch: {
-                    index: "notes_vector_index", 
-                    path: "embedding",
-                    queryVector: queryEmbedding,
-                    numCandidates: 20,
-                    limit: 3,
-                    filter: { user: req.user._id, isDeleted: false }
-                }
-            },
-            {
-                $project: { title: 1, content: 1, score: { $meta: "vectorSearchScore" } }
-            },
-            {
-                $match: { score: { $gte: 0.6 } }
-            }
-          ];
-
-          const [memoriesResult, retrievedNotes] = await Promise.all([
-             searchMemories(req.user._id, message, queryEmbedding),
-             Notes.aggregate(notesPipeline).catch(err => {
-                 console.warn("Note vector search failed:", err.message);
-                 return [];
-             })
-          ]);
-          
-          memories = memoriesResult;
-
-          if (retrievedNotes.length > 0) {
-             retrievedNotesContext = `\n--- RELEVANT NOTES RETRIEVED FROM USER'S BRAIN ---\n${retrievedNotes.map(n => `Title: ${n.title}\nContent:\n${stripHtml(n.content).slice(0, 1000)}`).join("\n\n")}\n--- END RETRIEVED NOTES ---\n`;
-          }
-          
-          if (isStreaming && (retrievedNotes.length > 0 || memories.length > 0)) {
-            res.write(
-              `data: ${JSON.stringify({ type: "tool_call", tool: "search_notes" })}\n\n`,
-            );
-          }
-        }
-      } catch (err) {
-         console.warn("Embedding generation failed:", err.message);
-         // Fallback to text-only memory search if embedding fails
-         memories = await searchMemories(req.user._id, message);
-      }
-    }
-
     let memoryContext = "";
-    if (memories.length > 0) {
-      memoryContext = `\n--- LONG-TERM MEMORIES ---\nThese are facts previously explicitly stated by the user. Use them if relevant to the query:\n${memories.map(m => `- [${m.category}] ${m.content}`).join("\n")}\n--- END MEMORIES ---\n`;
+    if (req.user?._id) {
+      try {
+        const memories = await Memory.find({ user: req.user._id })
+          .sort({ lastAccessedAt: -1 })
+          .limit(8)
+          .lean();
+        if (memories?.length > 0) {
+          memoryContext = `\n--- USER MEMORIES ---\nFacts previously noted about the user:\n${memories
+            .map((m) => `- [${m.category}] ${m.content}`)
+            .join("\n")}\n--- END MEMORIES ---\n`;
+        }
+      } catch (_) {}
     }
 
-    const userName = req.user?.name ? `You are talking to a user named ${req.user.name}. Address them politely when appropriate.` : "";
-    let finalSystemPrompt = `${userName}${memoryContext}${retrievedNotesContext}`;
+    const userName = req.user?.name
+      ? `You are talking to a user named ${req.user.name}. Address them politely when appropriate.`
+      : "";
+    let finalSystemPrompt = `${userName}${memoryContext}`;
 
-    const currentMode = activeSession?.chatMode || chatMode || "study";
-    const tools = currentMode === "study" ? [{
+    const currentMode = activeSession?.chatMode || chatMode || "casual";
+
+    // Autonomous tools: save_memory tool allows LLM to store information on demand
+    const saveMemoryTool = {
+      type: "function",
+      function: {
+        name: "save_memory",
+        description:
+          "Save an important personal fact, preference, goal, or detail explicitly shared by the user about themselves into long-term memory.",
+        parameters: {
+          type: "object",
+          properties: {
+            category: {
+              type: "string",
+              enum: ["PROFILE", "PREFERENCE", "GOAL", "PROJECT", "SKILL", "OTHER"],
+              description: "Category of the memory",
+            },
+            content: {
+              type: "string",
+              description: "The concise factual detail to remember about the user",
+            },
+          },
+          required: ["category", "content"],
+        },
+      },
+    };
+
+    const quizTool = {
       type: "function",
       function: {
         name: "generate_quiz",
@@ -770,22 +1015,36 @@ MCQ GENERATION RULES:
               items: {
                 type: "object",
                 properties: {
-                  id: { type: "string", description: "A unique identifier for this question (e.g. q1)" },
+                  id: {
+                    type: "string",
+                    description: "A unique identifier for this question (e.g. q1)",
+                  },
                   question: { type: "string", description: "The quiz question" },
-                  options: { type: "array", items: { type: "string" }, description: "4 possible answers" },
+                  options: {
+                    type: "array",
+                    items: { type: "string" },
+                    description: "4 possible answers",
+                  },
                 },
-                required: ["id", "question", "options"]
-              }
-            }
+                required: ["id", "question", "options"],
+              },
+            },
           },
-          required: ["questions"]
-        }
-      }
-    }] : null;
+          required: ["questions"],
+        },
+      },
+    };
+
+    const tools = [
+      saveMemoryTool,
+      ...(currentMode === "study" ? [quizTool] : []),
+    ];
+
+    const effectiveReasoning = useReasoning === true || useReasoning === "true";
 
     result = await chatWithAi({
       message,
-      history,
+      history: effectiveHistory,
       summary: sessionSummary || req.body.summary || "",
       noteContext: noteContext,
       webContext: "",
@@ -793,9 +1052,9 @@ MCQ GENERATION RULES:
       pdfContext: pdfContext || "",
       imageBase64,
       stream: isStreaming,
-      useReasoning: useReasoning !== false,
+      useReasoning: effectiveReasoning,
       enableWeb: shouldSearchWeb,
-      chatMode: activeSession?.chatMode || chatMode || "study",
+      chatMode: activeSession?.chatMode || chatMode || "casual",
       tools: tools,
     });
   } catch (aiError) {
@@ -816,7 +1075,14 @@ MCQ GENERATION RULES:
 
   if (isStreaming) {
     try {
-      const responseObj = await streamAiResponse(result.stream, res, noteFetched, req.user._id);
+      const responseObj = await streamAiResponse(
+        result.stream,
+        res,
+        noteFetched,
+        req.user._id,
+        message,
+        shouldSearchWeb
+      );
       finalReply = responseObj.finalReply;
       toolCalls = responseObj.toolCalls;
       // Send metadata (like extracted PDF text) after the stream completes

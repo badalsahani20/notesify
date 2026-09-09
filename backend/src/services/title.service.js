@@ -7,7 +7,7 @@ const genAI = process.env.GEMINI_API_KEY
   : null;
 
 export const TITLE_MODEL =
-  process.env.TITLE_MODEL || "meta-llama/llama-3.1-8b-instruct";
+  process.env.TITLE_MODEL || "openai/gpt-oss-20b";
 
 /**
  * Generate a short, high-quality 3-6 word title from plain text note or conversation content.
@@ -71,13 +71,13 @@ export const generateTitleFromText = async (text) => {
   // 2. Fall back to Groq if Gemini wasn't available or failed
   if (!rawTitle && process.env.GROQ_API_KEY) {
     try {
-      rawTitle = await executeGroq(titleMessages, false, "openai/gpt-oss-120b");
+      rawTitle = await executeGroq(titleMessages, false, "openai/gpt-oss-20b");
       if (rawTitle) {
-        successfulProvider = "Groq (openai/gpt-oss-120b)";
+        successfulProvider = "Groq (openai/gpt-oss-20b)";
       }
     } catch (groqErr) {
       console.warn(
-        "❌ [TitleService] Provider [Groq (openai/gpt-oss-120b)] failed:",
+        "❌ [TitleService] Provider [Groq (openai/gpt-oss-20b)] failed:",
         groqErr.message,
       );
     }

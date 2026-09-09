@@ -90,8 +90,8 @@ Under the hood, Iris routes requests dynamically across three providers based on
 |---|---|---|
 | OpenRouter | DeepSeek V4 Flash | Primary "Brain" for text, complex reasoning, and logic |
 | OpenRouter | Qwen 3.5 Flash | Dedicated Vision model for image analysis and OCR |
-| OpenRouter | GPT-OSS 120B | Dedicated teaching model and default chat |
-| OpenRouter | Ling 2.6 Flash / Ring 2.6 1T | Quick operations and complex analysis |
+| OpenRouter | GLM 5.3 Flash / Qwen 3.7 Flash | Dedicated teaching model and default chat |
+| OpenRouter | Ling 3.0 Flash / Ring 2.6 1T | Quick operations and complex analysis |
 | Groq | Llama 3.3 70B | High-speed fallback |
 | Google Gemini | 3.1 Flash Lite | High-speed summarization fallback and content extraction |
 

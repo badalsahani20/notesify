@@ -23,6 +23,7 @@ export type AssistResult = {
 };
 
 export type SelectionRange = { from: number; to: number } | null;
+
 export interface VizSegment {
   id?: string;
   kind: "viz";
@@ -47,6 +48,22 @@ export interface AskSegment {
 
 export type IrisSegment = textSegment | VizSegment | AskSegment;
 
+export interface WebCitation {
+  url: string;
+  title: string;
+  content?: string;
+}
+
+export type ToolCallRecord = {
+  tool: string;
+  quizData?: any[];
+  query?: string;
+  url?: string;
+  citations?: WebCitation[];
+  category?: string;
+  content?: string;
+};
+
 export type Message = {
   id: string;
   role: "user" | "assistant";
@@ -57,7 +74,7 @@ export type Message = {
   isThinking?: boolean;
   thinkingTime?: number;
   thought?: string;
-  toolCalls?: Array<{ tool: string; quizData?: any[] }>;
+  toolCalls?: ToolCallRecord[];
 };
 
 export type ChatHistoryMessage = {

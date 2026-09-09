@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 
-const MESSAGE_CAP = 50;
+const MESSAGE_CAP = 100;
 
 // Typed subdocument — each message has a strict shape
 const chatMessageSchema = new mongoose.Schema(
@@ -44,7 +44,7 @@ const globalChatSessionSchema = new mongoose.Schema(
     chatMode: {
       type: String,
       enum: ["study", "casual"],
-      default: "study",
+      default: "casual",
     },
 
   },

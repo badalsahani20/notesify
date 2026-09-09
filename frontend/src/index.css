@@ -7808,3 +7808,42 @@ html:not(.dark) .dock-btn-active {
     background: #00000000;
     border-color: rgba(255, 255, 255, 0.08);
 }
+
+/* --- Minimal Iris Telemetry & Web Activity --- */
+.iris-telemetry-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background-color: currentColor;
+  opacity: 0.85;
+  display: inline-block;
+  flex-shrink: 0;
+  animation: iris-telemetry-pulse 2.2s ease-in-out infinite;
+}
+
+@keyframes iris-telemetry-pulse {
+  0%, 100% {
+    opacity: 0.3;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+}
+
+.iris-source-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.76rem;
+  color: var(--muted-text);
+  text-decoration: none;
+  transition: color 0.15s ease;
+  max-width: 100%;
+}
+
+.iris-source-link:hover {
+  color: var(--text-strong);
+}
+

@@ -31,6 +31,7 @@ import { useSettingsStore } from "@/store/useSettingsStore";
 import { cn } from "@/lib/utils";
 import { formatMarkDownNodes } from "@/utils/FormatMarkdownNodes";
 import { useEditorUIStore } from "@/store/useEditorUIStore";
+import { BlockIdExtension } from "@/extensions/blockIdExtension";
 
 const PLACEHOLDERS = [
   "Need a starting point? Generate study notes with AI.",
@@ -199,6 +200,7 @@ const TipTap = ({ noteId, content, onChange, onEditorReady, aiChat, editable = t
         codeBlock: false, // Disabling native codeBlock to use our CustomCodeBlock
         link: false, // Disable built-in link extension to avoid duplication and custom extension override
       }),
+      BlockIdExtension,
       CustomCodeBlock,
       TextStyle,
       TextAlign.configure({ types: ["heading", "paragraph"] }),

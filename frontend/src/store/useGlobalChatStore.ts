@@ -4,7 +4,7 @@ import { parseIrisResponse } from "../utils/parseIrisResponse";
 import { prepareChatImage } from "@/utils/uploadImage";
 import { consumeAiChatStream } from "@/utils/consumeAiChatStream";
 
-import type { IrisSegment } from "@/components/ai/types";
+import type { IrisSegment, ToolCallRecord } from "@/components/ai/types";
 
 // Re-export so existing imports from this store path keep working
 export type { IrisSegment };
@@ -19,7 +19,7 @@ export type ChatMessage = {
   thought?: string;
   isThinking?: boolean;
   thinkingTime?: number;
-  toolCalls?: { tool: string; quizData?: any }[];
+  toolCalls?: ToolCallRecord[];
 };
 
 export type ChatSession = {
@@ -197,25 +197,47 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
       const { fullText, fullThought, thinkingTime: finalThinkingTime } =
         await consumeAiChatStream(response.body, {
           throttleMs: 60,
-          onToolCall: ({ tool, quizData }) => {
+          onToolCall: ({ tool, quizData, query, url, citations }) => {
             set((state) => ({
-              messages: state.messages.map((m) =>
-                m.id === aiMsgId
-                  ? { ...m, toolCalls: [...(m.toolCalls ?? []), { tool, quizData }] }
-                  : m
-              ),
+              messages: state.messages.map((m) => {
+                if (m.id !== aiMsgId) return m;
+                const existingCalls = m.toolCalls ?? [];
+                if (tool === "web_citations" && citations) {
+                  const filtered = existingCalls.filter((tc) => tc.tool !== "web_citations");
+                  return {
+                    ...m,
+                    toolCalls: [...filtered, { tool, citations }],
+                  };
+                }
+                const existingIdx = existingCalls.findIndex((tc) => tc.tool === tool);
+                if (existingIdx !== -1) {
+                  const updated = [...existingCalls];
+                  updated[existingIdx] = {
+                    ...updated[existingIdx],
+                    query: query ?? updated[existingIdx].query,
+                    url: url ?? updated[existingIdx].url,
+                  };
+                  return { ...m, toolCalls: updated };
+                }
+                return {
+                  ...m,
+                  toolCalls: [...existingCalls, { tool, quizData, query, url, citations }],
+                };
+              }),
             }));
           },
           onUpdate: ({ fullText, fullThought, isThinking, thinkingTime }) => {
             set((state) => ({
               messages: state.messages.map((m) =>
-                m.id === aiMsgId ? {
-                  ...m,
-                  text: fullText,
-                  thought: fullThought,
-                  isThinking,
-                  thinkingTime,
-                } : m
+                m.id === aiMsgId
+                  ? {
+                      ...m,
+                      text: fullText,
+                      thought: fullThought,
+                      isThinking,
+                      thinkingTime,
+                    }
+                  : m
               ),
             }));
           },
@@ -233,15 +255,17 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
             )
           : state.sessions,
         messages: state.messages.map((m) =>
-          m.id === aiMsgId ? { 
-            ...m, 
-            text: fullText,
-            thought: fullThought,
-            isThinking: false,
-            thinkingTime: finalThinkingTime,
-            segments,
-            skipAnimation: true 
-          } : m
+          m.id === aiMsgId
+            ? { 
+                ...m, 
+                text: fullText,
+                thought: fullThought,
+                isThinking: false,
+                thinkingTime: finalThinkingTime,
+                segments,
+                skipAnimation: true 
+              }
+            : m
         ),
       }));
 
