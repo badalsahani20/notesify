@@ -55,6 +55,7 @@ export interface WebCitation {
 }
 
 export type ToolCallRecord = {
+  id?: string;
   tool: string;
   quizData?: any[];
   query?: string;

@@ -7,6 +7,7 @@ export type WebCitation = {
 };
 
 export type ToolCallEvent = {
+  id?: string;
   tool: string;
   quizData?: any;
   query?: string;
@@ -72,6 +73,7 @@ export const consumeAiChatStream = async (
 
       if (data.type === "tool_call" && data.tool) {
         onToolCall?.({
+          id: (data as any).id,
           tool: data.tool,
           quizData: (data as any).quizData,
           query: (data as any).query,

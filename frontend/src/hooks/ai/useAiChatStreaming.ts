@@ -26,7 +26,7 @@ export const useAiChatStreaming = ({
     const { fullText, fullThought, thinkingTime: finalThinkingTime } =
       await consumeAiChatStream(responseBody, {
         throttleMs: 40,
-        onToolCall: ({ tool, quizData, query, url, citations }) => {
+        onToolCall: ({ id, tool, quizData, query, url, citations }) => {
           setMessages((prev) =>
             prev.map((m) => {
               if (m.id !== aiMsgId) return m;
@@ -38,7 +38,11 @@ export const useAiChatStreaming = ({
                   toolCalls: [...filtered, { tool, citations }],
                 };
               }
-              const existingIdx = existingCalls.findIndex((tc) => tc.tool === tool);
+              // Match by id if present to allow multiple distinct calls of the same tool (e.g. search_web)
+              const existingIdx = id
+                ? existingCalls.findIndex((tc) => tc.id === id)
+                : existingCalls.findIndex((tc) => tc.tool === tool);
+
               if (existingIdx !== -1) {
                 const updated = [...existingCalls];
                 updated[existingIdx] = {
@@ -50,7 +54,7 @@ export const useAiChatStreaming = ({
               }
               return {
                 ...m,
-                toolCalls: [...existingCalls, { tool, quizData, query, url, citations }],
+                toolCalls: [...existingCalls, { id, tool, quizData, query, url, citations }],
               };
             })
           );

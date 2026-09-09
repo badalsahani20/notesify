@@ -10,9 +10,7 @@ import {
   formatStructuredNoteContext,
   runAiAssist,
   getDynamicPrompts,
-  performWebSearch,
-  crawlUrl,
-  detectTools,
+  getChatTools,
 } from "../services/ai.service.js";
 import GlobalChatSession from "../models/globalChatSession.model.js";
 import { stripHtml } from "../utils/stripHtml.js";
@@ -20,7 +18,6 @@ import { parseIrisResponse } from "../utils/parseIrisResponse.js";
 import getEffectiveDailyLimit from "../utils/getEffectiveDailyLimit.js";
 import { SseStreamParser } from "../utils/sseParser.js";
 import Memory from "../models/Memory.js";
-import { extractCleanSearchQuery } from "../services/ai/tools/searchQueryExtractor.js";
 import { summarizeHistory } from "../utils/summarizeHistory.js";
 
 const normalizeForHash = (text = "") => text.replace(/\s+/g, " ").trim();
@@ -40,23 +37,6 @@ const shouldFetchNote = (message = "", history = [], contextChanged = false) => 
   // Otherwise, we rely on the LLM's vast context window history. 
   // We no longer use arbitrary regex keywords that trigger false positives!
   return false;
-};
-
-const mightNeedWeb = (msg) => {
-  const lower = msg.toLowerCase();
-  return (
-    /https?:\/\/[^\s]+/.test(msg) || // ✅ matches actual URLs
-    /\b(search(?:ing|es|ed)?|google|look up|find online|browse|web|internet|website|article|link|url)\b/.test(
-      lower,
-    ) || // ✅ explicit search intents
-    /\b(latest|recent|new|news|now|current|today|release|update|version|stock|price|rate|conversion|weather)\b/.test(
-      lower,
-    ) || // Timely keywords
-    /\b(api|documentation|lib|package|framework|how to install)\b/.test(
-      lower,
-    ) || // Technical gaps
-    /[\$\€]/.test(msg) // Currency triggers
-  );
 };
 
 const hashText = (text = "") =>
@@ -376,40 +356,10 @@ const resolveSession = async (req) => {
   };
 };
 
-// Run tool detection (web search / URL crawl) and return context + tool name
-const resolveToolContext = async (message, res, isStreaming) => {
-  let toolContext = "";
-  let toolUsed = null;
-
-  if (!mightNeedWeb(message)) return { toolContext, toolUsed };
-
-  const toolDecision = await detectTools(message);
-
-  if (toolDecision.tool === "search_web") {
-    toolUsed = "search_web";
-    if (isStreaming)
-      res.write(
-        `data: ${JSON.stringify({ type: "tool_call", tool: "search_web" })}\n\n`,
-      );
-    const searchResults = await performWebSearch(toolDecision.query);
-    toolContext = `\n[WEB SEARCH RESULTS for "${toolDecision.query}"]\n${searchResults}\n[/end of web search results]\n`;
-  } else if (toolDecision.tool === "crawl_url") {
-    toolUsed = "crawl_url";
-    if (isStreaming)
-      res.write(
-        `data: ${JSON.stringify({ type: "tool_call", tool: "crawl_url" })}\n\n`,
-      );
-    const pageContent = await crawlUrl(toolDecision.query);
-    toolContext = `\n[WEBPAGE CONTENT from ${toolDecision.query}]\n${pageContent.slice(0, 6000)}\n[END WEBPAGE]\n`;
-  }
-
-  return { toolContext, toolUsed };
-};
-
-// Fetch note context from the DB or frontend payload (skipped when a tool was used)
+// Fetch note context from the DB or frontend payload
 const resolveNoteContext = async (
   req,
-  { isGlobalChat, noteId, history, toolUsed },
+  { isGlobalChat, noteId, history },
 ) => {
   const { noteContext: reqNoteContext, structuredContext, hasSelection, message, contextChanged } = req.body;
   let noteContext = "";
@@ -454,14 +404,19 @@ const openSseConnection = (res, activeSessionId) => {
   res.write(": keep-alive\n\n");
 };
 
+const NORMALIZE_TOOL_NAME = {
+  "openrouter:web_search": "search_web",
+  "web_search": "search_web",
+  "openrouter:web_fetch": "crawl_url",
+  "web_fetch": "crawl_url",
+};
+
 // Pipe OpenRouter SSE chunks to the client and accumulate the full reply
 const streamAiResponse = async (
   stream,
   res,
   noteFetched,
-  userId,
-  userMessage = "",
-  shouldSearchWeb = false
+  userId
 ) => {
   const decoder = new TextDecoder();
   let finalReply = "";
@@ -471,29 +426,10 @@ const streamAiResponse = async (
   let quizToolArgs = "";
   let quizToolIndex = -1;
 
-  // Web tools & citations tracking
-  const webSearchToolCalls = new Map(); // index -> { query, emitted, lastEmittedQuery }
-  const webFetchToolCalls = new Map(); // index -> { url, emitted, lastEmittedUrl }
+  // Server tools & citations tracking
+  const toolCallsByIndex = new Map(); // index -> { id, name, rawArgs: "", emitted: false, parsedQuery: "", parsedUrl: "" }
   const citationsMap = new Map(); // normalizedUrl -> { url, title, content }
   const toolCalls = [];
-
-  const cleanInitialQuery = extractCleanSearchQuery(userMessage);
-
-  // Immediately notify the client if web search is enabled for this turn
-  if (shouldSearchWeb) {
-    webSearchToolCalls.set(0, {
-      query: cleanInitialQuery,
-      emitted: true,
-      lastEmittedQuery: cleanInitialQuery,
-    });
-    res.write(
-      `data: ${JSON.stringify({
-        type: "tool_call",
-        tool: "search_web",
-        query: cleanInitialQuery,
-      })}\n\n`
-    );
-  }
 
   if (noteFetched) {
     res.write(
@@ -510,35 +446,7 @@ const streamAiResponse = async (
     for (const data of events) {
       const choice = data.choices?.[0];
 
-      // Check if model emitted reasoning formulating a refined search query
-      if (choice?.delta?.reasoning) {
-        const r = choice.delta.reasoning;
-        const qMatch =
-          r.match(/(?:call\s+)?(?:openrouter_)?web_search.*?query\s*(?:is|as|=|:)?\s*["']([^"'\n]+)["']/i) ||
-          r.match(/query\s*:\s*["']([^"'\n]+)["']/i) ||
-          r.match(/searching\s+for\s+["']([^"'\n]+)["']/i);
-        if (qMatch && qMatch[1] && qMatch[1].trim().length > 2) {
-          const refined = qMatch[1].trim();
-          let state = webSearchToolCalls.get(0);
-          if (!state) {
-            state = { query: refined, emitted: true, lastEmittedQuery: refined };
-            webSearchToolCalls.set(0, state);
-          }
-          if (state.lastEmittedQuery !== refined) {
-            state.query = refined;
-            state.lastEmittedQuery = refined;
-            res.write(
-              `data: ${JSON.stringify({
-                type: "tool_call",
-                tool: "search_web",
-                query: refined,
-              })}\n\n`
-            );
-          }
-        }
-      }
-
-      // 1. Intercept choice annotations (citations)
+      // 1. Intercept choice annotations (citations returned by OpenRouter server tools)
       if (choice?.delta?.annotations && Array.isArray(choice.delta.annotations)) {
         let hasNewCitation = false;
         for (const ann of choice.delta.annotations) {
@@ -556,19 +464,6 @@ const streamAiResponse = async (
           }
         }
         if (hasNewCitation) {
-          // If server tool executed without client delta.tool_calls, ensure search_web event was emitted
-          if (webSearchToolCalls.size === 0) {
-            const q = cleanInitialQuery || "web sources";
-            webSearchToolCalls.set(0, { query: q, emitted: true, lastEmittedQuery: q });
-            res.write(
-              `data: ${JSON.stringify({
-                type: "tool_call",
-                tool: "search_web",
-                query: q,
-              })}\n\n`
-            );
-          }
-
           res.write(
             `data: ${JSON.stringify({
               type: "tool_call",
@@ -579,97 +474,72 @@ const streamAiResponse = async (
         }
       }
 
-      // 2. Intercept and detect tool calls delta
+      // 2. Intercept and accumulate tool calls delta
       if (choice?.delta?.tool_calls) {
         for (const tc of choice.delta.tool_calls) {
-          const toolName = tc.function?.name;
           const toolIndex = tc.index ?? 0;
+          let state = toolCallsByIndex.get(toolIndex);
+          if (!state) {
+            state = {
+              id: tc.id || `tool_${toolIndex}`,
+              name: tc.function?.name || "",
+              rawArgs: "",
+              emitted: false,
+              parsedQuery: "",
+              parsedUrl: "",
+            };
+            toolCallsByIndex.set(toolIndex, state);
+          }
+          if (tc.id && !state.id) state.id = tc.id;
+          if (tc.function?.name && !state.name) state.name = tc.function.name;
+          if (tc.function?.arguments) {
+            state.rawArgs += tc.function.arguments;
+          }
 
-          if (
-            toolName === "openrouter:web_search" ||
-            webSearchToolCalls.has(toolIndex)
-          ) {
-            let state = webSearchToolCalls.get(toolIndex);
-            if (!state) {
-              state = { query: "", emitted: false, lastEmittedQuery: "" };
-              webSearchToolCalls.set(toolIndex, state);
-            }
-            if (tc.function?.arguments) {
-              state.query += tc.function.arguments;
-            }
-
-            let parsedQuery = "";
+          // Accumulate tool-call arguments and parse complete JSON before emitting
+          if (state.rawArgs) {
             try {
-              if (state.query) {
-                const parsed = JSON.parse(state.query);
-                if (parsed.query) parsedQuery = parsed.query;
+              const parsed = JSON.parse(state.rawArgs);
+              const normalizedTool = NORMALIZE_TOOL_NAME[state.name] || state.name;
+
+              if (normalizedTool === "search_web" && parsed.query && !state.emitted) {
+                state.emitted = true;
+                state.parsedQuery = parsed.query;
+                res.write(
+                  `data: ${JSON.stringify({
+                    type: "tool_call",
+                    id: state.id,
+                    tool: "search_web",
+                    query: parsed.query,
+                  })}\n\n`,
+                );
+              } else if (normalizedTool === "crawl_url" && (parsed.url || parsed.query) && !state.emitted) {
+                state.emitted = true;
+                state.parsedUrl = parsed.url || parsed.query;
+                res.write(
+                  `data: ${JSON.stringify({
+                    type: "tool_call",
+                    id: state.id,
+                    tool: "crawl_url",
+                    url: state.parsedUrl,
+                  })}\n\n`,
+                );
               }
             } catch (_) {
-              const qMatch = state.query.match(/"query"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"/);
-              if (qMatch) parsedQuery = qMatch[1];
+              // Arguments are still streaming across chunks; wait for complete JSON
             }
+          }
 
-            if (!state.emitted || (parsedQuery && state.lastEmittedQuery !== parsedQuery)) {
-              state.emitted = true;
-              state.lastEmittedQuery = parsedQuery;
-              res.write(
-                `data: ${JSON.stringify({
-                  type: "tool_call",
-                  tool: "search_web",
-                  query: parsedQuery,
-                })}\n\n`,
-              );
-            }
-          } else if (
-            toolName === "openrouter:web_fetch" ||
-            webFetchToolCalls.has(toolIndex)
-          ) {
-            let state = webFetchToolCalls.get(toolIndex);
-            if (!state) {
-              state = { url: "", emitted: false, lastEmittedUrl: "" };
-              webFetchToolCalls.set(toolIndex, state);
-            }
-            if (tc.function?.arguments) {
-              state.url += tc.function.arguments;
-            }
-
-            let parsedUrl = "";
-            try {
-              if (state.url) {
-                const parsed = JSON.parse(state.url);
-                if (parsed.url) parsedUrl = parsed.url;
-              }
-            } catch (_) {
-              const uMatch = state.url.match(/"url"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"/);
-              if (uMatch) parsedUrl = uMatch[1];
-            }
-
-            if (!state.emitted || (parsedUrl && state.lastEmittedUrl !== parsedUrl)) {
-              state.emitted = true;
-              state.lastEmittedUrl = parsedUrl;
-              res.write(
-                `data: ${JSON.stringify({
-                  type: "tool_call",
-                  tool: "crawl_url",
-                  url: parsedUrl,
-                })}\n\n`,
-              );
-            }
-          } else if (toolName === "generate_quiz") {
-            quizToolIndex = tc.index;
-            if (tc.function?.arguments) {
-              quizToolArgs += tc.function.arguments;
-            }
-          } else if (toolName === "save_memory") {
-            memoryToolIndex = tc.index;
-            if (tc.function?.arguments) {
-              memoryToolArgs += tc.function.arguments;
-            }
-          } else if (memoryToolIndex !== -1 && tc.index === memoryToolIndex) {
-            if (tc.function?.arguments) {
-              memoryToolArgs += tc.function.arguments;
-            }
-          } else if (quizToolIndex !== -1 && tc.index === quizToolIndex) {
+          // Custom function tools (save_memory, generate_quiz)
+          if (state.name === "generate_quiz" || tc.function?.name === "generate_quiz") {
+            quizToolIndex = toolIndex;
+            if (tc.function?.arguments) quizToolArgs += tc.function.arguments;
+          } else if (state.name === "save_memory" || tc.function?.name === "save_memory") {
+            memoryToolIndex = toolIndex;
+            if (tc.function?.arguments) memoryToolArgs += tc.function.arguments;
+          } else if (memoryToolIndex !== -1 && toolIndex === memoryToolIndex) {
+            if (tc.function?.arguments) memoryToolArgs += tc.function.arguments;
+          } else if (quizToolIndex !== -1 && toolIndex === quizToolIndex) {
             if (tc.function?.arguments) quizToolArgs += tc.function.arguments;
           }
         }
@@ -684,68 +554,106 @@ const streamAiResponse = async (
     }
   }
 
-  // Record completed web search calls into toolCalls
-  for (const [_, state] of webSearchToolCalls) {
-    let finalQuery = "";
-    try {
-      if (state.query) {
-        const parsed = JSON.parse(state.query);
-        finalQuery = parsed.query || "";
-      }
-    } catch (_) {}
-    toolCalls.push({
-      tool: "search_web",
-      query: finalQuery || state.lastEmittedQuery || "",
-    });
-  }
+  // Finalize tool calls once stream has ended
+  for (const [_, state] of toolCallsByIndex) {
+    const normalizedTool = NORMALIZE_TOOL_NAME[state.name] || state.name;
 
-  // Record completed web fetch calls into toolCalls
-  for (const [_, state] of webFetchToolCalls) {
-    let finalUrl = "";
-    try {
-      if (state.url) {
-        const parsed = JSON.parse(state.url);
-        finalUrl = parsed.url || "";
+    if (!state.emitted && state.rawArgs) {
+      try {
+        const parsed = JSON.parse(state.rawArgs);
+        if (normalizedTool === "search_web" && parsed.query) {
+          state.emitted = true;
+          state.parsedQuery = parsed.query;
+          res.write(
+            `data: ${JSON.stringify({
+              type: "tool_call",
+              id: state.id,
+              tool: "search_web",
+              query: parsed.query,
+            })}\n\n`,
+          );
+        } else if (normalizedTool === "crawl_url" && (parsed.url || parsed.query)) {
+          state.emitted = true;
+          state.parsedUrl = parsed.url || parsed.query;
+          res.write(
+            `data: ${JSON.stringify({
+              type: "tool_call",
+              id: state.id,
+              tool: "crawl_url",
+              url: state.parsedUrl,
+            })}\n\n`,
+          );
+        }
+      } catch (_) {
+        // Fallback regex extraction if stream was truncated before trailing JSON brace
+        if (normalizedTool === "search_web") {
+          const qMatch = state.rawArgs.match(/"query"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"/);
+          if (qMatch && qMatch[1]) {
+            state.emitted = true;
+            state.parsedQuery = qMatch[1];
+            res.write(
+              `data: ${JSON.stringify({
+                type: "tool_call",
+                id: state.id,
+                tool: "search_web",
+                query: qMatch[1],
+              })}\n\n`,
+            );
+          }
+        } else if (normalizedTool === "crawl_url") {
+          const uMatch = state.rawArgs.match(/"url"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"/);
+          if (uMatch && uMatch[1]) {
+            state.emitted = true;
+            state.parsedUrl = uMatch[1];
+            res.write(
+              `data: ${JSON.stringify({
+                type: "tool_call",
+                id: state.id,
+                tool: "crawl_url",
+                url: uMatch[1],
+              })}\n\n`,
+            );
+          }
+        }
       }
-    } catch (_) {}
-    toolCalls.push({
-      tool: "crawl_url",
-      url: finalUrl || state.lastEmittedUrl || "",
-    });
-  }
+    }
 
-  // Record citations into toolCalls and ensure search_web is present if citations exist or web was searched
-  if (citationsMap.size > 0 || shouldSearchWeb) {
-    const finalCitations = Array.from(citationsMap.values());
-    if (finalCitations.length > 0) {
+    if (normalizedTool === "search_web" && state.parsedQuery) {
       toolCalls.push({
-        tool: "web_citations",
-        citations: finalCitations,
+        id: state.id,
+        tool: "search_web",
+        query: state.parsedQuery,
+      });
+    } else if (normalizedTool === "crawl_url" && state.parsedUrl) {
+      toolCalls.push({
+        id: state.id,
+        tool: "crawl_url",
+        url: state.parsedUrl,
       });
     }
-    if (!toolCalls.some((t) => t.tool === "search_web")) {
-      const q = webSearchToolCalls.get(0)?.query || cleanInitialQuery || "web sources";
-      toolCalls.push({ tool: "search_web", query: q });
-    }
-    // Emit final clean citations snapshot to client if any citations exist
-    if (finalCitations.length > 0) {
-      res.write(
-        `data: ${JSON.stringify({
-          type: "tool_call",
-          tool: "web_citations",
-          citations: finalCitations,
-        })}\n\n`
-      );
-    }
+  }
+
+  // Record citations into toolCalls and emit final snapshot
+  if (citationsMap.size > 0) {
+    const finalCitations = Array.from(citationsMap.values());
+    toolCalls.push({
+      tool: "web_citations",
+      citations: finalCitations,
+    });
+    res.write(
+      `data: ${JSON.stringify({
+        type: "tool_call",
+        tool: "web_citations",
+        citations: finalCitations,
+      })}\n\n`,
+    );
   }
 
   // Execute memory save if triggered
   if (memoryToolIndex !== -1 && memoryToolArgs) {
     try {
       const args = JSON.parse(memoryToolArgs);
-      // Only save if we have both
       if (args.category && args.content && userId) {
-        // we need to dynamically import or require saveMemory to avoid circular deps
         import("../services/memoryService.js").then(({ saveMemory }) => {
           saveMemory(userId, args).catch(console.error);
         });
@@ -753,14 +661,12 @@ const streamAiResponse = async (
           `data: ${JSON.stringify({ type: "tool_call", tool: "save_memory" })}\n\n`,
         );
 
-        // Register the tool call in toolCalls so it gets saved to the session database
         toolCalls.push({
           tool: "save_memory",
           category: args.category,
           content: args.content,
         });
 
-        // Fallback: If the model didn't stream any text before calling the tool, generate a friendly reply
         if (!finalReply.trim()) {
           finalReply = `Got it! I've saved that to my memory: "${args.content}"`;
           res.write(
@@ -966,79 +872,8 @@ export const chatWithAiController = catchAsync(async (req, res) => {
 
     const currentMode = activeSession?.chatMode || chatMode || "casual";
 
-    // Autonomous tools: save_memory tool allows LLM to store information on demand
-    const saveMemoryTool = {
-      type: "function",
-      function: {
-        name: "save_memory",
-        description:
-          "Save an important personal fact, preference, goal, or detail explicitly shared by the user about themselves into long-term memory.",
-        parameters: {
-          type: "object",
-          properties: {
-            category: {
-              type: "string",
-              enum: ["PROFILE", "PREFERENCE", "GOAL", "PROJECT", "SKILL", "OTHER"],
-              description: "Category of the memory",
-            },
-            content: {
-              type: "string",
-              description: "The concise factual detail to remember about the user",
-            },
-          },
-          required: ["category", "content"],
-        },
-      },
-    };
-
-    const quizTool = {
-      type: "function",
-      function: {
-        name: "generate_quiz",
-        description: `Generate a multiple-choice quiz based on the user's request and context.
-CRITICAL: Before calling this tool, you MUST generate a conversational message (e.g. 'Here is a quick quiz to test your knowledge:'). After calling the tool, DO NOT output any more text. DO NOT include the correct answer or explanation in the tool call.
-
-MCQ GENERATION RULES:
-- Ask exactly one concept per question.
-- Question: 20-60 words (hard limit: 75).
-- Options: exactly 4.
-- Option length: 2-10 words (hard limit: 12).
-- Distractors should be plausible but clearly incorrect.
-- Prefer direct or scenario-based questions.
-- Avoid unnecessary context and filler.
-- The entire card should be readable in under 15 seconds.`,
-        parameters: {
-          type: "object",
-          properties: {
-            questions: {
-              type: "array",
-              items: {
-                type: "object",
-                properties: {
-                  id: {
-                    type: "string",
-                    description: "A unique identifier for this question (e.g. q1)",
-                  },
-                  question: { type: "string", description: "The quiz question" },
-                  options: {
-                    type: "array",
-                    items: { type: "string" },
-                    description: "4 possible answers",
-                  },
-                },
-                required: ["id", "question", "options"],
-              },
-            },
-          },
-          required: ["questions"],
-        },
-      },
-    };
-
-    const tools = [
-      saveMemoryTool,
-      ...(currentMode === "study" ? [quizTool] : []),
-    ];
+    // Available tools for current chat mode
+    const tools = getChatTools(currentMode);
 
     const effectiveReasoning = useReasoning === true || useReasoning === "true";
 
@@ -1079,9 +914,7 @@ MCQ GENERATION RULES:
         result.stream,
         res,
         noteFetched,
-        req.user._id,
-        message,
-        shouldSearchWeb
+        req.user._id
       );
       finalReply = responseObj.finalReply;
       toolCalls = responseObj.toolCalls;

@@ -95,9 +95,19 @@ export const chatWithAi = async ({
     fullSystemPrompt += `\n\n${webContext}`;
   }
 
-  // Web search awareness
+  // Web search awareness & autonomous query planning
   if (enableWeb === true) {
-    fullSystemPrompt += `\n\n--- WEB RESEARCH CAPABILITIES ---\nYou have live access to the internet via web search and web fetch tools. When asked for current news, live updates, trending topics, or real-time information, autonomously use your web tools instead of stating that you cannot browse the internet.`;
+    fullSystemPrompt += `\n\n--- WEB RESEARCH CAPABILITIES ---
+You have live access to the internet via web search (openrouter:web_search) and web fetch (openrouter:web_fetch) tools.
+- Decide autonomously whether live web information is necessary. Do not search for every message merely because web mode is enabled when the question can be answered reliably from your existing knowledge.
+- Use web research when the user's request depends on current or changing information, recent events, releases, prices, schedules, or external verification across multiple sources.
+- When searching:
+  1. Identify the specific information needed.
+  2. Formulate a concise, targeted, keyword-oriented search query optimized for retrieval. Do not copy the user's conversational wording or filler.
+  3. Inspect search results and evaluate whether they are sufficient.
+  4. Search again with an improved targeted query if the first results are insufficient, ambiguous, outdated, or require verification.
+  5. Use web_fetch when a specific source or URL requires deeper inspection.
+  6. Base your final answer on the retrieved evidence without exposing internal tool-planning details unnecessarily.`;
   } else {
     fullSystemPrompt += `\n\n--- WEB STATUS ---\nWeb browsing is currently disabled for this message. If the user asks for real-time or live web information, let them know they can toggle the 'Web' button in the toolbar.`;
   }
