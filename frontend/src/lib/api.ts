@@ -7,8 +7,21 @@ interface CustomAxiosRequest extends InternalAxiosRequestConfig {
   _retry?: boolean;
 }
 
+const getApiBaseUrl = () => {
+  const envUrl = import.meta.env.VITE_API_URL;
+  // Fallback to production live API when running inside packaged Electron (file:) or PROD if env points to localhost
+  if (import.meta.env.PROD || window.location.protocol === "file:") {
+    if (!envUrl || envUrl.includes("localhost")) {
+      return "https://notesify.in/api";
+    }
+  }
+  return envUrl || "https://notesify.in/api";
+};
+
+export const API_BASE_URL = getApiBaseUrl();
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
+  baseURL: API_BASE_URL,
   withCredentials: true,
 });
 
@@ -28,7 +41,7 @@ export const requestSessionRefresh = async () => {
 
       return axios
         .post(
-          `${import.meta.env.VITE_API_URL}/users/refresh`,
+          `${API_BASE_URL}/users/refresh`,
           {},
           { ...config, timeout: SESSION_REFRESH_TIMEOUT_MS }
         )
