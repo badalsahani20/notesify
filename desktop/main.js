@@ -9,7 +9,6 @@ const __dirname = path.dirname(__filename);
 let mainWindow;
 
 const isDev = !app.isPackaged;
-const PRODUCTION_URL = 'https://app.notesify.in';
 const PROTOCOL = 'notesify';
 
 // Ensure single instance for deep linking
@@ -120,19 +119,12 @@ function createWindow() {
     mainWindow.loadURL('http://localhost:5173');
     mainWindow.webContents.openDevTools();
   } else {
-    mainWindow.loadURL(PRODUCTION_URL);
+    mainWindow.loadFile(path.join(app.getAppPath(), 'frontend', 'dist', 'index.html'));
   }
 
   // Inject thin scrollbars after every page load (dev + prod)
   mainWindow.webContents.on('did-finish-load', () => {
     mainWindow.webContents.insertCSS(THIN_SCROLLBAR_CSS);
-  });
-
-  // Handle loading failures (offline fallback)
-  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
-    if (!isDev && validatedURL.startsWith(PRODUCTION_URL)) {
-      mainWindow.loadFile(path.join(__dirname, 'offline.html'));
-    }
   });
 
   mainWindow.once('ready-to-show', () => {

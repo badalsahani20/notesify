@@ -13,7 +13,7 @@ export const DownloadPage = () => {
   const targetOS = os?.toLowerCase() === 'mac' ? 'macOS' : os?.toLowerCase() === 'linux' ? 'Linux' : 'Windows';
   
   // Note: Replace this with your actual GitHub releases URL once deployed
-  const downloadUrl = 'https://github.com/badalsahani20/notesify/releases/latest/download/Notesify-Setup.exe';
+  const downloadUrl = 'https://github.com/badalsahani20/notesify/releases/download/v1.0.2/Notesify.Setup.1.0.2.exe';
 
   useEffect(() => {
     // Auto-start download after a brief 2 second delay for the animation

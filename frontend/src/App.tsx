@@ -10,6 +10,7 @@ import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import VerifyEmailPage from "./pages/VerifyEmailPage";
 import { WebSyncTriggers } from "./services/WebSyncTriggers";
+import { ElectronSyncTriggers } from "./services/ElectronSyncTriggers";
 import { useAuthStore } from "./store/useAuthStore";
 
 // Lazy-loaded components
@@ -32,10 +33,11 @@ function App() {
 
   useEffect(() => {
     if (!authChecked) return;
-    WebSyncTriggers.start();
-    return () => WebSyncTriggers.stop();
+    const isElectron = window.location.protocol === "file:";
+    const triggers = isElectron ? ElectronSyncTriggers : WebSyncTriggers;
+    triggers.start();
+    return () => triggers.stop();
   }, [authChecked]);
-
 
   return (
     <>

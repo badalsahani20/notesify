@@ -53,7 +53,8 @@
       "shortcutName": "Notesify"
     },
     "files": [
-      "desktop/**/*"
+      "desktop/**/*",
+      "frontend/dist/**/*"
     ],
     "asar": true
   },

@@ -7,6 +7,7 @@ import api from "@/lib/api";
 // Tracks pending title-refresh timers per noteId so autosave doesn't stack them
 const titleRefreshTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const onlineReconnectListeners = new Map<string, () => void>();
+const inFlightTitleRequests = new Set<string>();
 const DEFAULT_TITLES = new Set(["Untitled Note", "Untitled"]);
 const AUTO_TITLE_POLL_INTERVAL_MS = 2000;
 const AUTO_TITLE_POLL_MAX_ATTEMPTS = 6;
@@ -79,25 +80,35 @@ const scheduleAutoTitleSync = (
             }
 
             // Direct online title request from backend service
-            const res = await notesApi.generateTitle(localNote.content);
-            const generatedTitle = res.data?.title;
-
-            if (generatedTitle && !DEFAULT_TITLES.has(generatedTitle)) {
-                // Update local note in Dexie & React Query cache
-                const updatedNote = await noteRepository.updateNote(
-                    noteId,
-                    { title: generatedTitle },
-                    localNote.version
-                );
-
-                queryClient.setQueryData(["note", noteId], updatedNote);
-                queryClient.setQueryData(["notes"], (old: Note[] = []) => updateNoteInList(old, updatedNote));
-
+            if (inFlightTitleRequests.has(noteId)) {
                 titleRefreshTimers.delete(noteId);
                 return;
             }
 
-            scheduleAutoTitleSync(queryClient, noteId, attempt + 1);
+            inFlightTitleRequests.add(noteId);
+            try {
+                const res = await notesApi.generateTitle(localNote.content);
+                const generatedTitle = res.data?.title;
+
+                if (generatedTitle && !DEFAULT_TITLES.has(generatedTitle)) {
+                    // Update local note in Dexie & React Query cache
+                    const updatedNote = await noteRepository.updateNote(
+                        noteId,
+                        { title: generatedTitle },
+                        localNote.version
+                    );
+
+                    queryClient.setQueryData(["note", noteId], updatedNote);
+                    queryClient.setQueryData(["notes"], (old: Note[] = []) => updateNoteInList(old, updatedNote));
+
+                    titleRefreshTimers.delete(noteId);
+                    return;
+                }
+
+                scheduleAutoTitleSync(queryClient, noteId, attempt + 1);
+            } finally {
+                inFlightTitleRequests.delete(noteId);
+            }
         } catch (error) {
             console.error("Failed to sync AI title:", error);
             titleRefreshTimers.delete(noteId);
