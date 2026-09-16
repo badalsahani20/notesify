@@ -47,7 +47,8 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": "always",
       "createStartMenuShortcut": true,
-      "shortcutName": "Notesify"
+      "shortcutName": "Notesify",
+      "include": "build/installer.nsh"
     },
     "files": [
       "desktop/**/*",
