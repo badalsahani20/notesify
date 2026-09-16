@@ -12,10 +12,10 @@ const getApiBaseUrl = () => {
   // Fallback to production live API when running inside packaged Electron (file:) or PROD if env points to localhost
   if (import.meta.env.PROD || window.location.protocol === "file:") {
     if (!envUrl || envUrl.includes("localhost")) {
-      return "https://notesify.in/api";
+      return "https://fullstack-notes-app-xluo.onrender.com/api";
     }
   }
-  return envUrl || "https://notesify.in/api";
+  return envUrl || "https://fullstack-notes-app-xluo.onrender.com/api";
 };
 
 export const API_BASE_URL = getApiBaseUrl();
