@@ -1,6 +1,6 @@
 {
   "name": "fullstack-notes-desktop",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "main": "desktop/main.js",
@@ -22,7 +22,7 @@
   "build": {
     "appId": "com.fullstack-notes.app",
     "productName": "Notesify",
-    "artifactName": "Notesify-Setup.exe",
+    "artifactName": "Notesify.Setup.${version}.exe",
     "protocols": {
       "name": "Notesify Protocol",
       "schemes": [

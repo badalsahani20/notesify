@@ -53,7 +53,7 @@ const AppHeader = ({ theme, onToggleTheme, onMenuOpen }: AppHeaderProps) => {
           <div className="absolute inset-0 bg-white/5 blur-md" />
           <div className="relative w-8 h-8 overflow-hidden bg-black shadow-[0_0_15px_rgba(255,255,255,0.05)]">
             <img 
-              src="/notesify-favicon.png" 
+              src="./notesify-favicon.png" 
               alt="Notesify" 
               width={32} 
               height={32} 

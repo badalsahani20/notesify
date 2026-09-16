@@ -24,7 +24,7 @@ const LoadingState = () => (
       <div className="absolute inset-0 rounded-full blur-xl bg-indigo-500/20 animate-pulse" />
       <div className="relative w-14 h-14 rounded-2xl overflow-hidden bg-black border border-white/10 shadow-2xl">
         <img
-          src="/notesify-favicon.png"
+          src="./notesify-favicon.png"
           alt="Notesify"
           className="w-full h-full object-cover scale-[1.15]"
         />
@@ -110,7 +110,7 @@ const SharedNotePage = () => {
               <div className="absolute inset-0 rounded-xl bg-indigo-500/20 blur-md" />
               <div className="relative w-7 h-7 rounded-lg overflow-hidden bg-black border border-white/10">
                 <img
-                  src="/notesify-favicon.png"
+                  src="./notesify-favicon.png"
                   alt="Notesify"
                   className="w-full h-full object-cover scale-[1.15]"
                 />
@@ -173,7 +173,7 @@ const SharedNotePage = () => {
             <div className="absolute inset-0 rounded-lg bg-indigo-500/20 blur-sm" />
             <div className="relative w-7 h-7 rounded-lg overflow-hidden bg-black border border-white/10">
               <img
-                src="/notesify-favicon.png"
+                src="./notesify-favicon.png"
                 alt="Notesify"
                 className="w-full h-full object-cover scale-[1.15]"
               />

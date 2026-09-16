@@ -4,7 +4,7 @@ import { SectionLabel } from "./SettingsShared";
 export const AboutTab = () => (
   <div className="space-y-1">
     <div className="flex flex-col items-center gap-3 py-8 text-center">
-      <img src="/notesify-favicon.png" alt="Notesify" className="h-14 w-14 rounded-2xl shadow-lg" />
+      <img src="./notesify-favicon.png" alt="Notesify" className="h-14 w-14 rounded-2xl shadow-lg" />
       <div>
         <p className="text-xl font-bold text-white tracking-tight">Notesify</p>
         <p className="text-sm text-zinc-500 mt-1">The AI-powered notes workspace</p>

@@ -68,7 +68,7 @@ const SignupForm = () => {
           <div className="relative">
             <div className="absolute inset-0 rounded-2xl bg-white/10 blur-[30px] scale-110" />
             <img
-              src="/notesify-favicon.png"
+              src="./notesify-favicon.png"
               alt="Notesify"
               width={56}
               height={56}
