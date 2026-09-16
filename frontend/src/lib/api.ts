@@ -77,18 +77,34 @@ const isAuthRoute = (url = "") =>
   url.includes("/users/showcase") ||
   url.includes("/public/");
 
+export const safeNavigateToLogin = () => {
+  if (isPublicPage()) return;
+  if (window.location.protocol === "file:" || window.location.hash.startsWith("#")) {
+    window.location.hash = "#/login";
+  } else {
+    window.location.href = "/login";
+  }
+};
+
 const isPublicPage = () => {
+  const hash = window.location.hash.replace(/^#/, "").split("?")[0] || "";
   const path = window.location.pathname;
-  return (
-    path === "/login" ||
-    path === "/signup" ||
-    path === "/register" ||
-    path === "/verify-email" ||
-    path === "/forgot-password" ||
-    path === "/oauth-success" ||
-    path.startsWith("/reset-password") ||
-    path.startsWith("/shared/")
-  );
+
+  const publicRoutes = [
+    "/login",
+    "/signup",
+    "/register",
+    "/verify-email",
+    "/forgot-password",
+    "/oauth-success",
+  ];
+
+  const matchesRoute = (route: string) =>
+    publicRoutes.includes(route) ||
+    route.startsWith("/reset-password") ||
+    route.startsWith("/shared/");
+
+  return matchesRoute(hash) || matchesRoute(path);
 };
 
 const createAuthError = (config: InternalAxiosRequestConfig) => {
@@ -123,7 +139,7 @@ api.interceptors.request.use(async (config) => {
       // local data and the sync queue intact during offline/server failures.
       if ([401, 403].includes(status ?? 0)) {
         clearAllLocalState();
-        if (!isPublicPage()) window.location.href = "/login";
+        safeNavigateToLogin();
         throw createAuthError(config);
       }
 
@@ -136,7 +152,7 @@ api.interceptors.request.use(async (config) => {
     config.headers.Authorization = `Bearer ${token}`;
   } else if (!isAuthRoute(config.url)) {
     clearAllLocalState();
-    if (!isPublicPage()) window.location.href = "/login";
+    safeNavigateToLogin();
     throw createAuthError(config);
   }
 
@@ -164,7 +180,7 @@ api.interceptors.response.use(
         // user out or delete offline data unless refresh was rejected as auth.
         if ([401, 403].includes(status ?? 0)) {
           clearAllLocalState();
-          if (!isPublicPage()) window.location.href = "/login";
+          safeNavigateToLogin();
         }
         return Promise.reject(refreshErr);
       }

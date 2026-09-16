@@ -1,4 +1,4 @@
-import api, { requestSessionRefresh } from "@/lib/api";
+import api, { API_BASE_URL, requestSessionRefresh } from "@/lib/api";
 import { useAuthStore } from "@/store/useAuthStore";
 import type { AiAction } from "@/components/ai/types";
 
@@ -26,7 +26,7 @@ export const postAiAssistStream = async ({
     stream: true,
   });
 
-  let response = await fetch(`${import.meta.env.VITE_API_URL}/ai/assist`, {
+  let response = await fetch(`${API_BASE_URL}/ai/assist`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -38,7 +38,7 @@ export const postAiAssistStream = async ({
 
   if (response.status === 401) {
     const newToken = await requestSessionRefresh();
-    response = await fetch(`${import.meta.env.VITE_API_URL}/ai/assist`, {
+    response = await fetch(`${API_BASE_URL}/ai/assist`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

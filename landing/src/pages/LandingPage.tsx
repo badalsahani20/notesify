@@ -18,15 +18,16 @@ import { Footer } from '../components/landing/Footer';
 import { SEO } from '../components/landing/SEO';
 
 import { HeroScreenshot } from '../components/landing/HeroScreenshot';
+import { OfflineShowcase } from '../components/landing/OfflineShowcase';
 
 export const LandingPage = () => {
   const [isScreenshotExpanded, setIsScreenshotExpanded] = useState(false);
   return (
     <div className="min-h-screen bg-[#050505] text-stone-200 selection:bg-indigo-500/30 font-sans overflow-x-hidden">
       <SEO 
-        title="Notesify — AI Notes, Quizzes & Flashcards in One Study Workspace"
-        description="Write notes, ask doubts, generate AI-powered quizzes, flashcards, notes, summaries, and study smarter with Notesify — a calm workspace built for focused learning."
-        keywords="ai notes app, flashcards app, quiz generator, markdown notes, study app, ai study assistant, notesify"
+        title="Notesify — Offline-Ready AI Notes & Study Workspace"
+        description="Your notes, online or offline. Read, write, and organize locally with automatic cloud synchronization and Iris AI assistance."
+        keywords="offline notes app, ai notes app, local first notes, study app, ai study assistant, notesify"
         path="/"
       />
       <Header />
@@ -40,7 +41,11 @@ export const LandingPage = () => {
           onExpand={() => setIsScreenshotExpanded(true)} 
         />
 
+        {/* --- Offline-First Star Showcase --- */}
+        <OfflineShowcase />
+
         {/* --- Iris Preview Section --- */}
+
         <section className="relative py-24 bg-[#050505]/50 border-t border-white/5">
           <div className="container mx-auto px-6 max-w-4xl">
             <div className="text-center mb-12">

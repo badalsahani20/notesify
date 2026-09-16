@@ -24,6 +24,15 @@ export const Hero = () => {
           </div>
         </FadeIn>
 
+        <FadeIn delay={350}>
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-medium bg-white/[0.04] border border-white/10 text-stone-300 mb-6 backdrop-blur-md hover:border-indigo-500/40 transition-all">
+            <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span>Offline-Ready Workspace</span>
+            <span className="text-stone-600">·</span>
+            <span className="text-indigo-300">Dual Sync Reconciler</span>
+          </div>
+        </FadeIn>
+
         <FadeIn delay={400}>
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight text-white leading-[1.15] mb-6">
             A calm space for your <br className="hidden sm:block" />

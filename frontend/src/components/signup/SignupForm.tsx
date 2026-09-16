@@ -46,9 +46,10 @@ const SignupForm = () => {
   const isDesktop = !!(window as any).electronAPI?.auth; //return true if desktop and false if web
 
   const handleGoogleSignup = async () => {
+    const { API_BASE_URL } = await import("@/lib/api");
     if (isDesktop) {
       const { challenge } = await generatePkceChallenge();
-      const authUrl = new URL(`${import.meta.env.VITE_API_URL}/users/google`);
+      const authUrl = new URL(`${API_BASE_URL}/users/google`);
       authUrl.searchParams.set("code_challenge", challenge);
       authUrl.searchParams.set("redirect_uri", "notesify://callback");
       authUrl.searchParams.set("clientId", "notesify-desktop");
@@ -57,7 +58,7 @@ const SignupForm = () => {
       // Open in system browser, via IPC
       (window as any).electronAPI.auth.openExternal(authUrl.toString());
     } else {
-      window.location.href = `${import.meta.env.VITE_API_URL}/users/google`;
+      window.location.href = `${API_BASE_URL}/users/google`;
     }
   };
 

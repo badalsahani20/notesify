@@ -52,7 +52,7 @@ export const generateTitleFromText = async (text) => {
   if (genAI) {
     try {
       const geminiModel = genAI.getGenerativeModel({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.5-flash-lite",
       });
       const result = await geminiModel.generateContent(
         `Generate a short, specific, high-quality title (3 to 6 words) for this note content. Do NOT wrap in quotes, do NOT include markdown formatting or trailing punctuation. Return ONLY the title string.\n\nNote Content:\n${source.slice(
@@ -62,11 +62,11 @@ export const generateTitleFromText = async (text) => {
       );
       rawTitle = result.response?.text?.() || "";
       if (rawTitle) {
-        successfulProvider = "Gemini 2.5 Flash";
+        successfulProvider = "Gemini 3.5 Flash Lite";
       }
     } catch (geminiErr) {
       console.warn(
-        "❌ [TitleService] Provider [Gemini 2.5 Flash] failed:",
+        "❌ [TitleService] Provider [Gemini 3.5 Flash Lite] failed:",
         geminiErr.message,
       );
     }
@@ -112,7 +112,7 @@ export const generateTitleFromText = async (text) => {
     }
   }
 
-  // 4. Final title formatting and clean-up
+// 4. Final title formatting and clean-up
   const title = rawTitle
     .replace(/```[\s\S]*?```/g, "")
     .replace(/^(here is (a |the )?(short |suggested )?title|suggested title|title)\s*:\s*/i, "")
@@ -132,6 +132,131 @@ export const generateTitleFromText = async (text) => {
 
   const finalTitle = title.slice(0, 54);
   console.log(`✅ [TitleService] Successfully generated title via [${successfulProvider}]: "${finalTitle}"`);
+  return finalTitle;
+};
+
+/**
+ * Strips conversational filler, conversational prefixes, and personal greetings
+ * from a raw conversation turn to produce clean topic text.
+ */
+export const sanitizeConversationText = (text = "") => {
+  return text
+    .replace(/^(user|assistant|system|iris)\s*:\s*/gi, "")
+    .replace(/^\[Attached Image[^\]]*\]\s*/gi, "")
+    .replace(/\b(hey|hello|hi|yo|sup|please|can you|could you|i want to know|tell me about|explain to me|help me with|show me|review this)\b/gi, "")
+    .replace(/\s+/g, " ")
+    .replace(/^["'`*_#\s,.:;-]+|["'`*_#\s,.:;-]+$/g, "")
+    .trim();
+};
+
+/**
+ * Dedicated high-quality session title generator for AI conversations.
+ * Produces a concise 3-7 word topic bookmark without "User:", greetings, or transcripts.
+ */
+export const generateConversationTitle = async (messages = []) => {
+  if (!Array.isArray(messages) || messages.length === 0) {
+    return "New Conversation";
+  }
+
+  // Extract up to the first 4 meaningful turns (user & assistant)
+  const meaningfulTurns = messages
+    .filter((m) => m && m.content && typeof m.content === "string")
+    .slice(0, 4)
+    .map((m) => {
+      const role = m.role === "assistant" ? "Assistant" : "User";
+      const clean = sanitizeConversationText(stripHtml(m.content));
+      return clean ? `${role}: ${clean.slice(0, 300)}` : "";
+    })
+    .filter(Boolean);
+
+  if (meaningfulTurns.length === 0) {
+    return "New Conversation";
+  }
+
+  const conversationSummary = meaningfulTurns.join("\n");
+
+  // Fallback title derived from sanitized first user query
+  const firstUserMsg = messages.find((m) => m.role === "user");
+  const sanitizedFirst = sanitizeConversationText(stripHtml(firstUserMsg?.content || ""));
+  const words = sanitizedFirst.split(/\s+/).filter(Boolean);
+  const fallbackTitle = words.length > 0
+    ? words.slice(0, 6).map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ")
+    : "New Conversation";
+
+  const systemPrompt =
+    "You are a concise session title generator for an AI note-taking app. " +
+    "Generate a specific, natural, 3 to 6 word title summarizing the central topic or task of this conversation. " +
+    "STRICT RULES:\n" +
+    "- Return ONLY the title string.\n" +
+    "- No quotes, no markdown, no punctuation at the end.\n" +
+    "- Do NOT include transcript labels like 'User:', 'Assistant:', or message numbers.\n" +
+    "- Do NOT include conversational filler like 'Hey', 'Can you', 'Yo', 'I want', etc.\n" +
+    "- Do NOT include names of users or AI assistants.\n" +
+    "- Never return 'New Chat' or 'Conversation'.";
+
+  const titleMessages = [
+    { role: "system", content: systemPrompt },
+    { role: "user", content: `Conversation Context:\n${conversationSummary}\n\nTitle:` },
+  ];
+
+  let rawTitle = "";
+  let successfulProvider = "";
+
+  // 1. Try Gemini AI
+  const genAI = getGenAI();
+  if (genAI) {
+    try {
+      const geminiModel = genAI.getGenerativeModel({ model: "gemini-3.5-flash-lite" });
+      const prompt = `${systemPrompt}\n\nConversation Context:\n${conversationSummary}\n\nTitle:`;
+      const result = await geminiModel.generateContent(prompt);
+      rawTitle = result.response?.text?.() || "";
+      if (rawTitle) successfulProvider = "Gemini 3.5 Flash Lite";
+    } catch (err) {
+      console.warn("❌ [TitleService:Conversation] Gemini failed:", err.message);
+    }
+  }
+
+  // 2. Fall back to Groq
+  if (!rawTitle && process.env.GROQ_API_KEY) {
+    try {
+      rawTitle = await executeGroq(titleMessages, false, "openai/gpt-oss-20b");
+      if (rawTitle) successfulProvider = "Groq (openai/gpt-oss-20b)";
+    } catch (err) {
+      console.warn("❌ [TitleService:Conversation] Groq failed:", err.message);
+    }
+  }
+
+  // 3. Fall back to OpenRouter
+  if (!rawTitle) {
+    try {
+      rawTitle = await executeOpenRouter(TITLE_MODEL, titleMessages, false, false);
+      if (rawTitle) successfulProvider = `OpenRouter (${TITLE_MODEL})`;
+    } catch (err) {
+      console.warn("❌ [TitleService:Conversation] OpenRouter failed:", err.message);
+    }
+  }
+
+  // 4. Sanitize and validate
+  let cleaned = rawTitle
+    .replace(/```[\s\S]*?```/g, "")
+    .replace(/^(here is (a |the )?(short |suggested )?title|suggested title|title)\s*:\s*/i, "")
+    .replace(/^(user|assistant|system|iris)\s*:\s*/gi, "")
+    .replace(/^["'`*_#\s]+|["'`*_#\s]+$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const isInvalid =
+    !cleaned ||
+    /^(here is|here's|untitled|new chat|conversation|title)/i.test(cleaned) ||
+    /return only|no quotes|3 to 6 words/i.test(cleaned);
+
+  if (isInvalid) {
+    console.warn(`⚠️ [TitleService:Conversation] Providers returned invalid title. Using fallback: "${fallbackTitle}"`);
+    return fallbackTitle;
+  }
+
+  const finalTitle = cleaned.slice(0, 54);
+  console.log(`✅ [TitleService:Conversation] Generated via [${successfulProvider}]: "${finalTitle}"`);
   return finalTitle;
 };
 

@@ -164,7 +164,11 @@ export const GlobalChatSidebar = memo(({
                       >
                         <div className="flex items-center gap-2 truncate min-w-0 flex-1">
                           <MessageSquare size={12} className={cn("shrink-0", isActive ? "text-indigo-400" : "text-white/30 group-hover:text-white/60")} />
-                          <span className="truncate leading-tight text-[12px]">{session.title || "Untitled Chat"}</span>
+                          <span className="truncate leading-tight text-[12px]">
+                            {session.title
+                              ? session.title.replace(/^(user|assistant|system)\s*:\s*/gi, "").trim() || "Untitled Chat"
+                              : "Untitled Chat"}
+                          </span>
                         </div>
                         <span className="text-[10px] text-white/35 shrink-0 flex items-center gap-0.5">
                           {formatCompactTime(session.updatedAt)}

@@ -1,4 +1,4 @@
-import { getGeminiClient, ensureAiApiKey, getOpenRouterApiKey, NOTES_GENERATION_MODEL, VISUALIZATION_MODEL } from "../config/aiModels.js";
+import { getGeminiClient, ensureAiApiKey, getOpenRouterApiKey, QUICK_MODEL, GRAMMAR_MODEL } from "../config/aiModels.js";
 import { executeOpenRouter } from "./openRouterClient.js";
 
 export const executeGemini = async (messages, stream = false) => {
@@ -26,9 +26,9 @@ export const generateContentWithFallback = async (prompt, stream = true) => {
 
   if (getOpenRouterApiKey()) {
     try {
-      return await executeOpenRouter(NOTES_GENERATION_MODEL, message, stream);
+      return await executeOpenRouter(GRAMMAR_MODEL, message, stream);
     } catch (err) {
-      errors.push(`${NOTES_GENERATION_MODEL} failed: ${err.message}`);
+      errors.push(`${GRAMMAR_MODEL} failed: ${err.message}`);
     }
   }
 
@@ -42,9 +42,9 @@ export const generateContentWithFallback = async (prompt, stream = true) => {
 
   if (getOpenRouterApiKey()) {
     try {
-      return await executeOpenRouter(VISUALIZATION_MODEL, message, stream);
+      return await executeOpenRouter(QUICK_MODEL, message, stream);
     } catch (err) {
-      errors.push(`${VISUALIZATION_MODEL}/OpenRouter failed: ${err.message}`);
+      errors.push(`${QUICK_MODEL}/OpenRouter failed: ${err.message}`);
     }
   }
 

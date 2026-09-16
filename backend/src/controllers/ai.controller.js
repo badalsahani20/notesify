@@ -3,7 +3,7 @@ import User from "../models/user.model.js";
 import Notes from "../models/notes.model.js";
 import AiAssistCache from "../models/aiAssistCache.model.js";
 import catchAsync from "../utils/catchAsync.js";
-import { generateTitle } from "../services/title.service.js";
+import { generateTitle, generateConversationTitle } from "../services/title.service.js";
 import {
   checkGrammar,
   chatWithAi,
@@ -48,13 +48,14 @@ const hashText = (text = "") =>
 const cleanSessionTitle = (title = "") => {
   const cleaned = title
     .replace(/^title\s*:\s*/i, "")
+    .replace(/^(user|assistant|system|iris)\s*:\s*/gi, "")
     .replace(/^["'`*_#\s]+|["'`*_#\s]+$/g, "")
     .replace(/\s+/g, " ")
     .trim();
 
   if (
     !cleaned ||
-    /generate|descriptive|return only|no quotes|input content|task:/i.test(
+    /^(here is|here's|untitled|task:|generate|descriptive|return only|no quotes|input content)/i.test(
       cleaned,
     )
   ) {
@@ -736,29 +737,25 @@ const persistToDb = async (
   if (summary) sessionToUpdate.summary = summary;
   await sessionToUpdate.save();
 
+  const userTurnCount = sessionToUpdate.messages.filter((msg) => msg.role === "user").length;
+  const isUntitled = !sessionToUpdate.title || sessionToUpdate.title === "New Chat";
+
+  // Generate title promptly once meaningful conversation context exists:
+  // - After first turn (1 user + 1 assistant message) if session is still untitled
+  // - Or refine once at turn 2 if initial title was a basic fallback
   const shouldGenerateTitle =
-    (!sessionToUpdate.title || sessionToUpdate.title === "New Chat") &&
-    sessionToUpdate.messages.filter((msg) => msg.role === "user").length >= 2;
+    (isUntitled && userTurnCount >= 1) ||
+    (sessionToUpdate.title === "New Conversation" && userTurnCount === 2);
 
   if (shouldGenerateTitle) {
-    console.log("🏷️ Generating title for session:", activeSessionId);
+    console.log("🏷️ Generating conversation title for session:", activeSessionId);
 
-    // Use only the first user message + first assistant reply.
-    // Avoids noise from system prompts, tool calls, and image blobs.
-    const firstUser = sessionToUpdate.messages.find((m) => m.role === "user");
-    const firstAssistant = sessionToUpdate.messages.find((m) => m.role === "assistant");
-    const titleContext = [
-      firstUser ? `User: ${firstUser.content}` : "",
-      firstAssistant ? `Assistant: ${firstAssistant.content}` : "",
-    ]
-      .filter(Boolean)
-      .join("\n\n");
-
-    generateTitle(titleContext)
+    generateConversationTitle(sessionToUpdate.messages)
       .then((title) => {
-        console.log("✅ Title generated:", title);
+        const cleanTitle = cleanSessionTitle(title);
+        console.log("✅ Conversation title generated:", cleanTitle);
         return GlobalChatSession.findByIdAndUpdate(activeSessionId, {
-          title,
+          title: cleanTitle,
         }).exec();
       })
       .catch((err) => console.error("❌ Title update failed:", err.message));

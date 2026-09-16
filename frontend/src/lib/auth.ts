@@ -24,8 +24,9 @@ export const logout = async () => {
     } catch (error) {
         console.error("Logout failed on server", error);
     } finally {
-        // Always clear local state even if server request fails
+        // Always clear local state even if server request fails.
+        // PrivateRoute and React Router's Navigate handle declarative redirection
+        // to /login without forcing an invalid file:///login browser navigation in Electron.
         clearAllLocalState();
-        window.location.href = "/login";
     }
 }

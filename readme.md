@@ -11,6 +11,15 @@ A production-grade, full-stack notes application built on the MERN stack — fea
 
 ---
 
+## 🚀 What's New in v1.1.0
+- **Full Offline-First Capability (Packaged Desktop):** The Electron desktop client operates locally via bundled assets (`file://`) and Dexie / IndexedDB. Notes, notebooks, and state changes persist on disk offline with bidirectional queue synchronization and conflict-free reconciliation upon reconnection.
+- **DPI-Aware Native Windows Installer:** Enhanced NSIS installer configuration with true Per-Monitor V2 DPI awareness, eliminating blurry text and interface scaling artifacts at 125%, 150%, and higher Windows display scaling settings.
+- **Smart AI Session Title Generation:** Autonomous multi-turn title summarization for Global AI Chat. Automatically generates natural 3–6 word topic bookmarks (e.g. *"Offline-First Dexie Sync Plan"*) by filtering out filler words, transcript labels (`User:`, `Assistant:`), and user names.
+- **Gemini 3.5 Flash Lite Integration:** Upgraded title generation and long-term conversation summarization to Google's ultra-fast `gemini-3.5-flash-lite`, delivering instant title synthesis and lower latency.
+- **Zero-Flicker Safe Desktop Routing & Teardown:** Packaged desktop routing utilizes hash-aware navigation safeguards and declarative React Router routing on logout, preventing white screens, invalid `file://` navigations, and unauthenticated post-logout background sync triggers.
+
+---
+
 ## 🚀 What's New in v1.0.3
 - **Real-Time Web Search & Source Citations:** Global AI Chat features integrated live web browsing powered by OpenRouter + Exa (`openrouter:web_search` and `openrouter:web_fetch`). Includes real-time streaming telemetry (`● Searching the web for "<query>"`), automatic search keyword extraction from conversational prompts, and interactive source citation badges.
 - **High-Performance Memory & Zero-Latency Routing:** Replaced per-message embedding generation and vector lookups with direct indexed memory retrieval (~1ms) and autonomous LLM tool calling (`save_memory`). Casual messages no longer suffer from unnecessary vector latency or false-positive note injections.
@@ -23,6 +32,12 @@ A production-grade, full-stack notes application built on the MERN stack — fea
 ## Architecture Highlights
 
 These are the non-trivial engineering decisions behind Notesify — the things that separate it from a tutorial CRUD app.
+
+### Offline-First Architecture & Dual Synchronization
+Notesify desktop operates as an offline-first workspace powered by Dexie.js (IndexedDB) and an asynchronous mutation queue.
+- **Local Read/Write Execution**: Notes and folders render and mutate locally in sub-millisecond time.
+- **Safe State Reconciler**: Background sync queues push local changes and pull remote modifications with version-based OCC checks.
+- **Zero-Blank Desktop Teardown**: Packaged Electron runs under `file://` with `HashRouter`. Authentication state teardown cleans local Dexie cache, safeStorage credentials, and React Query caches declaratively without triggering broken filesystem redirects.
 
 ### Optimistic Concurrency Control (OCC)
 All core documents carry a `version` field. Every mutation from the client must include the current version. If another session modified the document in the meantime, the backend returns a `409 Conflict` — the frontend handles state-merging gracefully instead of silently overwriting data. Combined with TanStack React Query's optimistic UI, mutations feel instant while remaining safe under concurrent edits.
@@ -38,7 +53,7 @@ Iris AI routes requests dynamically across providers based on task type:
 | OpenRouter | Ling 3.0 Flash (`ling-3.0-flash`) | Quick operations and complex document analysis |
 | OpenRouter | GPT-OSS 120B (`openai/gpt-oss-120b`) | Autonomous notes generation |
 | Groq | OpenAI GPT-OSS 120B / 20B | High-speed fallback, conversation summarization, and title generation |
-| Google Gemini | Gemma 4 26B (`gemma-4-26b-a4b-it`) | Summarization and content extraction fallback |
+| Google Gemini | Gemini 3.5 Flash Lite (`gemini-3.5-flash-lite`) | High-speed conversation title generation & context summarization |
 
 Cascading fallbacks ensure near-zero AI downtime: DeepSeek → Groq (GPT-OSS 120B) on failure, primary chat → Gemini on failure.
 

@@ -154,8 +154,9 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
 
     try {
       const { accessToken } = (await import("./useAuthStore")).useAuthStore.getState();
+      const { API_BASE_URL } = await import("@/lib/api");
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/ai/chat`, {
+      const response = await fetch(`${API_BASE_URL}/ai/chat`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -179,6 +180,16 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
       const newSessionId = response.headers.get("X-Session-Id");
       const effectiveSessionId = newSessionId || requestSessionId;
       if (newSessionId) {
+        // Derive clean optimistic title without transcript/filler prefixes
+        const cleanInitial = text
+          .replace(/^(user|assistant|system)\s*:\s*/gi, "")
+          .replace(/\b(hey|hello|hi|yo|sup|can you|could you|please)\b/gi, "")
+          .replace(/\s+/g, " ")
+          .trim();
+        const optimisticTitle = cleanInitial
+          ? cleanInitial.slice(0, 42)
+          : "New Chat";
+
         set((state) => ({
           activeSessionId: newSessionId,
           sessions: state.sessions.some((session) => session._id === newSessionId)
@@ -186,7 +197,7 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
             : [
                 {
                   _id: newSessionId,
-                  title: text.slice(0, 48) || "New Chat",
+                  title: optimisticTitle,
                   updatedAt: new Date().toISOString(),
                 },
                 ...state.sessions,
@@ -271,11 +282,12 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
 
       const userTurnCount = get().messages.filter((message) => message.role === "user").length;
 
-      // The backend generates a title after 2 user turns.
-      if (effectiveSessionId && userTurnCount >= 2) {
+      // The backend generates/refines a high-quality title after conversation turns.
+      // Fetch updated sessions once title generation completes in the background.
+      if (effectiveSessionId && (userTurnCount === 1 || userTurnCount === 2)) {
         window.setTimeout(() => {
           get().fetchSessions();
-        }, 2500);
+        }, 2200);
       }
 
     } catch (err: any) {

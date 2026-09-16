@@ -29,15 +29,16 @@ import WelcomeLoader from "./components/ui/WelcomeLoader";
 const RouteLoader = () => <WelcomeLoader />;
 
 function App() {
-  const authChecked = useAuthStore((state) => state.authChecked);
+  const { user, accessToken, authChecked } = useAuthStore();
+  const isAuthenticated = Boolean(authChecked && user && (accessToken || !navigator.onLine));
 
   useEffect(() => {
-    if (!authChecked) return;
+    if (!isAuthenticated) return;
     const isElectron = window.location.protocol === "file:";
     const triggers = isElectron ? ElectronSyncTriggers : WebSyncTriggers;
     triggers.start();
     return () => triggers.stop();
-  }, [authChecked]);
+  }, [isAuthenticated]);
 
   return (
     <>

@@ -115,6 +115,19 @@ const FeatureIcon = ({ title }: { title: string }) => {
     );
   }
 
+  if (title === "Offline-First Reliability") {
+    return (
+      <div className="relative mb-5 group h-12 w-12 shrink-0 perspective-1000">
+        <div className="absolute inset-0 bg-emerald-500/20 rounded-xl blur-md transition-all duration-500 group-hover:bg-emerald-500/40 group-hover:blur-xl" />
+        <div className="relative h-full w-full rounded-xl bg-white/[0.02] backdrop-blur-sm border border-white/10 flex items-center justify-center overflow-hidden transition-transform duration-500 group-hover:scale-105">
+          <svg className="w-5 h-5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M1 1l22 22M16.72 11.06A10.94 10.94 0 0 1 19 12.55M5 12.55a10.94 10.94 0 0 1 5.17-2.39M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01" />
+          </svg>
+        </div>
+      </div>
+    );
+  }
+
   // Grows With Your Thoughts
   return (
     <div className="relative mb-5 group h-12 w-12 shrink-0 perspective-1000">
@@ -132,6 +145,10 @@ const FeatureIcon = ({ title }: { title: string }) => {
 export const Features = () => {
   const features = [
     {
+      title: "Offline-First Reliability",
+      desc: "Your workspace doesn't stop when your connection does. Write, edit, and organize locally; changes synchronize automatically when reconnected.",
+    },
+    {
       title: "An Assistant That Researches",
       desc: "Iris doesn't guess. It browses the live web to find the exact, up-to-date information you need before answering.",
     },
@@ -141,7 +158,7 @@ export const Features = () => {
     },
     {
       title: "The Right Tool For The Job",
-      desc: "Whether you need a quick grammar fix or deep logical reasoning, Iris instantly selects the most capable AI model behind the scenes.",
+      desc: "Whether you need a quick grammar fix or deep logical reasoning, Iris selects the most capable AI model behind the scenes.",
     },
     {
       title: "Never Leave Your Editor",
@@ -150,10 +167,6 @@ export const Features = () => {
     {
       title: "Write Together, Not Alone",
       desc: "Select a rough paragraph and let Iris polish it. Review suggestions as inline 'ghost text' and accept them with a single click.",
-    },
-    {
-      title: "Share With Confidence",
-      desc: "Generate clean, beautiful links to share your work. Add password protection or let them expire automatically when you're done.",
     },
   ];
 

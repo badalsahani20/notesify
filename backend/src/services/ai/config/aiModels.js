@@ -12,6 +12,7 @@ export const COMPLEX_ANALYSIS_MODEL = "inclusionai/ling-3.0-flash";
 export const VISUALIZATION_MODEL = "z-ai/glm-5.3-flash";
 export const VISUALIZATION_FALLBACK_MODEL = "qwen/qwen3.7-flash";
 export const NOTES_GENERATION_MODEL = "openai/gpt-oss-120b";
+export const GRAMMAR_MODEL = "meta-llama/llama-3.1-8b-instruct"
 export const FALLBACK_MODEL = "openai/gpt-oss-120b";
 export const GROQ_CHEAP_MODEL = "openai/gpt-oss-20b";
 export const GROQ_STRONG_MODEL = "openai/gpt-oss-120b";
@@ -19,7 +20,7 @@ export const GROQ_STRONG_MODEL = "openai/gpt-oss-120b";
 export const getGeminiClient = () => {
   if (!process.env.GEMINI_API_KEY) return null;
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  return genAI.getGenerativeModel({ model: "gemma-4-26b-a4b-it" });
+  return genAI.getGenerativeModel({ model: "gemini-3.5-flash-lite" });
 };
 
 export const getOpenRouterApiKey = () =>

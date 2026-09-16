@@ -1,4 +1,4 @@
-import { requestSessionRefresh } from "@/lib/api";
+import { API_BASE_URL, requestSessionRefresh } from "@/lib/api";
 import { useAuthStore } from "@/store/useAuthStore";
 import type { ChatHistoryMessage } from "@/components/ai/types";
 import type { StructuredNoteContext } from "@/utils/ai/noteContextBuilder";
@@ -28,7 +28,7 @@ export const postAiChatStream = async (payload: ChatStreamPayload): Promise<Resp
     stream: true,
   });
 
-  let response = await fetch(`${import.meta.env.VITE_API_URL}/ai/chat`, {
+  let response = await fetch(`${API_BASE_URL}/ai/chat`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -40,7 +40,7 @@ export const postAiChatStream = async (payload: ChatStreamPayload): Promise<Resp
 
   if (response.status === 401) {
     const newToken = await requestSessionRefresh();
-    response = await fetch(`${import.meta.env.VITE_API_URL}/ai/chat`, {
+    response = await fetch(`${API_BASE_URL}/ai/chat`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

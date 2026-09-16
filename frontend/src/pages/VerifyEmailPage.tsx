@@ -106,8 +106,8 @@ const VerifyEmailPage = () => {
 
     setResending(true);
     try {
-      const apiUrl = import.meta.env.VITE_API_URL;
-      const res = await fetch(`${apiUrl}/users/resend-verification`, {
+      const { API_BASE_URL } = await import("@/lib/api");
+      const res = await fetch(`${API_BASE_URL}/users/resend-verification`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: targetEmail }),
