@@ -1,13 +1,14 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { executeGroq, executeOpenRouter, QUICK_MODEL } from "./ai.service.js";
+import { executeGroq, executeOpenRouter, QUICK_MODEL, TITLE_GENERATION_MODEL } from "./ai.service.js";
 import { stripHtml } from "../utils/stripHtml.js";
 
-const genAI = process.env.GEMINI_API_KEY
-  ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
-  : null;
+const getGenAI = () =>
+  process.env.GEMINI_API_KEY
+    ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
+    : null;
 
 export const TITLE_MODEL =
-  process.env.TITLE_MODEL || "openai/gpt-oss-20b";
+  process.env.TITLE_MODEL || TITLE_GENERATION_MODEL || QUICK_MODEL || "openai/gpt-oss-20b";
 
 /**
  * Generate a short, high-quality 3-6 word title from plain text note or conversation content.
@@ -17,7 +18,11 @@ export const TITLE_MODEL =
  */
 export const generateTitleFromText = async (text) => {
   const plainText = typeof text === "string" ? stripHtml(text).trim() : "";
-  const source = plainText || "New Note";
+  if (!plainText || plainText.length < 5) {
+    return "Untitled Note";
+  }
+
+  const source = plainText;
 
   const fallbackTitle = source
     .replace(/\s+/g, " ")
@@ -43,6 +48,7 @@ export const generateTitleFromText = async (text) => {
   console.log(`[TitleService] 🚀 Generating title for text (${source.length} chars)...`);
 
   // 1. Try Gemini AI first if GEMINI_API_KEY is available
+  const genAI = getGenAI();
   if (genAI) {
     try {
       const geminiModel = genAI.getGenerativeModel({
@@ -85,10 +91,10 @@ export const generateTitleFromText = async (text) => {
     console.log("ℹ️ [TitleService] Provider [Groq] skipped (GROQ_API_KEY missing)");
   }
 
-  // 3. Fall back to OpenRouter (using TITLE_MODEL / QUICK_MODEL)
+  // 3. Fall back to OpenRouter (using TITLE_MODEL)
   if (!rawTitle) {
     try {
-      const modelName = TITLE_MODEL || QUICK_MODEL;
+      const modelName = TITLE_MODEL;
       rawTitle = await executeOpenRouter(
         modelName,
         titleMessages,
@@ -109,15 +115,16 @@ export const generateTitleFromText = async (text) => {
   // 4. Final title formatting and clean-up
   const title = rawTitle
     .replace(/```[\s\S]*?```/g, "")
-    .replace(/^title\s*:\s*/i, "")
+    .replace(/^(here is (a |the )?(short |suggested )?title|suggested title|title)\s*:\s*/i, "")
     .replace(/^["'`*_#\s]+|["'`*_#\s]+$/g, "")
     .replace(/\s+/g, " ")
     .trim();
 
-  if (
-    !title ||
-    /generate|descriptive|content|input|task|return only|no quotes/i.test(title)
-  ) {
+  const isMetaEcho =
+    /^(here is|here's|untitled note|new note)/i.test(title) ||
+    /return only|no quotes|3 to 6 words/i.test(title);
+
+  if (!title || isMetaEcho) {
     const finalFallback = fallbackTitle || "Untitled Note";
     console.warn(`⚠️ [TitleService] All AI providers failed or returned generic title. Using fallback: "${finalFallback}"`);
     return finalFallback;

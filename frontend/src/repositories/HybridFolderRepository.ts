@@ -28,6 +28,10 @@ export class HybridFolderRepository implements IFolderRepository {
             return localFolders;
         }
 
+        if (!navigator.onLine) {
+            return [];
+        }
+
         const remoteFolders = await this.remoteAPI.getFolders();
         await this.localDB.saveMany(remoteFolders);
         return remoteFolders;

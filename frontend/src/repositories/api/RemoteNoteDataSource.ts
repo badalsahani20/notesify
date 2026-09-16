@@ -3,29 +3,6 @@ import type { Note } from "@/store/useNoteStore";
 import * as notesApi from "@/api/notes";
 import api from "@/lib/api";
 
-const withVersionRetry = async (
-    requestFn: (version: number) => Promise<any>,
-    initialVersion: number,
-    maxRetries = 3
-) => {
-    let currentVersion = initialVersion;
-    let retries = 0;
-    
-    while (true) {
-        try {
-            const res = await requestFn(currentVersion);
-            return res.data?.updatedNote || res.data?.note || res.data || res;
-        } catch (error: any) {
-            if (error?.response?.status === 409 && error?.response?.data?.serverVersion && retries < maxRetries) {
-                currentVersion = error.response.data.serverVersion.version;
-                retries++;
-                continue;
-            }
-            throw error;
-        }
-    }
-};
-
 export class RemoteNoteDataSource implements INoteRepository {
     async getNotes(): Promise<Note[]> {
         const res = await notesApi.getNotes();
@@ -45,13 +22,8 @@ export class RemoteNoteDataSource implements INoteRepository {
     }
     
     async updateNote(id: string, updates: Partial<Note>, version: number): Promise<Note> {
-        return withVersionRetry(
-            async (v) => {
-                const res = await notesApi.updateNote(id, updates, v);
-                return res.data.updatedNote || res.data.note || res.data;
-            },
-            version
-        );
+        const res = await notesApi.updateNote(id, updates, version);
+        return res.data.updatedNote || res.data.note || res.data;
     }
 
   async getArchivedNotes(): Promise<Note[]> {
@@ -76,13 +48,8 @@ export class RemoteNoteDataSource implements INoteRepository {
     }
 
     async togglePin(id: string, version: number) : Promise<Note> {
-        return withVersionRetry(
-            async (v) => {
-                const res = await notesApi.togglePin(id, v);
-                return res.data.updatedNote || res.data.note || res.data;
-            },
-            version
-        )
+        const res = await notesApi.togglePin(id, version);
+        return res.data.updatedNote || res.data.note || res.data;
     }
 
     async deleteNote(id: string, version: number): Promise<void> {
@@ -91,12 +58,7 @@ export class RemoteNoteDataSource implements INoteRepository {
     }
 
     async toggleArchive(id: string, version: number): Promise<Note> {
-        return withVersionRetry(
-            async (v) => {
-                const res = await notesApi.toggleArchive(id, v);
-                return res.data.updatedNote || res.data.note || res.data;
-            },
-            version
-        )
+        const res = await notesApi.toggleArchive(id, version);
+        return res.data.updatedNote || res.data.note || res.data;
     }
 }

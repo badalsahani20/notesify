@@ -12,12 +12,21 @@ export async function getArchivedNotes() {
     return api.get("/notes/archive");
 }
 
-export async function createNote(data: { folderId?: string | null; title?: string; content?: string }) {
-    const { folderId = null, title = "Untitled Note", content = "" } = data;
+export async function createNote(data: {
+    _id?: string;
+    folderId?: string | null;
+    folder?: string | null;
+    title?: string;
+    content?: string;
+    color?: string;
+}) {
+    const { _id, folderId = null, folder, title = "Untitled Note", content = "", color } = data;
     return api.post("/notes/", {
+        ...(_id ? { _id } : {}),
         title,
         content,
-        folder: folderId,
+        folder: folderId ?? folder ?? null,
+        ...(color ? { color } : {})
     });
 }
 

@@ -16,10 +16,11 @@ export class HybridNoteRepository implements INoteRepository {
         this.localDB = localDB;
         this.remoteAPI = remoteAPI;
     }
+
     async restoreNote(id: string): Promise<Note> {
         const current = await this.localDB.getById(id);
         if(!current) {
-            throw new Error("Note not found locally");
+            throw new Error("Note not found");
         }
 
         const restoredNote: Note = {
@@ -62,12 +63,14 @@ export class HybridNoteRepository implements INoteRepository {
     }
 
     async getNotes(): Promise<Note[]> {
-        const localNotes = (await this.localDB.getAll()).filter(
+        const allNotes = await this.localDB.getAll();
+
+        const activeNotes = allNotes.filter(
             note => !note.isDeleted && !note.isArchived,
         );
 
-        if (localNotes.length > 0) {
-            return localNotes;
+        if (allNotes.length > 0) {
+            return activeNotes;
         }
 
         if (!navigator.onLine) return [];
@@ -83,6 +86,8 @@ export class HybridNoteRepository implements INoteRepository {
         if (localNote) {
             return localNote;
         }
+
+        if (!navigator.onLine) throw new Error("No note found locally");
 
         const remoteNote = await this.remoteAPI.getNote(noteId);
         await this.localDB.save(remoteNote);
@@ -145,12 +150,14 @@ export class HybridNoteRepository implements INoteRepository {
     }
 
     async getArchivedNotes(): Promise<Note[]> {
-        const localNotes = (await this.localDB.getAll()).filter(
+        const allNotes = await this.localDB.getAll();
+
+        const archivedNotes = allNotes.filter(
             note => !note.isDeleted && note.isArchived,
         );
 
-        if (localNotes.length > 0 || !navigator.onLine) {
-            return localNotes;
+        if (allNotes.length > 0 || !navigator.onLine) {
+            return archivedNotes;
         }
 
         const remoteNotes = await this.remoteAPI.getArchivedNotes();
@@ -159,16 +166,18 @@ export class HybridNoteRepository implements INoteRepository {
     }
 
     async getTrashedNotes(): Promise<Note[]> {
-        const localNotes = (await this.localDB.getAll()).filter(note => note.isDeleted);
+        const allNotes = await this.localDB.getAll();
+        const trashedNotes = allNotes.filter(note => note.isDeleted);
 
-        if (localNotes.length > 0 || !navigator.onLine) {
-            return localNotes;
+        if (allNotes.length > 0 || !navigator.onLine) {
+            return trashedNotes;
         }
 
         const remoteNotes = await this.remoteAPI.getTrashedNotes();
         await this.localDB.saveMany(remoteNotes);
         return remoteNotes;
     }
+
 
     async togglePin(id: string, version: number): Promise<Note> {
         const current = await this.localDB.getById(id);
@@ -185,14 +194,24 @@ export class HybridNoteRepository implements INoteRepository {
     }
 
     async deleteNote(id: string, version: number): Promise<void> {
+        const current = await this.localDB.getById(id);
+        if(!current) throw new Error("Note not found locally");
+
+        const trashedNote: Note = {
+            ...current,
+            isDeleted: true,
+            version: current.version + 1,
+            updatedAt: new Date().toISOString()
+        };
+
         await db.transaction('rw', [db.notes, db.syncQueue], async () => {
-            await db.notes.delete(id);
+            await db.notes.put(trashedNote);
             await db.syncQueue.add({
                 action: "DELETE",
                 entity: "note",
                 entityId: id,
                 payload: { version },
-                timestamp: Date.now()
+                timestamp: Date.now(),
             });
         });
     }
