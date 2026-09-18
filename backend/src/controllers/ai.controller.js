@@ -3,7 +3,7 @@ import User from "../models/user.model.js";
 import Notes from "../models/notes.model.js";
 import AiAssistCache from "../models/aiAssistCache.model.js";
 import catchAsync from "../utils/catchAsync.js";
-import { generateTitle, generateConversationTitle } from "../services/title.service.js";
+import { generateConversationTitle } from "../services/title.service.js";
 import {
   checkGrammar,
   chatWithAi,
@@ -13,6 +13,7 @@ import {
   getChatTools,
 } from "../services/ai.service.js";
 import GlobalChatSession from "../models/globalChatSession.model.js";
+import { getNoteContentForUser } from "../services/notes.service.js";
 import { stripHtml } from "../utils/stripHtml.js";
 import { parseIrisResponse } from "../utils/parseIrisResponse.js";
 import getEffectiveDailyLimit from "../utils/getEffectiveDailyLimit.js";
@@ -322,6 +323,7 @@ const resolveSession = async (req) => {
       history = session.messages.map((m) => ({
         role: m.role,
         content: m.content,
+        toolCalls: m.toolCalls,
       }));
       summary = session.summary || "";
     }
@@ -412,6 +414,30 @@ const NORMALIZE_TOOL_NAME = {
   "web_fetch": "crawl_url",
 };
 
+export const executeServerTool = async (
+  toolName,
+  args,
+  userId,
+  fallbackNoteId = null
+) => {
+  if (toolName === "get_note_content") {
+    const noteId = args?.noteId || fallbackNoteId;
+    if (!noteId) {
+      return { error: "Missing noteId for get_note_content." };
+    }
+    try {
+      const note = await getNoteContentForUser(noteId, userId);
+      if (!note) {
+        return { error: `Note "${noteId}" not found or unauthorized.` };
+      }
+      return note;
+    } catch (err) {
+      return { error: `Failed to fetch note: ${err.message}` };
+    }
+  }
+  return { error: `Unknown server tool: ${toolName}` };
+};
+
 // Pipe OpenRouter SSE chunks to the client and accumulate the full reply
 const streamAiResponse = async (
   stream,
@@ -431,6 +457,7 @@ const streamAiResponse = async (
   const toolCallsByIndex = new Map(); // index -> { id, name, rawArgs: "", emitted: false, parsedQuery: "", parsedUrl: "" }
   const citationsMap = new Map(); // normalizedUrl -> { url, title, content }
   const toolCalls = [];
+  const serverToolCalls = [];
 
   if (noteFetched) {
     res.write(
@@ -525,6 +552,28 @@ const streamAiResponse = async (
                     url: state.parsedUrl,
                   })}\n\n`,
                 );
+              } else if(normalizedTool === "create_note" && !state.emitted) {
+                state.emitted = true;
+                res.write(
+                  `data: ${JSON.stringify({
+                    type: "tool_call",
+                    id: state.id,
+                    tool: "create_note",
+                    args: parsed,
+                    execution: "local",
+                  })}\n\n`,
+                )
+              } else if(normalizedTool === "get_note_content" && !state.emitted) {
+                state.emitted = true;
+                res.write(
+                  `data: ${JSON.stringify({
+                    type: "tool_call",
+                    id: state.id,
+                    tool: "get_note_content",
+                    args: parsed,
+                    status: "executing",
+                  })}\n\n`,
+                )
               }
             } catch (_) {
               // Arguments are still streaming across chunks; wait for complete JSON
@@ -584,6 +633,42 @@ const streamAiResponse = async (
               url: state.parsedUrl,
             })}\n\n`,
           );
+        } else if (normalizedTool === "create_note") {
+          state.emitted = true;
+          state.parsedArgs = parsed;
+          res.write(
+            `data: ${JSON.stringify({
+              type: "tool_call",
+              id: state.id,
+              tool: "create_note",
+              args: parsed,
+              execution: "local",
+            })}\n\n`,
+          );
+        } else if(normalizedTool === "update_note") {
+          state.emitted = true;
+          state.parsedArgs = parsed;
+          res.write(
+            `data: ${JSON.stringify({
+              type: "tool_call",
+              id: state.id,
+              tool: "update_note",
+              args: parsed,
+              execution: "local",
+            })}\n\n`,
+          );
+        } else if(normalizedTool === "get_note_content") {
+          state.emitted = true;
+          state.parsedArgs = parsed;
+          res.write(
+            `data: ${JSON.stringify({
+              type: "tool_call",
+              id: state.id,
+              tool: "get_note_content",
+              args: parsed,
+              status: "executing",
+            })}\n\n`,
+          );
         }
       } catch (_) {
         // Fallback regex extraction if stream was truncated before trailing JSON brace
@@ -631,6 +716,69 @@ const streamAiResponse = async (
         tool: "crawl_url",
         url: state.parsedUrl,
       });
+    } else if (normalizedTool === "create_note") {
+      let parsedArgs = state.parsedArgs;
+      if (!parsedArgs && state.rawArgs) {
+        try {
+          parsedArgs = JSON.parse(state.rawArgs);
+        } catch (_) {}
+      }
+
+      if (parsedArgs) {
+        toolCalls.push({
+          id: state.id,
+          tool: "create_note",
+          args: parsedArgs,
+          execution: "local",
+        });
+
+        if (!finalReply.trim()) {
+          const noteTitle = parsedArgs.title ? `**${parsedArgs.title}**` : "your note";
+          finalReply = `I've created ${noteTitle} in your workspace!`;
+          res.write(
+            `data: ${JSON.stringify({ choices: [{ delta: { content: finalReply } }] })}\n\n`,
+          );
+        }
+      }
+    } else if (normalizedTool === "update_note") {
+      let parsedArgs = state.parsedArgs;
+      if(!parsedArgs && state.rawArgs) {
+        try {
+          parsedArgs = JSON.parse(state.rawArgs);
+        } catch (_) {}
+      }
+
+      if (parsedArgs) {
+        toolCalls.push({
+          id: state.id,
+          tool: "update_note",
+          args: parsedArgs,
+          execution: "local",
+        });
+
+        if(!finalReply.trim()) {
+          const noteTitle = parsedArgs.title ? `**${parsedArgs.title}**` : "your note";
+          finalReply = `Got it! I've updated ${noteTitle} in your workspace`;
+          res.write(
+            `data: ${JSON.stringify({ choices: [{ delta: { content: finalReply } }] })}\n\n`
+          )
+        }
+      }
+    } else if (normalizedTool === "get_note_content") {
+      let parsedArgs = state.parsedArgs;
+      if (!parsedArgs && state.rawArgs) {
+        try {
+          parsedArgs = JSON.parse(state.rawArgs);
+        } catch (_) {}
+      }
+
+      if (parsedArgs) {
+        serverToolCalls.push({
+          id: state.id,
+          tool: "get_note_content",
+          args: parsedArgs,
+        });
+      }
     }
   }
 
@@ -700,7 +848,7 @@ const streamAiResponse = async (
     }
   }
 
-  return { finalReply, toolCalls };
+  return { finalReply, toolCalls, serverToolCalls };
 };
 
 // Save the completed turn to the global-chat session in MongoDB
@@ -813,6 +961,23 @@ export const chatWithAiController = catchAsync(async (req, res) => {
     effectiveHistory = recentHistory;
   }
 
+  // Merge any verified client-side tool execution results into history
+  if (Array.isArray(req.body.clientToolResults) && req.body.clientToolResults.length > 0 && effectiveHistory) {
+    for (const ctr of req.body.clientToolResults) {
+      for (const h of effectiveHistory) {
+        if (h.role === "assistant" && Array.isArray(h.toolCalls)) {
+          for (const tc of h.toolCalls) {
+            if ((ctr.toolCallId && tc.id === ctr.toolCallId) || (!ctr.toolCallId && tc.tool === ctr.tool)) {
+              tc.status = ctr.status;
+              if (ctr.data) tc.data = ctr.data;
+              if (ctr.error) tc.error = ctr.error;
+            }
+          }
+        }
+      }
+    }
+  }
+
   if (isGlobalChat && req.body.sessionId && !sessionData.session) {
     return res
       .status(404)
@@ -844,8 +1009,14 @@ export const chatWithAiController = catchAsync(async (req, res) => {
     timestamp: new Date().toISOString(),
   });
 
-  // 4. Retrieve User Facts & Memories (Direct Indexed DB Fetch, NO vector search on chat messages)
-  let result;
+  // 4. Retrieve User Facts & Memories (Direct Indexed DB Fetch)
+  let finalReply = "";
+  let toolCalls = [];
+  let extraMessages = [];
+  let pdfContextToEmit = pdfContext || "";
+  const MAX_TOOL_ROUNDS = 3;
+  let currentRound = 0;
+
   try {
     let memoryContext = "";
     if (req.user?._id) {
@@ -862,72 +1033,174 @@ export const chatWithAiController = catchAsync(async (req, res) => {
       } catch (_) {}
     }
 
+    const activeNoteId = req.body.noteId || null;
+    let activeNoteTitle;
+    if (activeNoteId && !activeNoteTitle) {
+      try {
+        const existingNote = await Notes.findOne(
+          { _id: activeNoteId, user: req.user._id },
+          "title"
+        ).lean();
+        if (existingNote) {
+          activeNoteTitle = existingNote.title;
+        }
+      } catch (_) {}
+    }
+
+    let activeNoteContext = "";
+    if (activeNoteId) {
+      activeNoteContext = `\n\n[ACTIVE NOTE]\nid: ${activeNoteId}\ntitle: "${activeNoteTitle || "Untitled"}"\n[/ACTIVE NOTE]`;
+    }
+
     const userName = req.user?.name
-      ? `You are talking to a user named ${req.user.name}. Address them politely when appropriate.`
+      ? `User: ${req.user.name}`
       : "";
-    let finalSystemPrompt = `${userName}${memoryContext}`;
+    let finalSystemPrompt = [userName, memoryContext, activeNoteContext].filter(Boolean).join("\n");
 
     const currentMode = activeSession?.chatMode || chatMode || "casual";
+    const isNoteScoped = !sessionData.isGlobalChat || Boolean(req.body.noteId);
 
-    // Available tools for current chat mode
-    const tools = getChatTools(currentMode);
+    // Available tools for current chat mode (in note editor drawer, create_note is excluded)
+    const tools = getChatTools(currentMode, { isNoteScoped });
 
     const effectiveReasoning = useReasoning === true || useReasoning === "true";
 
-    result = await chatWithAi({
-      message,
-      history: effectiveHistory,
-      summary: sessionSummary || req.body.summary || "",
-      noteContext: noteContext,
-      webContext: "",
-      systemPrompt: finalSystemPrompt,
-      pdfContext: pdfContext || "",
-      imageBase64,
-      stream: isStreaming,
-      useReasoning: effectiveReasoning,
-      enableWeb: shouldSearchWeb,
-      chatMode: activeSession?.chatMode || chatMode || "casual",
-      tools: tools,
-    });
-  } catch (aiError) {
-    console.error("❌ All AI models failed:", aiError.message);
-    if (isStreaming) {
-      res.write(
-        `data: ${JSON.stringify({ type: "error", message: "AI service unavailable" })}\n\n`,
-      );
-      res.end();
+    // 5. Bounded Agentic Loop (MAX_TOOL_ROUNDS = 3)
+    while (currentRound < MAX_TOOL_ROUNDS) {
+      currentRound++;
+      console.log(`🤖 [AgenticLoop] Round ${currentRound}/${MAX_TOOL_ROUNDS}`);
+
+      let roundResult;
+      try {
+        roundResult = await chatWithAi({
+          message,
+          history: effectiveHistory,
+          summary: sessionSummary || req.body.summary || "",
+          noteContext: noteContext,
+          webContext: "",
+          systemPrompt: finalSystemPrompt,
+          pdfContext: pdfContext || "",
+          imageBase64,
+          stream: isStreaming,
+          useReasoning: effectiveReasoning,
+          enableWeb: shouldSearchWeb,
+          chatMode: activeSession?.chatMode || chatMode || "casual",
+          tools: tools,
+          isNoteScoped,
+          extraMessages,
+        });
+      } catch (aiError) {
+        console.error(`❌ [AgenticLoop] AI model failed on round ${currentRound}:`, aiError.message);
+        if (currentRound === 1 && isStreaming) {
+          res.write(
+            `data: ${JSON.stringify({ type: "error", message: "AI service unavailable" })}\n\n`,
+          );
+        }
+        break;
+      }
+
+      if (isStreaming) {
+        try {
+          const responseObj = await streamAiResponse(
+            roundResult.stream,
+            res,
+            currentRound === 1 ? noteFetched : false,
+            req.user._id
+          );
+
+          if (responseObj.finalReply) {
+            finalReply = finalReply ? `${finalReply}\n\n${responseObj.finalReply}` : responseObj.finalReply;
+          }
+          if (responseObj.toolCalls?.length > 0) {
+            toolCalls.push(...responseObj.toolCalls);
+          }
+          if (roundResult.pdfContext) {
+            pdfContextToEmit = roundResult.pdfContext;
+          }
+
+          // Server-side tool execution:
+          // get_note_content runs on server -> loop continues
+          // update_note / create_note run on client -> loop pauses/terminates
+          const serverToolsToRun = responseObj.serverToolCalls || [];
+          if (serverToolsToRun.length > 0 && currentRound < MAX_TOOL_ROUNDS) {
+            for (const st of serverToolsToRun) {
+              const toolExecResult = await executeServerTool(
+                st.tool,
+                st.args,
+                req.user._id,
+                activeNoteId
+              );
+
+              // Emit verified tool execution completion to SSE
+              res.write(
+                `data: ${JSON.stringify({
+                  type: "tool_call",
+                  id: st.id,
+                  tool: st.tool,
+                  status: toolExecResult.error ? "error" : "success",
+                  data: toolExecResult,
+                })}\n\n`
+              );
+
+              toolCalls.push({
+                id: st.id,
+                tool: st.tool,
+                args: st.args,
+                status: toolExecResult.error ? "error" : "success",
+                data: toolExecResult,
+              });
+
+              // Feed tool result back into Iris for the next loop round
+              extraMessages.push(
+                {
+                  role: "assistant",
+                  content: responseObj.finalReply || null,
+                  tool_calls: [
+                    {
+                      id: st.id,
+                      type: "function",
+                      function: {
+                        name: st.tool,
+                        arguments: JSON.stringify(st.args),
+                      },
+                    },
+                  ],
+                },
+                {
+                  role: "tool",
+                  tool_call_id: st.id,
+                  name: st.tool,
+                  content: JSON.stringify(toolExecResult),
+                }
+              );
+            }
+            // Loop continues so Iris reads the retrieved note content!
+            continue;
+          }
+
+          // No server-side tools needed or client tool executed (update_note / create_note) -> loop finishes!
+          break;
+        } catch (streamError) {
+          console.error("Streaming error in round:", streamError.message);
+          break;
+        }
+      } else {
+        // Non-streaming fallback
+        finalReply = roundResult.reply;
+        break;
+      }
     }
-    return;
-  }
-
-  // 6. Stream or return the response
-  let finalReply = "";
-
-  let toolCalls = [];
-
-  if (isStreaming) {
-    try {
-      const responseObj = await streamAiResponse(
-        result.stream,
-        res,
-        noteFetched,
-        req.user._id
-      );
-      finalReply = responseObj.finalReply;
-      toolCalls = responseObj.toolCalls;
-      // Send metadata (like extracted PDF text) after the stream completes
-      if (result.pdfContext) {
+  } catch (err) {
+    console.error("❌ Controller error:", err.message);
+  } finally {
+    if (isStreaming) {
+      if (pdfContextToEmit) {
         res.write(
-          `data: ${JSON.stringify({ type: "metadata", pdfContext: result.pdfContext })}\n\n`,
+          `data: ${JSON.stringify({ type: "metadata", pdfContext: pdfContextToEmit })}\n\n`,
         );
       }
-    } catch (streamError) {
-      console.error("Streaming error:", streamError.message);
-    } finally {
       res.end();
     }
-  } else {
-    finalReply = result.reply;
   }
 
   // 7. Persist to DB (global chat only)
@@ -938,7 +1211,7 @@ export const chatWithAiController = catchAsync(async (req, res) => {
       imageBase64,
       activeSessionId,
       activeSession,
-      result.summary,
+      sessionSummary,
       toolCalls
     );
   }
@@ -957,7 +1230,7 @@ export const chatWithAiController = catchAsync(async (req, res) => {
         { role: "assistant", content: finalReply, toolCalls },
       ],
       sessionId: activeSessionId,
-      pdfContext: result.pdfContext,
+      pdfContext: pdfContextToEmit,
       chatMode: activeSession?.chatMode || chatMode || "study",
     },
   });
@@ -1080,3 +1353,43 @@ async function checkAndIncrementRateLimit(userId) {
   await incrementDailyCount(userId);
   return { allowed: true, used: effectiveCount + 1, limit };
 }
+
+export const reportToolResultController = catchAsync(async (req, res) => {
+  const { sessionId, toolCallId, tool, status, data, error } = req.body;
+  if (!sessionId) {
+    return res.status(400).json({ success: false, message: "sessionId is required" });
+  }
+
+  const session = await GlobalChatSession.findOne({
+    _id: sessionId,
+    user: req.user._id,
+  });
+
+  if (!session) {
+    return res.status(404).json({ success: false, message: "Session not found" });
+  }
+
+  let updated = false;
+  for (let i = session.messages.length - 1; i >= 0; i--) {
+    const msg = session.messages[i];
+    if (msg.role === "assistant" && Array.isArray(msg.toolCalls)) {
+      for (const tc of msg.toolCalls) {
+        if ((toolCallId && tc.id === toolCallId) || (!toolCallId && tc.tool === tool)) {
+          tc.status = status;
+          if (data) tc.data = data;
+          if (error) tc.error = error;
+          updated = true;
+          break;
+        }
+      }
+      if (updated) break;
+    }
+  }
+
+  if (updated) {
+    session.markModified("messages");
+    await session.save();
+  }
+
+  return res.json({ success: true, updated });
+});

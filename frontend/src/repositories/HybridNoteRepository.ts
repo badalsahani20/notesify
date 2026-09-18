@@ -117,7 +117,7 @@ export class HybridNoteRepository implements INoteRepository {
                         action: "CREATE",
                         entity: "note",
                         entityId: tempId,
-                        payload: { ...data, _id: tempId },
+                        payload: { ...data, _id: tempId, version: 1 },
                         timestamp: Date.now()
                     });
                 });

@@ -57,12 +57,17 @@ export interface WebCitation {
 export type ToolCallRecord = {
   id?: string;
   tool: string;
+  args?: Record<string, any>;
+  execution?: "local" | "server" | "client";
+  data?: any;
+  status?: "pending" | "success" | "error";
   quizData?: any[];
   query?: string;
   url?: string;
   citations?: WebCitation[];
   category?: string;
   content?: string;
+  error?: string;
 };
 
 export type Message = {
@@ -82,3 +87,18 @@ export type ChatHistoryMessage = {
   role: "system" | "user" | "assistant";
   content: string;
 };
+
+export type ChatArtifact =
+  | {
+      type: "note";
+      id?: string;
+      title?: string;
+      content?: string;
+    }
+  | {
+      type: "pdf";
+      id?: string;
+      title?: string;
+      url?: string;
+      rawText?: string;
+    };

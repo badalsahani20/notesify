@@ -11,6 +11,23 @@ A production-grade, full-stack notes application built on the MERN stack — fea
 
 ---
 
+## 🚀 What's New in v1.2.0
+
+- **Bounded Agentic Loop:** Iris now supports a server-side, bounded agentic execution loop (`Round 1/3` → `Round 2/3`). When local editor context isn't enough, Iris can retrieve the complete active note, incorporate it into the conversation context, and continue reasoning in a single continuous SSE stream.
+- **Contextual Document Retrieval (`get_note_content`):** Iris can now retrieve the complete active note on demand using its `noteId`. Retrieval is separated from note discovery, with user ownership enforcement and cleaned note content returned to the model.
+- **Global Note Actions:** Iris can now create and update notes directly from Global Chat. You can ask Iris to create a new note or modify an existing one without manually switching into the note editor. **This feature is still being refined, so some note creation or update requests may not behave exactly as intended. We're actively working to improve its reliability and accuracy.**
+- **Unified Minimalist Telemetry:** Replaced heavy cards and bordered telemetry with lightweight, consistent status indicators such as `Reading note...`, `Searching the web...`, `Reading webpage...`, and `Saving memory...`. Indicators automatically disappear when response text begins streaming.
+- **Dynamic Teaching Mode & 3-Layer Constitution:** Streamlined Iris's system instructions into a token-efficient three-layer architecture, while adding dynamic intent-based routing between teaching-focused and general chat models.
+
+### ⚙️ Technical Highlights
+- On-demand full-note retrieval instead of injecting the entire document into every request.
+- Strict `noteId`-based retrieval; note discovery remains a separate concern.
+- Bounded tool execution with a maximum of 3 agentic rounds.
+- Local editor context remains the first source of context, reducing unnecessary database retrieval.
+- Continuous SSE streaming across tool execution rounds.
+
+---
+
 ## 🚀 What's New in v1.1.0
 - **Full Offline-First Capability (Packaged Desktop):** The Electron desktop client operates locally via bundled assets (`file://`) and Dexie / IndexedDB. Notes, notebooks, and state changes persist on disk offline with bidirectional queue synchronization and conflict-free reconciliation upon reconnection.
 - **DPI-Aware Native Windows Installer:** Enhanced NSIS installer configuration with true Per-Monitor V2 DPI awareness, eliminating blurry text and interface scaling artifacts at 125%, 150%, and higher Windows display scaling settings.

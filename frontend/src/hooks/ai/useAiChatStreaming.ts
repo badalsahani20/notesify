@@ -26,7 +26,13 @@ export const useAiChatStreaming = ({
     const { fullText, fullThought, thinkingTime: finalThinkingTime } =
       await consumeAiChatStream(responseBody, {
         throttleMs: 40,
-        onToolCall: ({ id, tool, quizData, query, url, citations }) => {
+        onToolCall: ({ id, tool, args, execution, quizData, query, url, citations }) => {
+          if ((execution === "client" || execution === "local") && args) {
+            import("@/services/ai/clientToolExecutor").then(({ executeClientTool }) => {
+              executeClientTool(tool, args);
+            });
+          }
+
           setMessages((prev) =>
             prev.map((m) => {
               if (m.id !== aiMsgId) return m;
@@ -49,12 +55,13 @@ export const useAiChatStreaming = ({
                   ...updated[existingIdx],
                   query: query ?? updated[existingIdx].query,
                   url: url ?? updated[existingIdx].url,
+                  args: args ?? updated[existingIdx].args,
                 };
                 return { ...m, toolCalls: updated };
               }
               return {
                 ...m,
-                toolCalls: [...existingCalls, { id, tool, quizData, query, url, citations }],
+                toolCalls: [...existingCalls, { id, tool, args, quizData, query, url, citations }],
               };
             })
           );

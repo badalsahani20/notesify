@@ -71,14 +71,109 @@ MCQ GENERATION RULES:
   },
 };
 
+export const createNoteTool = {
+  type: "function",
+  function: {
+    name: "create_note",
+    description:
+      "Create a new note in Notesify. Call this when the user wants a new note created and is not asking to modify an existing note (e.g. 'Create a note about Docker', 'Turn this explanation into a note').",
+    parameters: {
+      type: "object",
+      properties: {
+        title: {
+          type: "string",
+          description: "The title of the note",
+        },
+        content: {
+          type: "string",
+          description: "The body content in rich Markdown (headings, bullet lists, code blocks).",
+        },
+      },
+      required: ["title", "content"],
+      additionalProperties: false,
+    },
+  },
+};
+
+export const getNoteContentTool = {
+  type: "function",
+  function: {
+    name: "get_note_content",
+    description:
+      "Retrieve the complete current title, version, and content of the active note when the local editor context or selection is not sufficient. Pass the noteId from [ACTIVE NOTE].",
+    parameters: {
+      type: "object",
+      properties: {
+        noteId: {
+          type: "string",
+          description: "The unique ID of the active note to retrieve (from [ACTIVE NOTE]). Required.",
+        },
+      },
+      required: ["noteId"],
+      additionalProperties: false,
+    },
+  },
+};
+
+export const updateNoteTool = {
+  type: "function",
+  function: {
+    name: "update_note",
+    description:
+      "Modify an existing note in Notesify. Use mode='append' to add new material. Use mode='replace' only when the user explicitly requests a complete rewrite or overwrite.",
+    parameters: {
+      type: "object",
+      properties: {
+        noteId: {
+          type: "string",
+          description: "The unique ID of the existing note to update (e.g. from [ACTIVE NOTE]). Required.",
+        },
+        title: {
+          type: "string",
+          description: "New title for the note (if renaming)",
+        },
+        content: {
+          type: "string",
+          description:
+            "mode='append': provide ONLY the new section(s) to add at the end. mode='replace': provide the complete replacement content.",
+        },
+        mode: {
+          type: "string",
+          enum: ["append", "replace"],
+          description:
+            "Default 'append' adds content to the end without modifying existing text. Use 'replace' only when user explicitly asks to replace or rewrite the whole note.",
+        },
+      },
+      required: ["noteId"],
+      additionalProperties: false,
+    },
+  },
+};
+
 /**
  * Returns available tools for the current chat mode.
  * @param {string} chatMode - "casual" | "study"
+ * @param {object} [options]
+ * @param {boolean} [options.isNoteScoped=false] - If true (note editor drawer), only get_note_content and update_note are available (no create_note).
  * @returns {Array<object>}
  */
-export const getChatTools = (chatMode = "casual") => {
+export const getChatTools = (chatMode = "casual", options = {}) => {
+  const { isNoteScoped = false } = options;
+
+  if (isNoteScoped) {
+    return [
+      saveMemoryTool,
+      getNoteContentTool,
+      updateNoteTool,
+      ...(chatMode === "study" ? [quizTool] : []),
+    ];
+  }
+
   return [
     saveMemoryTool,
+    getNoteContentTool,
+    createNoteTool,
+    updateNoteTool,
     ...(chatMode === "study" ? [quizTool] : []),
   ];
 };

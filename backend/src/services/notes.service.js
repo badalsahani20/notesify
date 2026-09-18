@@ -1,6 +1,8 @@
+import mongoose from "mongoose";
 import Notes from "../models/notes.model.js";
 import { getWelcomeNote } from "../utils/welcomeNote.js";
 import { nanoid } from "nanoid";
+import { stripHtml } from "../utils/stripHtml.js";
 // Bypasses the Mongoose pre('find') hook while matching missing fields on old docs
 const ANY_ARCHIVE_STATE = { $in: [true, false, null] };
 
@@ -260,4 +262,31 @@ export const findByShareSlug = async (slug) => {
     });
 
     return { note };
-}
+};
+
+/**
+ * Retrieve complete note content snapshot for an authenticated user.
+ * Used by server-side AI tool executors (e.g. get_note_content).
+ */
+export const getNoteContentForUser = async (noteId, userId) => {
+  if (!noteId || !mongoose.Types.ObjectId.isValid(noteId)) {
+    throw new Error("Invalid noteId");
+  }
+
+  const note = await Notes.findOne({
+    _id: noteId,
+    user: userId,
+    isDeleted: { $ne: true },
+  }).lean();
+
+  if (!note) {
+    return null;
+  }
+
+  return {
+    noteId: note._id.toString(),
+    title: note.title || "Untitled",
+    version: note.version ?? 1,
+    content: stripHtml(note.content),
+  };
+};

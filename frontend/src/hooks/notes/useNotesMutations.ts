@@ -26,7 +26,7 @@ const updateNoteInList = (list: Note[], updated: Partial<Note> & { _id: string }
 const removeNoteFromList = (list: Note[], noteId: string) =>
     list.filter((n) => n._id !== noteId);
 
-const addNoteToList = (list: Note[], note: Note) =>
+export const addNoteToList = (list: Note[], note: Note) =>
     sortNotes([note, ...removeNoteFromList(list, note._id)]);
 
 const scheduleAutoTitleSync = (

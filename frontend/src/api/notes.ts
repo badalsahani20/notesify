@@ -19,14 +19,16 @@ export async function createNote(data: {
     title?: string;
     content?: string;
     color?: string;
+    version?: number;
 }) {
-    const { _id, folderId = null, folder, title = "Untitled Note", content = "", color } = data;
+    const { _id, folderId = null, folder, title = "Untitled Note", content = "", color, version } = data;
     return api.post("/notes/", {
         ...(_id ? { _id } : {}),
         title,
         content,
         folder: folderId ?? folder ?? null,
-        ...(color ? { color } : {})
+        ...(color ? { color } : {}),
+        ...(version !== undefined ? { version } : {}),
     });
 }
 

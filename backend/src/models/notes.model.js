@@ -59,7 +59,7 @@ const notesSchema = new mongoose.Schema({
     },
     version: {
         type: Number,
-        default: 0
+        default: 1
     },
     isDeleted: {
         type: Boolean,

@@ -1,11 +1,13 @@
 import "katex/dist/katex.min.css";
-import { ChevronRight, ChevronDown, Check, Copy, Globe } from "lucide-react";
+import { ChevronRight, ChevronDown, Check, Copy } from "lucide-react";
 import { GlobalChatEmptyState } from "@/components/chat/GlobalChatEmptyState";
 import type { Message } from "@/components/ai/types";
 import IrisMessageBody from "./IrisMessageBody";
 import { InlineQuizManager } from "./InlineQuizManager";
+import { IrisNoteCreatedCard } from "./IrisNoteCreatedCard";
+import { Tool, ToolCall, ToolStatus } from "@/components/ai/tool";
 import { parseIrisResponse } from "@/utils/parseIrisResponse";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useLayoutEffect } from "react";
 import { getThinkingState } from "@/utils/getThinkingState";
 
 
@@ -205,6 +207,24 @@ export const GlobalChatMessages = ({
     };
   }, []);
 
+  const isInitialMount = useRef(true);
+  const prevMessagesLength = useRef(messages.length);
+
+  // Instantly pin scroll position before browser paint when returning to this page/session
+  useLayoutEffect(() => {
+    const container = scrollContainerRef.current;
+    if (container && messages.length > 0) {
+      container.scrollTop = container.scrollHeight;
+    }
+  }, []);
+
+  // When a new session is being loaded, prepare for instant pinning on completion
+  useEffect(() => {
+    if (messagesLoading) {
+      isInitialMount.current = true;
+    }
+  }, [messagesLoading]);
+
   // Re-enable auto-scroll on new messages
   useEffect(() => {
     if (messages.length > lastMessageCount.current || isSending) {
@@ -213,9 +233,37 @@ export const GlobalChatMessages = ({
     lastMessageCount.current = messages.length;
   }, [messages.length, isSending]);
 
-  // Auto-scroll logic
+  // Auto-scroll logic: instant pin on initial mount/tab switch and during streaming
   useEffect(() => {
-    if (!userHasScrolledUp) {
+    if (userHasScrolledUp) return;
+
+    const container = scrollContainerRef.current;
+
+    // 1. Initial mount or returning to tab: instant pin without slow smooth-scroll animation
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      prevMessagesLength.current = messages.length;
+      if (container) {
+        container.scrollTop = container.scrollHeight;
+      } else {
+        bottomRef.current?.scrollIntoView({ behavior: "auto" });
+      }
+      return;
+    }
+
+    // 2. During streaming: keep pinned instantly
+    if (isStreaming) {
+      if (container) {
+        container.scrollTop = container.scrollHeight;
+      } else {
+        bottomRef.current?.scrollIntoView({ behavior: "auto" });
+      }
+      return;
+    }
+
+    // 3. Only smooth-scroll when a new message was actually appended while actively viewing
+    if (messages.length > prevMessagesLength.current) {
+      prevMessagesLength.current = messages.length;
       bottomRef.current?.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages, streamedMessageText, isStreaming, isSending, userHasScrolledUp, bottomRef]);
@@ -313,10 +361,12 @@ export const GlobalChatMessages = ({
           const toolCalls = (msg as any).toolCalls as Array<{ tool: string; query?: string; url?: string; citations?: any[]; quizData?: any[] }> | undefined;
           const isWorking = (isActiveStream && (isStreaming || isSending)) || isThinking;
 
-          // Filter out active web activities for quiet telemetry
-          const webActivities = (toolCalls ?? []).filter((tc) =>
-            ["search_web", "crawl_url", "get_note_content"].includes(tc.tool)
-          );
+          // Identify active agentic tasks
+          const noteReadActivity = (toolCalls ?? []).find((tc) => tc.tool === "get_note_content");
+          const searchActivity = (toolCalls ?? []).find((tc) => tc.tool === "search_web");
+          const crawlActivity = (toolCalls ?? []).find((tc) => tc.tool === "crawl_url");
+          const memoryActivity = (toolCalls ?? []).find((tc) => tc.tool === "save_memory");
+          const hasAgenticTask = Boolean(noteReadActivity || searchActivity || crawlActivity || memoryActivity);
 
           // Extract deduplicated citations for sources list
           const citations = (() => {
@@ -339,84 +389,60 @@ export const GlobalChatMessages = ({
             <div key={msg.id} className={`gc-msg gc-msg-${msg.role}`}>
               {msg.role === "assistant" ? (
                 <div className="gc-msg-bubble gc-msg-bubble-ai">
-                  {/* Web Activity Telemetry (Both Active Streaming & Completed Messages) */}
-                      {(webActivities.length > 0 || citations.length > 0) && (
-                        <div className="flex flex-col gap-1.5 mb-3 pb-2.5 border-b border-white/5">
-                          {webActivities.length > 0 ? (
-                            webActivities.map((tc, idx) => {
-                              const isSearch = tc.tool === "search_web";
-                              const isCrawl = tc.tool === "crawl_url";
-                              const target = tc.query || tc.url || "";
-                              const actionLabel = isWorking
-                                ? (isSearch ? "Searching the web" : isCrawl ? "Reading webpage" : "Reading note")
-                                : (isSearch ? "Searched the web" : isCrawl ? "Read webpage" : "Read note");
-
-                              return (
-                                <div key={idx} className="flex flex-col gap-0.5">
-                                  <div className="flex items-center gap-2 text-xs text-neutral-300 font-medium">
-                                    {isWorking ? (
-                                      <span className="iris-telemetry-dot text-emerald-400" />
-                                    ) : (
-                                      <Globe className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
-                                    )}
-                                    <span>{actionLabel}</span>
-                                    {target && (
-                                      <span className="text-neutral-400 font-normal">
-                                        for <span className="font-mono text-neutral-200 text-[11px]">"{target}"</span>
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })
-                          ) : (
-                            <div className="flex items-center gap-2 text-xs text-neutral-300 font-medium">
-                              <Globe className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
-                              <span>Searched the web</span>
-                            </div>
-                          )}
-                        </div>
+                  {/* Unified Agentic Task Indicators (Unboxed, No Icons, Pulsing, Bolder) */}
+                  {!displayText.trim() && isWorking && hasAgenticTask && (
+                    <div className="flex flex-col gap-1 text-xs text-neutral-200 font-semibold my-1">
+                      {noteReadActivity && (
+                        <span className="animate-pulse">Reading note...</span>
                       )}
-
-                      {/* 2. Done badge or Active thought (Middle) */}
-                      {(thinkingTime || thought || (isWorking && !displayText && webActivities.length === 0)) && (
-                        <ThinkingWidget
-                          isThinking={isThinking || (isWorking && !displayText)}
-                          thinkingTime={thinkingTime}
-                          thought={thought}
-                          isReasoningOff={!useReasoning}
-                        />
+                      {searchActivity && (
+                        <span className="animate-pulse">
+                          {searchActivity.query ? `Searching the web for "${searchActivity.query}"...` : "Searching the web..."}
+                        </span>
                       )}
+                      {crawlActivity && (
+                        <span className="animate-pulse">Reading webpage...</span>
+                      )}
+                      {memoryActivity && (
+                        <span className="animate-pulse">Saving memory...</span>
+                      )}
+                    </div>
+                  )}
 
-                      {/* 3. Message content (Bottom) */}
-                      {displayText ? (
-                        <div
-                          className="gc-markdown max-w-full focus:outline-none"
-                          contentEditable={true}
-                          suppressContentEditableWarning={true}
-                          spellCheck={false}
-                          autoCorrect="off"
-                          data-ms-editor="false"
-                          onBeforeInput={(e) => e.preventDefault()}
-                          onKeyDown={(e) => {
-                            if (!(e.ctrlKey || e.metaKey)) {
-                              e.preventDefault();
-                            }
-                          }}
-                          onDrop={(e) => e.preventDefault()}
-                          onPaste={(e) => e.preventDefault()}
-                        >
-                          <IrisMessageBody
-                            segments={msg.segments ?? parseIrisResponse(displayText)}
-                            onAnswer={sendMessage}
-                          />
-                        </div>
-                      ) : isWorking && webActivities.length > 0 && !thought ? (
-                        <div className="flex items-center gap-2 text-xs text-neutral-400 py-1">
-                          <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                          <span className="italic">Scanning web sources...</span>
-                        </div>
-                      ) : null}
+                  {/* Thinking Widget (Only when reasoning thought exists, or waiting without an active agentic task) */}
+                  {(thinkingTime || thought || (isWorking && !displayText && !hasAgenticTask)) && (
+                    <ThinkingWidget
+                      isThinking={isThinking || (isWorking && !displayText)}
+                      thinkingTime={thinkingTime}
+                      thought={thought}
+                      isReasoningOff={!useReasoning}
+                    />
+                  )}
+
+                  {/* Message content */}
+                  {displayText ? (
+                    <div
+                      className="gc-markdown max-w-full focus:outline-none"
+                      contentEditable={true}
+                      suppressContentEditableWarning={true}
+                      spellCheck={false}
+                      autoCorrect="off"
+                      data-ms-editor="false"
+                      onBeforeInput={(e) => e.preventDefault()}
+                      onKeyDown={(e) => {
+                        if (!(e.ctrlKey || e.metaKey)) {
+                          e.preventDefault();
+                        }
+                      }}
+                      onDrop={(e) => e.preventDefault()}
+                      onPaste={(e) => e.preventDefault()}
+                    >
+                      <IrisMessageBody
+                        segments={msg.segments ?? parseIrisResponse(displayText)}
+                        onAnswer={sendMessage}
+                      />
+                    </div>
+                  ) : null}
 
                       {/* Sources UI (Minimal, understated, interactive links) */}
                       {citations.length > 0 && (
@@ -469,7 +495,8 @@ export const GlobalChatMessages = ({
                           tc.tool === "search_web" ||
                           tc.tool === "crawl_url" ||
                           tc.tool === "save_memory" ||
-                          tc.tool === "web_citations"
+                          tc.tool === "web_citations" ||
+                          tc.tool === "get_note_content"
                         )
                           return null;
                         if (tc.tool === "render_quiz" && tc.quizData) {
@@ -482,6 +509,27 @@ export const GlobalChatMessages = ({
                                 sendMessage(formattedAnswers);
                               }}
                             />
+                          );
+                        }
+                        if (tc.tool === "create_note" || tc.tool === "update_note") {
+                          const noteId = tc.data?._id || tc.args?.noteId || tc.args?.id;
+                          const title = tc.data?.title || tc.args?.title || "Untitled Note";
+                          const content = tc.data?.content || tc.args?.content;
+                          const toolState = tc.status === "error" ? "error" : "completed";
+                          const isUpdate = tc.tool === "update_note";
+                          return (
+                            <div key={`note-tool-${idx}`} className="my-2">
+                              <Tool state={toolState}>
+                                <ToolCall name={ tc.tool } argsSummary={title} />
+                                <ToolStatus state={toolState} />
+                              </Tool>
+                              <IrisNoteCreatedCard
+                                noteId={noteId}
+                                title={title}
+                                content={content}
+                                variant={isUpdate ? "updated" : "created"}
+                              />
+                            </div>
                           );
                         }
                         return null;

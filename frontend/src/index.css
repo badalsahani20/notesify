@@ -3799,15 +3799,22 @@ span[data-ai-ghost] {
 }
 
 .gc-markdown {
-  color: inherit;
+  color: rgba(255, 255, 255, 0.88);
+  font-weight: 400;
+  line-height: 1.7;
+  letter-spacing: -0.006em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-.gc-markdown :where(p, li, ul, ol, strong, em, a, blockquote, code, pre, h1, h2, h3) {
+.gc-markdown :where(p, li, ul, ol, em) {
   color: inherit;
 }
 
 .gc-markdown p {
-  margin: 0 0 0.5rem;
+  margin: 0 0 0.9rem;
+  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.88);
 }
 
 .gc-markdown p:last-child {
@@ -3815,86 +3822,139 @@ span[data-ai-ghost] {
 }
 
 .gc-markdown ul {
-  margin: 0.4rem 0;
+  margin: 0.6rem 0 0.9rem;
   padding-left: 1.4rem !important;
   list-style-type: disc !important;
   color: inherit;
 }
 
 .gc-markdown ol {
-  margin: 0.4rem 0;
+  margin: 0.6rem 0 0.9rem;
   padding-left: 1.4rem !important;
   list-style-type: decimal !important;
   color: inherit;
 }
 
 .gc-markdown li {
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.35rem;
+  line-height: 1.65;
+  color: rgba(255, 255, 255, 0.88);
 }
 
 .gc-markdown li::marker {
-  color: var(--text-strong);
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.gc-markdown li > p {
+  margin: 0 0 0.35rem;
+}
+
+.gc-markdown li > p:last-child {
+  margin-bottom: 0;
 }
 
 .gc-markdown :where(code):not(:where(pre code)) {
-  background: color-mix(in srgb, currentColor 12%, transparent);
-  color: inherit;
-  border: 1px solid color-mix(in srgb, currentColor 8%, transparent);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 0.35rem;
   padding: 0.15em 0.4em;
-  font-size: 0.85em;
+  font-size: 0.86em;
+  font-weight: 400;
+  line-height: 1.5;
   font-family: "JetBrains Mono", "Fira Code", monospace;
 }
 
 .gc-markdown pre {
-  margin: 0.6rem 0;
+  margin: 0.85rem 0;
 }
 
 .gc-markdown pre code {
   background: transparent;
   padding: 0;
-  color: #e2e8f0;
+  color: rgba(255, 255, 255, 0.88);
 }
 
 .gc-markdown h1 {
-  font-size: 1.05rem;
-  font-weight: 700;
-  margin: 0.75rem 0 0.35rem;
-  color: var(--text-strong);
+  font-size: 1.25rem;
+  font-weight: 650;
+  line-height: 1.4;
+  letter-spacing: -0.022em;
+  margin: 1.35rem 0 0.6rem;
+  color: rgba(255, 255, 255, 0.98);
 }
 
 .gc-markdown h2 {
-  font-size: 0.97rem;
-  font-weight: 700;
-  margin: 0.65rem 0 0.3rem;
-  color: var(--text-strong);
+  font-size: 1.1rem;
+  font-weight: 620;
+  line-height: 1.45;
+  letter-spacing: -0.018em;
+  margin: 1.15rem 0 0.5rem;
+  color: rgba(255, 255, 255, 0.95);
 }
 
 .gc-markdown h3 {
-  font-size: 0.9rem;
+  font-size: 0.98rem;
   font-weight: 600;
-  margin: 0.55rem 0 0.25rem;
-  color: var(--text-strong);
+  line-height: 1.5;
+  letter-spacing: -0.015em;
+  margin: 0.95rem 0 0.4rem;
+  color: rgba(255, 255, 255, 0.92);
 }
 
-.gc-markdown strong {
-  font-weight: 700;
+.gc-markdown strong,
+.gc-markdown b {
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.96);
 }
 
 .gc-markdown blockquote {
   border-left: 3px solid #6366f1;
-  padding-left: 0.75rem;
-  color: var(--muted-text);
-  font-style: italic;
-  margin: 0.5rem 0;
+  padding-left: 0.85rem;
+  color: rgba(255, 255, 255, 0.65);
+  font-style: normal;
+  line-height: 1.65;
+  margin: 0.75rem 0;
 }
 
 .dark .gc-markdown blockquote {
-  color: #cbd5e1;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+/* Secondary helper / caption / metadata text in chat */
+.gc-secondary-text {
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  font-weight: 400;
 }
 
 /* ── Tables ── */
-/* .gc-markdown table styles are shared with .editor-content-shell .ProseMirror table above */
+.gc-markdown table {
+  font-size: 0.875rem;
+  line-height: 1.65;
+}
+
+.gc-markdown table th {
+  font-weight: 600;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+  color: rgba(255, 255, 255, 0.95);
+  padding: 0.65rem 1rem;
+}
+
+.gc-markdown table td {
+  padding: 0.65rem 1rem;
+  line-height: 1.65;
+  color: rgba(255, 255, 255, 0.88);
+  font-weight: 400;
+}
+
+.gc-markdown table td:first-child {
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.92);
+}
 
 
 /* Ã¢â€â‚¬Ã¢â€â‚¬ Horizontal rule (section divider) Ã¢â€â‚¬Ã¢â€â‚¬ */
@@ -5251,14 +5311,14 @@ span[data-ai-ghost] {
   padding: 0;
   border: 0;
   border-radius: 0;
-  color: rgba(245, 245, 245, 0.93);
+  color: rgba(255, 255, 255, 0.88);
   background: transparent;
   width: 100%;
   max-width: 100%;
 }
 
 .dark .gc-msg-bubble-ai {
-  color: rgba(245, 245, 245, 0.93);
+  color: rgba(255, 255, 255, 0.88);
   background: transparent;
   border-color: transparent;
 }
@@ -7532,9 +7592,10 @@ html:not(.dark) .dock-btn-active {
 
 .gc-code-content {
   font-family: 'JetBrains Mono', 'Fira Code', 'Menlo', 'Consolas', monospace;
-  font-size: 0.9rem;
-  line-height: 1.6;
-  color: #e4e4e7;
+  font-size: 0.875rem;
+  line-height: 1.65;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.88);
   background: transparent;
   display: block;
 }
@@ -7728,7 +7789,6 @@ html:not(.dark) .dock-btn-active {
   line-height: 1.5;
 }
 
-/* Premium Badges */
 .iris-badge {
   display: inline-flex;
   align-items: center;

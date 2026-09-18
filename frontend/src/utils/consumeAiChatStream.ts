@@ -9,6 +9,8 @@ export type WebCitation = {
 export type ToolCallEvent = {
   id?: string;
   tool: string;
+  args?: Record<string, any>;
+  execution?: "local" | "server" | "client";
   quizData?: any;
   query?: string;
   url?: string;
@@ -75,6 +77,8 @@ export const consumeAiChatStream = async (
         onToolCall?.({
           id: (data as any).id,
           tool: data.tool,
+          args: (data as any).args,
+          execution: (data as any).execution,
           quizData: (data as any).quizData,
           query: (data as any).query,
           url: (data as any).url,

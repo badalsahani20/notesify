@@ -3,11 +3,12 @@ import api from "@/lib/api";
 import { parseIrisResponse } from "../utils/parseIrisResponse";
 import { prepareChatImage } from "@/utils/uploadImage";
 import { consumeAiChatStream } from "@/utils/consumeAiChatStream";
+import { executeClientTool } from "@/services/ai/clientToolExecutor";
 
-import type { IrisSegment, ToolCallRecord } from "@/components/ai/types";
+import type { IrisSegment, ToolCallRecord, ChatArtifact } from "@/components/ai/types";
 
 // Re-export so existing imports from this store path keep working
-export type { IrisSegment };
+export type { IrisSegment, ChatArtifact };
 
 export type ChatMessage = {
   id: string;
@@ -46,6 +47,10 @@ type GlobalChatStore = {
   useWebSearch: boolean;
   chatMode: "study" | "casual";
 
+  // Artifacts (split panel for notes, pdfs, etc.)
+  activeArtifact: ChatArtifact | null;
+  setActiveArtifact: (artifact: ChatArtifact | null) => void;
+
   // Actions
   fetchSessions: () => Promise<void>;
   loadSession: (sessionId: string) => Promise<void>;
@@ -70,6 +75,8 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
   useReasoning: false, 
   useWebSearch: false,
   chatMode: "casual",
+  activeArtifact: null,
+  setActiveArtifact: (artifact) => set({ activeArtifact: artifact }),
 
   fetchSessions: async () => {
     set({ sessionsLoading: true });
@@ -89,7 +96,7 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
       const { data } = await api.get(`/ai/chat/session/${sessionId}`);
       
       // Inherit the chatMode from the loaded session if available
-      if (data.data.chatMode) {
+      if (data.data.chatMode === "study" || data.data.chatMode === "casual") {
         set({ chatMode: data.data.chatMode });
       }
 
@@ -156,6 +163,42 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
       const { accessToken } = (await import("./useAuthStore")).useAuthStore.getState();
       const { API_BASE_URL } = await import("@/lib/api");
 
+      const currentArtifact = get().activeArtifact;
+      let currentNoteContext = currentArtifact?.id
+        ? { id: currentArtifact.id, title: currentArtifact.title }
+        : undefined;
+
+      // Fallback: If no active artifact in chat, check if a note is currently opened in the workspace
+      if (!currentNoteContext) {
+        try {
+          const { activeNoteId } = (await import("./useNoteStore")).useNoteStore.getState();
+          if (activeNoteId) {
+            const { queryClient } = await import("@/lib/queryClient");
+            const note = queryClient.getQueryData<any>(["note", activeNoteId]);
+            if (note) {
+              currentNoteContext = { id: note._id, title: note.title };
+            }
+          }
+        } catch (_) {}
+      }
+
+      // Collect verified tool execution outcomes from recent messages to keep LLM context in sync
+      const clientToolResults: Array<{ toolCallId?: string; tool: string; status: string; data?: any; error?: string }> = [];
+      const prevAssistantMsg = [...messages].reverse().find((m) => m.role === "assistant" && m.toolCalls && m.toolCalls.length > 0);
+      if (prevAssistantMsg?.toolCalls) {
+        for (const tc of prevAssistantMsg.toolCalls) {
+          if (tc.status) {
+            clientToolResults.push({
+              toolCallId: tc.id,
+              tool: tc.tool,
+              status: tc.status,
+              data: tc.data ? { _id: tc.data._id, title: tc.data.title } : undefined,
+              error: tc.error,
+            });
+          }
+        }
+      }
+
       const response = await fetch(`${API_BASE_URL}/ai/chat`, {
         method: "POST",
         headers: {
@@ -170,6 +213,8 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
           useReasoning: get().useReasoning,
           enableWeb: get().useWebSearch,
           chatMode: get().chatMode,
+          currentNote: currentNoteContext,
+          clientToolResults,
         }),
       });
 
@@ -208,7 +253,64 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
       const { fullText, fullThought, thinkingTime: finalThinkingTime } =
         await consumeAiChatStream(response.body, {
           throttleMs: 60,
-          onToolCall: ({ tool, quizData, query, url, citations }) => {
+          onToolCall: ({ id, args, execution, tool, quizData, query, url, citations }) => {
+            if (execution === "local" && args) {
+              executeClientTool(tool, args).then((res) => {
+                // Report verified tool execution result back to session history on server
+                const targetSessionId = get().activeSessionId || effectiveSessionId;
+                if (targetSessionId) {
+                  fetch(`${API_BASE_URL}/ai/chat/tool-result`, {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                      Authorization: `Bearer ${accessToken}`,
+                    },
+                    body: JSON.stringify({
+                      sessionId: targetSessionId,
+                      toolCallId: id,
+                      tool,
+                      status: res.success ? "success" : "error",
+                      data: res.data ? { _id: res.data._id, title: res.data.title } : undefined,
+                      error: res.error,
+                    }),
+                  }).catch(() => {});
+                }
+
+                if (res?.data) {
+                  // If a note was created or updated, automatically open it in the split artifact panel
+                  if (tool === "create_note" || tool === "update_note") {
+                    set({
+                      activeArtifact: {
+                        type: "note",
+                        id: res.data._id,
+                        title: res.data.title,
+                        content: res.data.content,
+                      },
+                    });
+                  }
+                }
+
+                set((state) => ({
+                  messages: state.messages.map((m) => {
+                    if (m.id !== aiMsgId) return m;
+                    const existing = m.toolCalls ?? [];
+                    const idx = existing.findIndex((tc) => (id ? tc.id === id : tc.tool === tool));
+                    if (idx !== -1) {
+                      const updated = [...existing];
+                      updated[idx] = {
+                        ...updated[idx],
+                        data: res.data,
+                        status: res.success ? "success" : "error",
+                        error: res.error,
+                      };
+                      return { ...m, toolCalls: updated };
+                    }
+                    return m;
+                  }),
+                }));
+              });
+            }
+
             set((state) => ({
               messages: state.messages.map((m) => {
                 if (m.id !== aiMsgId) return m;
@@ -220,11 +322,12 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
                     toolCalls: [...filtered, { tool, citations }],
                   };
                 }
-                const existingIdx = existingCalls.findIndex((tc) => tc.tool === tool);
+                const existingIdx = existingCalls.findIndex((tc) => (id ? tc.id === id : tc.tool === tool));
                 if (existingIdx !== -1) {
                   const updated = [...existingCalls];
                   updated[existingIdx] = {
                     ...updated[existingIdx],
+                    args: args ?? updated[existingIdx].args,
                     query: query ?? updated[existingIdx].query,
                     url: url ?? updated[existingIdx].url,
                   };
@@ -232,7 +335,7 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
                 }
                 return {
                   ...m,
-                  toolCalls: [...existingCalls, { tool, quizData, query, url, citations }],
+                  toolCalls: [...existingCalls, { id, args, execution, tool, quizData, query, url, citations }],
                 };
               }),
             }));
