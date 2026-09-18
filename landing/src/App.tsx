@@ -12,6 +12,7 @@ function App() {
       <Route path="/docs" element={<DocsPage />} />
       <Route path="/terms" element={<TermsPage />} />
       <Route path="/privacy" element={<PrivacyPage />} />
+      <Route path="/download" element={<DownloadPage />} />
       <Route path="/download/:os" element={<DownloadPage />} />
     </Routes>
   );
