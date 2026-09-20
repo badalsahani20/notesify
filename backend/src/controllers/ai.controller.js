@@ -6,11 +6,11 @@ import catchAsync from "../utils/catchAsync.js";
 import { generateConversationTitle } from "../services/title.service.js";
 import {
   checkGrammar,
-  chatWithAi,
   formatStructuredNoteContext,
   runAiAssist,
   getDynamicPrompts,
   getChatTools,
+  irisAgent,
 } from "../services/ai.service.js";
 import GlobalChatSession from "../models/globalChatSession.model.js";
 import { getNoteContentForUser } from "../services/notes.service.js";
@@ -1012,10 +1012,7 @@ export const chatWithAiController = catchAsync(async (req, res) => {
   // 4. Retrieve User Facts & Memories (Direct Indexed DB Fetch)
   let finalReply = "";
   let toolCalls = [];
-  let extraMessages = [];
   let pdfContextToEmit = pdfContext || "";
-  const MAX_TOOL_ROUNDS = 3;
-  let currentRound = 0;
 
   try {
     let memoryContext = "";
@@ -1065,131 +1062,33 @@ export const chatWithAiController = catchAsync(async (req, res) => {
 
     const effectiveReasoning = useReasoning === true || useReasoning === "true";
 
-    // 5. Bounded Agentic Loop (MAX_TOOL_ROUNDS = 3)
-    while (currentRound < MAX_TOOL_ROUNDS) {
-      currentRound++;
-      console.log(`🤖 [AgenticLoop] Round ${currentRound}/${MAX_TOOL_ROUNDS}`);
+    const agentResult = await irisAgent.run({
+      message,
+      history: effectiveHistory,
+      summary: sessionSummary || req.body.summary || "",
+      noteContext,
+      noteFetched,
+      systemPrompt: finalSystemPrompt,
+      pdfContext: pdfContext || "",
+      imageBase64,
+      stream: isStreaming,
+      useReasoning: effectiveReasoning,
+      enableWeb: shouldSearchWeb,
+      chatMode: activeSession?.chatMode || chatMode || "casual",
+      tools,
+      isNoteScoped,
+      userId: req.user._id,
+      activeNoteId,
+      res,
 
-      let roundResult;
-      try {
-        roundResult = await chatWithAi({
-          message,
-          history: effectiveHistory,
-          summary: sessionSummary || req.body.summary || "",
-          noteContext: noteContext,
-          webContext: "",
-          systemPrompt: finalSystemPrompt,
-          pdfContext: pdfContext || "",
-          imageBase64,
-          stream: isStreaming,
-          useReasoning: effectiveReasoning,
-          enableWeb: shouldSearchWeb,
-          chatMode: activeSession?.chatMode || chatMode || "casual",
-          tools: tools,
-          isNoteScoped,
-          extraMessages,
-        });
-      } catch (aiError) {
-        console.error(`❌ [AgenticLoop] AI model failed on round ${currentRound}:`, aiError.message);
-        if (currentRound === 1 && isStreaming) {
-          res.write(
-            `data: ${JSON.stringify({ type: "error", message: "AI service unavailable" })}\n\n`,
-          );
-        }
-        break;
-      }
+      // Temporary Task 1 dependencies.
+      streamAiResponse,
+      executeServerTool,
+    });
 
-      if (isStreaming) {
-        try {
-          const responseObj = await streamAiResponse(
-            roundResult.stream,
-            res,
-            currentRound === 1 ? noteFetched : false,
-            req.user._id
-          );
-
-          if (responseObj.finalReply) {
-            finalReply = finalReply ? `${finalReply}\n\n${responseObj.finalReply}` : responseObj.finalReply;
-          }
-          if (responseObj.toolCalls?.length > 0) {
-            toolCalls.push(...responseObj.toolCalls);
-          }
-          if (roundResult.pdfContext) {
-            pdfContextToEmit = roundResult.pdfContext;
-          }
-
-          // Server-side tool execution:
-          // get_note_content runs on server -> loop continues
-          // update_note / create_note run on client -> loop pauses/terminates
-          const serverToolsToRun = responseObj.serverToolCalls || [];
-          if (serverToolsToRun.length > 0 && currentRound < MAX_TOOL_ROUNDS) {
-            for (const st of serverToolsToRun) {
-              const toolExecResult = await executeServerTool(
-                st.tool,
-                st.args,
-                req.user._id,
-                activeNoteId
-              );
-
-              // Emit verified tool execution completion to SSE
-              res.write(
-                `data: ${JSON.stringify({
-                  type: "tool_call",
-                  id: st.id,
-                  tool: st.tool,
-                  status: toolExecResult.error ? "error" : "success",
-                  data: toolExecResult,
-                })}\n\n`
-              );
-
-              toolCalls.push({
-                id: st.id,
-                tool: st.tool,
-                args: st.args,
-                status: toolExecResult.error ? "error" : "success",
-                data: toolExecResult,
-              });
-
-              // Feed tool result back into Iris for the next loop round
-              extraMessages.push(
-                {
-                  role: "assistant",
-                  content: responseObj.finalReply || null,
-                  tool_calls: [
-                    {
-                      id: st.id,
-                      type: "function",
-                      function: {
-                        name: st.tool,
-                        arguments: JSON.stringify(st.args),
-                      },
-                    },
-                  ],
-                },
-                {
-                  role: "tool",
-                  tool_call_id: st.id,
-                  name: st.tool,
-                  content: JSON.stringify(toolExecResult),
-                }
-              );
-            }
-            // Loop continues so Iris reads the retrieved note content!
-            continue;
-          }
-
-          // No server-side tools needed or client tool executed (update_note / create_note) -> loop finishes!
-          break;
-        } catch (streamError) {
-          console.error("Streaming error in round:", streamError.message);
-          break;
-        }
-      } else {
-        // Non-streaming fallback
-        finalReply = roundResult.reply;
-        break;
-      }
-    }
+    finalReply = agentResult.finalReply;
+    toolCalls = agentResult.toolCalls;
+    pdfContextToEmit = agentResult.pdfContext;
   } catch (err) {
     console.error("❌ Controller error:", err.message);
   } finally {

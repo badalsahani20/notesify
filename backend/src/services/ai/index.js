@@ -6,3 +6,4 @@ export * from "./router/modelRouter.js";
 export * from "./tools/chatTools.js";
 export * from "./assistService.js";
 export * from "./chatService.js";
+export * from "./agent/irisAgent.js";
