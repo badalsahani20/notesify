@@ -6,39 +6,19 @@ import catchAsync from "../utils/catchAsync.js";
 import { generateConversationTitle } from "../services/title.service.js";
 import {
   checkGrammar,
-  formatStructuredNoteContext,
   runAiAssist,
   getDynamicPrompts,
-  getChatTools,
   irisAgent,
+  irisStreamHandler,
+  resolveChatContext,
 } from "../services/ai.service.js";
 import GlobalChatSession from "../models/globalChatSession.model.js";
-import { getNoteContentForUser } from "../services/notes.service.js";
 import { stripHtml } from "../utils/stripHtml.js";
 import { parseIrisResponse } from "../utils/parseIrisResponse.js";
 import getEffectiveDailyLimit from "../utils/getEffectiveDailyLimit.js";
 import { SseStreamParser } from "../utils/sseParser.js";
-import Memory from "../models/Memory.js";
-import { summarizeHistory } from "../utils/summarizeHistory.js";
 
 const normalizeForHash = (text = "") => text.replace(/\s+/g, " ").trim();
-
-/**
- * Fetch note context when the message is plausibly about the note.
- * First turn always fetches. Follow-ups fetch on broad note-related keywords.
- * Clearly off-topic messages (greetings, math, general questions) are skipped.
- */
-const shouldFetchNote = (message = "", history = [], contextChanged = false) => {
-  // If the frontend explicitly tells us the editor content changed, we must include it!
-  if (contextChanged) return true;
-  
-  // If this is the very first message of the chat, always fetch the note context.
-  if (!history || history.length === 0) return true;
-
-  // Otherwise, we rely on the LLM's vast context window history. 
-  // We no longer use arbitrary regex keywords that trigger false positives!
-  return false;
-};
 
 const hashText = (text = "") =>
   crypto
@@ -359,43 +339,6 @@ const resolveSession = async (req) => {
   };
 };
 
-// Fetch note context from the DB or frontend payload
-const resolveNoteContext = async (
-  req,
-  { isGlobalChat, noteId, history },
-) => {
-  const { noteContext: reqNoteContext, structuredContext, hasSelection, message, contextChanged } = req.body;
-  let noteContext = "";
-  let noteFetched = false;
-
-  // Only fetch note context if the message is actually about the note/editor context.
-  // We allow this even if a tool was used, so you can compare web data with note data.
-  const isNoteQuery =
-    noteId && (hasSelection || shouldFetchNote(message, history, contextChanged));
-  const shouldIncludeContext = !!isNoteQuery;
-
-  if (shouldIncludeContext) {
-    if (structuredContext) {
-      noteContext = formatStructuredNoteContext(structuredContext);
-    } else if (reqNoteContext) {
-      noteContext = hasSelection
-        ? `[User specifically highlighted this text in their editor]:\n${reqNoteContext}`
-        : `[user's current editor context]:\n${reqNoteContext}`;
-    } else {
-      const note = await Notes.findOne({
-        _id: noteId,
-        user: req.user._id,
-      }).lean();
-      if (note?.content) {
-        noteContext = `Title: ${note.title || "Untitled"}\n\n${stripHtml(note.content).slice(0, 1500)}`;
-        noteFetched = true;
-      }
-    }
-  }
-
-  return { noteContext, noteFetched };
-};
-
 // Set up SSE headers and fire the keep-alive comment
 const openSseConnection = (res, activeSessionId) => {
   res.setHeader("Content-Type", "text/event-stream");
@@ -405,450 +348,6 @@ const openSseConnection = (res, activeSessionId) => {
   if (activeSessionId)
     res.setHeader("X-Session-Id", activeSessionId.toString());
   res.write(": keep-alive\n\n");
-};
-
-const NORMALIZE_TOOL_NAME = {
-  "openrouter:web_search": "search_web",
-  "web_search": "search_web",
-  "openrouter:web_fetch": "crawl_url",
-  "web_fetch": "crawl_url",
-};
-
-export const executeServerTool = async (
-  toolName,
-  args,
-  userId,
-  fallbackNoteId = null
-) => {
-  if (toolName === "get_note_content") {
-    const noteId = args?.noteId || fallbackNoteId;
-    if (!noteId) {
-      return { error: "Missing noteId for get_note_content." };
-    }
-    try {
-      const note = await getNoteContentForUser(noteId, userId);
-      if (!note) {
-        return { error: `Note "${noteId}" not found or unauthorized.` };
-      }
-      return note;
-    } catch (err) {
-      return { error: `Failed to fetch note: ${err.message}` };
-    }
-  }
-  return { error: `Unknown server tool: ${toolName}` };
-};
-
-// Pipe OpenRouter SSE chunks to the client and accumulate the full reply
-const streamAiResponse = async (
-  stream,
-  res,
-  noteFetched,
-  userId
-) => {
-  const decoder = new TextDecoder();
-  let finalReply = "";
-  const parser = new SseStreamParser();
-  let memoryToolArgs = "";
-  let memoryToolIndex = -1;
-  let quizToolArgs = "";
-  let quizToolIndex = -1;
-
-  // Server tools & citations tracking
-  const toolCallsByIndex = new Map(); // index -> { id, name, rawArgs: "", emitted: false, parsedQuery: "", parsedUrl: "" }
-  const citationsMap = new Map(); // normalizedUrl -> { url, title, content }
-  const toolCalls = [];
-  const serverToolCalls = [];
-
-  if (noteFetched) {
-    res.write(
-      `data: ${JSON.stringify({ type: "tool_call", tool: "get_note_content" })}\n\n`,
-    );
-  }
-
-  for await (const chunk of stream) {
-    const text = decoder.decode(chunk, { stream: true });
-    res.write(text);
-
-    const events = parser.processChunk(chunk);
-
-    for (const data of events) {
-      const choice = data.choices?.[0];
-
-      // 1. Intercept choice annotations (citations returned by OpenRouter server tools)
-      if (choice?.delta?.annotations && Array.isArray(choice.delta.annotations)) {
-        let hasNewCitation = false;
-        for (const ann of choice.delta.annotations) {
-          if (ann?.type === "url_citation" && ann.url_citation?.url) {
-            const rawUrl = String(ann.url_citation.url).trim();
-            const normUrl = rawUrl.toLowerCase();
-            if (!citationsMap.has(normUrl)) {
-              citationsMap.set(normUrl, {
-                url: rawUrl,
-                title: ann.url_citation.title || "",
-                content: ann.url_citation.content || "",
-              });
-              hasNewCitation = true;
-            }
-          }
-        }
-        if (hasNewCitation) {
-          res.write(
-            `data: ${JSON.stringify({
-              type: "tool_call",
-              tool: "web_citations",
-              citations: Array.from(citationsMap.values()),
-            })}\n\n`
-          );
-        }
-      }
-
-      // 2. Intercept and accumulate tool calls delta
-      if (choice?.delta?.tool_calls) {
-        for (const tc of choice.delta.tool_calls) {
-          const toolIndex = tc.index ?? 0;
-          let state = toolCallsByIndex.get(toolIndex);
-          if (!state) {
-            state = {
-              id: tc.id || `tool_${toolIndex}`,
-              name: tc.function?.name || "",
-              rawArgs: "",
-              emitted: false,
-              parsedQuery: "",
-              parsedUrl: "",
-            };
-            toolCallsByIndex.set(toolIndex, state);
-          }
-          if (tc.id && !state.id) state.id = tc.id;
-          if (tc.function?.name && !state.name) state.name = tc.function.name;
-          if (tc.function?.arguments) {
-            state.rawArgs += tc.function.arguments;
-          }
-
-          // Accumulate tool-call arguments and parse complete JSON before emitting
-          if (state.rawArgs) {
-            try {
-              const parsed = JSON.parse(state.rawArgs);
-              const normalizedTool = NORMALIZE_TOOL_NAME[state.name] || state.name;
-
-              if (normalizedTool === "search_web" && parsed.query && !state.emitted) {
-                state.emitted = true;
-                state.parsedQuery = parsed.query;
-                res.write(
-                  `data: ${JSON.stringify({
-                    type: "tool_call",
-                    id: state.id,
-                    tool: "search_web",
-                    query: parsed.query,
-                  })}\n\n`,
-                );
-              } else if (normalizedTool === "crawl_url" && (parsed.url || parsed.query) && !state.emitted) {
-                state.emitted = true;
-                state.parsedUrl = parsed.url || parsed.query;
-                res.write(
-                  `data: ${JSON.stringify({
-                    type: "tool_call",
-                    id: state.id,
-                    tool: "crawl_url",
-                    url: state.parsedUrl,
-                  })}\n\n`,
-                );
-              } else if(normalizedTool === "create_note" && !state.emitted) {
-                state.emitted = true;
-                res.write(
-                  `data: ${JSON.stringify({
-                    type: "tool_call",
-                    id: state.id,
-                    tool: "create_note",
-                    args: parsed,
-                    execution: "local",
-                  })}\n\n`,
-                )
-              } else if(normalizedTool === "get_note_content" && !state.emitted) {
-                state.emitted = true;
-                res.write(
-                  `data: ${JSON.stringify({
-                    type: "tool_call",
-                    id: state.id,
-                    tool: "get_note_content",
-                    args: parsed,
-                    status: "executing",
-                  })}\n\n`,
-                )
-              }
-            } catch (_) {
-              // Arguments are still streaming across chunks; wait for complete JSON
-            }
-          }
-
-          // Custom function tools (save_memory, generate_quiz)
-          if (state.name === "generate_quiz" || tc.function?.name === "generate_quiz") {
-            quizToolIndex = toolIndex;
-            if (tc.function?.arguments) quizToolArgs += tc.function.arguments;
-          } else if (state.name === "save_memory" || tc.function?.name === "save_memory") {
-            memoryToolIndex = toolIndex;
-            if (tc.function?.arguments) memoryToolArgs += tc.function.arguments;
-          } else if (memoryToolIndex !== -1 && toolIndex === memoryToolIndex) {
-            if (tc.function?.arguments) memoryToolArgs += tc.function.arguments;
-          } else if (quizToolIndex !== -1 && toolIndex === quizToolIndex) {
-            if (tc.function?.arguments) quizToolArgs += tc.function.arguments;
-          }
-        }
-      }
-
-      finalReply +=
-        choice?.delta?.content ||
-        choice?.message?.content ||
-        data.content ||
-        data.text ||
-        "";
-    }
-  }
-
-  // Finalize tool calls once stream has ended
-  for (const [_, state] of toolCallsByIndex) {
-    const normalizedTool = NORMALIZE_TOOL_NAME[state.name] || state.name;
-
-    if (!state.emitted && state.rawArgs) {
-      try {
-        const parsed = JSON.parse(state.rawArgs);
-        if (normalizedTool === "search_web" && parsed.query) {
-          state.emitted = true;
-          state.parsedQuery = parsed.query;
-          res.write(
-            `data: ${JSON.stringify({
-              type: "tool_call",
-              id: state.id,
-              tool: "search_web",
-              query: parsed.query,
-            })}\n\n`,
-          );
-        } else if (normalizedTool === "crawl_url" && (parsed.url || parsed.query)) {
-          state.emitted = true;
-          state.parsedUrl = parsed.url || parsed.query;
-          res.write(
-            `data: ${JSON.stringify({
-              type: "tool_call",
-              id: state.id,
-              tool: "crawl_url",
-              url: state.parsedUrl,
-            })}\n\n`,
-          );
-        } else if (normalizedTool === "create_note") {
-          state.emitted = true;
-          state.parsedArgs = parsed;
-          res.write(
-            `data: ${JSON.stringify({
-              type: "tool_call",
-              id: state.id,
-              tool: "create_note",
-              args: parsed,
-              execution: "local",
-            })}\n\n`,
-          );
-        } else if(normalizedTool === "update_note") {
-          state.emitted = true;
-          state.parsedArgs = parsed;
-          res.write(
-            `data: ${JSON.stringify({
-              type: "tool_call",
-              id: state.id,
-              tool: "update_note",
-              args: parsed,
-              execution: "local",
-            })}\n\n`,
-          );
-        } else if(normalizedTool === "get_note_content") {
-          state.emitted = true;
-          state.parsedArgs = parsed;
-          res.write(
-            `data: ${JSON.stringify({
-              type: "tool_call",
-              id: state.id,
-              tool: "get_note_content",
-              args: parsed,
-              status: "executing",
-            })}\n\n`,
-          );
-        }
-      } catch (_) {
-        // Fallback regex extraction if stream was truncated before trailing JSON brace
-        if (normalizedTool === "search_web") {
-          const qMatch = state.rawArgs.match(/"query"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"/);
-          if (qMatch && qMatch[1]) {
-            state.emitted = true;
-            state.parsedQuery = qMatch[1];
-            res.write(
-              `data: ${JSON.stringify({
-                type: "tool_call",
-                id: state.id,
-                tool: "search_web",
-                query: qMatch[1],
-              })}\n\n`,
-            );
-          }
-        } else if (normalizedTool === "crawl_url") {
-          const uMatch = state.rawArgs.match(/"url"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"/);
-          if (uMatch && uMatch[1]) {
-            state.emitted = true;
-            state.parsedUrl = uMatch[1];
-            res.write(
-              `data: ${JSON.stringify({
-                type: "tool_call",
-                id: state.id,
-                tool: "crawl_url",
-                url: uMatch[1],
-              })}\n\n`,
-            );
-          }
-        }
-      }
-    }
-
-    if (normalizedTool === "search_web" && state.parsedQuery) {
-      toolCalls.push({
-        id: state.id,
-        tool: "search_web",
-        query: state.parsedQuery,
-      });
-    } else if (normalizedTool === "crawl_url" && state.parsedUrl) {
-      toolCalls.push({
-        id: state.id,
-        tool: "crawl_url",
-        url: state.parsedUrl,
-      });
-    } else if (normalizedTool === "create_note") {
-      let parsedArgs = state.parsedArgs;
-      if (!parsedArgs && state.rawArgs) {
-        try {
-          parsedArgs = JSON.parse(state.rawArgs);
-        } catch (_) {}
-      }
-
-      if (parsedArgs) {
-        toolCalls.push({
-          id: state.id,
-          tool: "create_note",
-          args: parsedArgs,
-          execution: "local",
-        });
-
-        if (!finalReply.trim()) {
-          const noteTitle = parsedArgs.title ? `**${parsedArgs.title}**` : "your note";
-          finalReply = `I've created ${noteTitle} in your workspace!`;
-          res.write(
-            `data: ${JSON.stringify({ choices: [{ delta: { content: finalReply } }] })}\n\n`,
-          );
-        }
-      }
-    } else if (normalizedTool === "update_note") {
-      let parsedArgs = state.parsedArgs;
-      if(!parsedArgs && state.rawArgs) {
-        try {
-          parsedArgs = JSON.parse(state.rawArgs);
-        } catch (_) {}
-      }
-
-      if (parsedArgs) {
-        toolCalls.push({
-          id: state.id,
-          tool: "update_note",
-          args: parsedArgs,
-          execution: "local",
-        });
-
-        if(!finalReply.trim()) {
-          const noteTitle = parsedArgs.title ? `**${parsedArgs.title}**` : "your note";
-          finalReply = `Got it! I've updated ${noteTitle} in your workspace`;
-          res.write(
-            `data: ${JSON.stringify({ choices: [{ delta: { content: finalReply } }] })}\n\n`
-          )
-        }
-      }
-    } else if (normalizedTool === "get_note_content") {
-      let parsedArgs = state.parsedArgs;
-      if (!parsedArgs && state.rawArgs) {
-        try {
-          parsedArgs = JSON.parse(state.rawArgs);
-        } catch (_) {}
-      }
-
-      if (parsedArgs) {
-        serverToolCalls.push({
-          id: state.id,
-          tool: "get_note_content",
-          args: parsedArgs,
-        });
-      }
-    }
-  }
-
-  // Record citations into toolCalls and emit final snapshot
-  if (citationsMap.size > 0) {
-    const finalCitations = Array.from(citationsMap.values());
-    toolCalls.push({
-      tool: "web_citations",
-      citations: finalCitations,
-    });
-    res.write(
-      `data: ${JSON.stringify({
-        type: "tool_call",
-        tool: "web_citations",
-        citations: finalCitations,
-      })}\n\n`,
-    );
-  }
-
-  // Execute memory save if triggered
-  if (memoryToolIndex !== -1 && memoryToolArgs) {
-    try {
-      const args = JSON.parse(memoryToolArgs);
-      if (args.category && args.content && userId) {
-        import("../services/memoryService.js").then(({ saveMemory }) => {
-          saveMemory(userId, args).catch(console.error);
-        });
-        res.write(
-          `data: ${JSON.stringify({ type: "tool_call", tool: "save_memory" })}\n\n`,
-        );
-
-        toolCalls.push({
-          tool: "save_memory",
-          category: args.category,
-          content: args.content,
-        });
-
-        if (!finalReply.trim()) {
-          finalReply = `Got it! I've saved that to my memory: "${args.content}"`;
-          res.write(
-            `data: ${JSON.stringify({ choices: [{ delta: { content: finalReply } }] })}\n\n`,
-          );
-        }
-      }
-    } catch (err) {
-      console.error(
-        `Failed to parse save_memory arguments: ${err.message}. Raw args:`,
-        memoryToolArgs,
-      );
-    }
-  }
-
-  if (quizToolIndex !== -1 && quizToolArgs) {
-    try {
-      const args = JSON.parse(quizToolArgs);
-      if (args.questions && args.questions.length > 0) {
-        res.write(
-          `data: ${JSON.stringify({ type: "tool_call", tool: "render_quiz", quizData: args.questions })}\n\n`,
-        );
-        toolCalls.push({ tool: "render_quiz", quizData: args.questions });
-      }
-    } catch (err) {
-      console.error(
-        `Failed to parse generate_quiz arguments: ${err.message}. Raw args:`,
-        quizToolArgs,
-      );
-    }
-  }
-
-  return { finalReply, toolCalls, serverToolCalls };
 };
 
 // Save the completed turn to the global-chat session in MongoDB
@@ -927,56 +426,9 @@ export const chatWithAiController = catchAsync(async (req, res) => {
   let {
     isGlobalChat,
     history,
-    summary: sessionSummary,
     activeSessionId,
     activeSession,
   } = sessionData;
-
-  // Context-aware history management (Large Context Window Strategy)
-  // 1. Keep approximately the last 16 messages in full (untruncated)
-  // 2. Older messages outside the recent window are consolidated into a state-preserving rolling summary
-  const RECENT_MESSAGE_COUNT = 16;
-  const SUMMARY_TRIGGER_COUNT = 24;
-
-  let effectiveHistory = history;
-
-  if (history && history.length > RECENT_MESSAGE_COUNT) {
-    const recentHistory = history.slice(-RECENT_MESSAGE_COUNT);
-    const olderMessages = history.slice(0, -RECENT_MESSAGE_COUNT);
-
-    if (history.length >= SUMMARY_TRIGGER_COUNT && olderMessages.length > 0) {
-      try {
-        const consolidatedSummary = await summarizeHistory(olderMessages, sessionSummary);
-        if (consolidatedSummary) {
-          sessionSummary = consolidatedSummary;
-          if (activeSession) {
-            activeSession.summary = consolidatedSummary;
-          }
-        }
-      } catch (sumErr) {
-        console.warn("⚠️ [ChatController] Conversation summarization failed:", sumErr.message);
-      }
-    }
-
-    effectiveHistory = recentHistory;
-  }
-
-  // Merge any verified client-side tool execution results into history
-  if (Array.isArray(req.body.clientToolResults) && req.body.clientToolResults.length > 0 && effectiveHistory) {
-    for (const ctr of req.body.clientToolResults) {
-      for (const h of effectiveHistory) {
-        if (h.role === "assistant" && Array.isArray(h.toolCalls)) {
-          for (const tc of h.toolCalls) {
-            if ((ctr.toolCallId && tc.id === ctr.toolCallId) || (!ctr.toolCallId && tc.tool === ctr.tool)) {
-              tc.status = ctr.status;
-              if (ctr.data) tc.data = ctr.data;
-              if (ctr.error) tc.error = ctr.error;
-            }
-          }
-        }
-      }
-    }
-  }
 
   if (isGlobalChat && req.body.sessionId && !sessionData.session) {
     return res
@@ -992,76 +444,32 @@ export const chatWithAiController = catchAsync(async (req, res) => {
     openSseConnection(res, activeSessionId);
   }
 
-  // 3. Note context (always fetched when relevant to note context)
-  const { noteContext, noteFetched } = await resolveNoteContext(req, {
-    ...sessionData,
-    toolUsed: null,
+  // 3. Resolve chat context
+  const resolvedContext = await resolveChatContext({
+    user: req.user,
+    body: req.body,
+    sessionData,
   });
 
-  console.log("📊 [AI_TELEMETRY_BACKEND]", {
-    userId: req.user._id,
-    noteId: req.body.noteId || null,
-    hasSelection: req.body.hasSelection || false,
-    contextChanged: req.body.contextChanged || false,
-    contextLength: (noteContext || "").length,
+  const {
+    effectiveHistory,
+    sessionSummary,
+    noteContext,
     noteFetched,
-    isGlobalChat: sessionData.isGlobalChat,
-    timestamp: new Date().toISOString(),
-  });
+    finalSystemPrompt,
+    currentMode,
+    isNoteScoped,
+    activeNoteId,
+    tools,
+  } = resolvedContext;
 
-  // 4. Retrieve User Facts & Memories (Direct Indexed DB Fetch)
+  const effectiveReasoning = useReasoning === true || useReasoning === "true";
+
   let finalReply = "";
   let toolCalls = [];
   let pdfContextToEmit = pdfContext || "";
 
   try {
-    let memoryContext = "";
-    if (req.user?._id) {
-      try {
-        const memories = await Memory.find({ user: req.user._id })
-          .sort({ lastAccessedAt: -1 })
-          .limit(8)
-          .lean();
-        if (memories?.length > 0) {
-          memoryContext = `\n--- USER MEMORIES ---\nFacts previously noted about the user:\n${memories
-            .map((m) => `- [${m.category}] ${m.content}`)
-            .join("\n")}\n--- END MEMORIES ---\n`;
-        }
-      } catch (_) {}
-    }
-
-    const activeNoteId = req.body.noteId || null;
-    let activeNoteTitle;
-    if (activeNoteId && !activeNoteTitle) {
-      try {
-        const existingNote = await Notes.findOne(
-          { _id: activeNoteId, user: req.user._id },
-          "title"
-        ).lean();
-        if (existingNote) {
-          activeNoteTitle = existingNote.title;
-        }
-      } catch (_) {}
-    }
-
-    let activeNoteContext = "";
-    if (activeNoteId) {
-      activeNoteContext = `\n\n[ACTIVE NOTE]\nid: ${activeNoteId}\ntitle: "${activeNoteTitle || "Untitled"}"\n[/ACTIVE NOTE]`;
-    }
-
-    const userName = req.user?.name
-      ? `User: ${req.user.name}`
-      : "";
-    let finalSystemPrompt = [userName, memoryContext, activeNoteContext].filter(Boolean).join("\n");
-
-    const currentMode = activeSession?.chatMode || chatMode || "casual";
-    const isNoteScoped = !sessionData.isGlobalChat || Boolean(req.body.noteId);
-
-    // Available tools for current chat mode (in note editor drawer, create_note is excluded)
-    const tools = getChatTools(currentMode, { isNoteScoped });
-
-    const effectiveReasoning = useReasoning === true || useReasoning === "true";
-
     const agentResult = await irisAgent.run({
       message,
       history: effectiveHistory,
@@ -1074,16 +482,29 @@ export const chatWithAiController = catchAsync(async (req, res) => {
       stream: isStreaming,
       useReasoning: effectiveReasoning,
       enableWeb: shouldSearchWeb,
-      chatMode: activeSession?.chatMode || chatMode || "casual",
+      chatMode: currentMode,
       tools,
       isNoteScoped,
       userId: req.user._id,
       activeNoteId,
       res,
 
-      // Temporary Task 1 dependencies.
-      streamAiResponse,
-      executeServerTool,
+      // Stream handler invocation
+      streamAiResponse: (stream, res, noteFetched, userId) =>
+        irisStreamHandler.handle({
+          stream,
+          res,
+          noteFetched,
+          userId,
+          fallbackNoteId: activeNoteId,
+        }),
+      executeServerTool: (toolName, args, uId, fallbackNoteId) =>
+        irisStreamHandler.executeServerTool(
+          toolName,
+          args,
+          uId,
+          fallbackNoteId || activeNoteId,
+        ),
     });
 
     finalReply = agentResult.finalReply;

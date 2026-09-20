@@ -7,3 +7,6 @@ export * from "./tools/chatTools.js";
 export * from "./assistService.js";
 export * from "./chatService.js";
 export * from "./agent/irisAgent.js";
+export * from "./stream/irisStreamHandler.js";
+export * from "./tools/toolExecutor.js";
+export * from "./chatContextResolver.js";
