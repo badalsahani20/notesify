@@ -12,6 +12,15 @@ import { db } from "./database/database";
 const isFileProtocol = window.location.protocol === "file:";
 const Router = isFileProtocol ? HashRouter : BrowserRouter;
 
+if (
+  typeof window !== "undefined" &&
+  (Boolean((window as any).electronAPI) ||
+    navigator.userAgent.toLowerCase().includes("electron") ||
+    isFileProtocol)
+) {
+  document.documentElement.classList.add("is-electron");
+}
+
 // Debug helper to inspect Dexie sync queue from browser/Electron console
 (window as any).debugSyncQueue = async () => {
   const queue = await db.syncQueue.toArray();

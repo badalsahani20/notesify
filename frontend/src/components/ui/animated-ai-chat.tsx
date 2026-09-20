@@ -108,6 +108,7 @@ export interface AnimatedAIChatProps {
   onStop?: () => void;
   attachments?: React.ReactNode;
   extraActionButtons?: React.ReactNode;
+  rightActionButtons?: React.ReactNode;
   textareaRef?: React.RefObject<HTMLTextAreaElement | null>;
   placeholder?: string;
   showHeading?: boolean;
@@ -123,6 +124,7 @@ export function AnimatedAIChat({
   onStop,
   attachments,
   extraActionButtons,
+  rightActionButtons,
   textareaRef: externalTextareaRef,
   placeholder = "Ask Iris anything...",
   showHeading = false,
@@ -395,39 +397,42 @@ export function AnimatedAIChat({
                                 {extraActionButtons}
                             </div>
                             
-                            {isTyping && onStop ? (
-                                <motion.button
-                                    type="button"
-                                    onClick={onStop}
-                                    whileHover={{ scale: 1.05 }}
-                                    whileTap={{ scale: 0.95 }}
-                                    className="p-1.5 rounded-lg text-white hover:text-red-400 bg-white/5 hover:bg-red-400/10 transition-colors"
-                                    title="Stop generating"
-                                >
-                                    <XIcon className="w-4 h-4" />
-                                </motion.button>
-                            ) : (
-                                <motion.button
-                                    type="button"
-                                    onClick={handleSendMessage}
-                                    whileHover={{ scale: 1.02 }}
-                                    whileTap={{ scale: 0.95 }}
-                                    disabled={isTyping || (!value.trim() && !attachments)}
-                                    className={cn(
-                                        "w-8 h-8 rounded-lg transition-all flex items-center justify-center cursor-pointer shrink-0",
-                                        value.trim() || attachments
-                                            ? "bg-white text-black shadow-md hover:bg-white/90"
-                                            : "bg-white/5 text-white/30 cursor-not-allowed"
-                                    )}
-                                    title="Send message"
-                                >
-                                    {isTyping ? (
-                                        <LoaderIcon className="w-4 h-4 animate-[spin_2s_linear_infinite]" />
-                                    ) : (
-                                        <ArrowUpIcon className="w-4 h-4" />
-                                    )}
-                                </motion.button>
-                            )}
+                            <div className="flex items-center gap-1.5 shrink-0">
+                                {rightActionButtons}
+                                {isTyping && onStop ? (
+                                    <motion.button
+                                        type="button"
+                                        onClick={onStop}
+                                        whileHover={{ scale: 1.05 }}
+                                        whileTap={{ scale: 0.95 }}
+                                        className="w-8 h-8 rounded-lg text-white hover:text-red-400 bg-white/10 hover:bg-red-500/20 border border-white/10 transition-all flex items-center justify-center cursor-pointer shrink-0"
+                                        title="Stop generating"
+                                    >
+                                        <XIcon className="w-4 h-4" />
+                                    </motion.button>
+                                ) : (
+                                    <motion.button
+                                        type="button"
+                                        onClick={handleSendMessage}
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.95 }}
+                                        disabled={isTyping || (!value.trim() && !attachments)}
+                                        className={cn(
+                                            "w-8 h-8 rounded-lg transition-all flex items-center justify-center cursor-pointer shrink-0",
+                                            value.trim() || attachments
+                                                ? "bg-white text-black shadow-md hover:bg-white/90"
+                                                : "bg-white/5 text-white/30 cursor-not-allowed"
+                                        )}
+                                        title="Send message"
+                                    >
+                                        {isTyping ? (
+                                            <LoaderIcon className="w-4 h-4 animate-[spin_2s_linear_infinite]" />
+                                        ) : (
+                                            <ArrowUpIcon className="w-4 h-4" />
+                                        )}
+                                    </motion.button>
+                                )}
+                            </div>
                         </div>
                     </motion.div>
                 </motion.div>

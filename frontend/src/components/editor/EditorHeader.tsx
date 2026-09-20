@@ -43,6 +43,7 @@ type EditorHeaderProps = {
   loadingAction?: AiAction | null;
   onRunAction?: (action: AiAction) => Promise<void>;
   onOpenGenerateNotes?: () => void;
+  onClose?: () => void;
 };
 
 
@@ -70,11 +71,20 @@ const EditorHeader = ({
   isSaving,
   loadingAction,
   onOpenGenerateNotes,
+  onClose,
 }: EditorHeaderProps) => {
 
   const navigate = useNavigate();
   const [isShareOpen, setIsShareOpen] = React.useState(false);
   const [searchNoteQuery, setSearchNoteQuery] = React.useState("");
+
+  const handleClose = () => {
+    if (onClose) {
+      onClose();
+    } else {
+      window.history.back();
+    }
+  };
 
   const { folders } = useFolderStore();
   const { data: allNotes = [] } = useNotesQuery();
@@ -121,16 +131,15 @@ const EditorHeader = ({
     <div className="desktop-editor-header">
       <div className="editor-title-row">
         <div className="flex flex-1 items-center min-w-0 gap-1 group/title-switcher">
-          {isMobile && (
-            <button
-              type="button"
-              onClick={() => window.history.back()}
-              className="mr-1 -ml-2 p-1.5 rounded-full hover:bg-white/5 active:bg-white/10 transition-colors"
-              aria-label="Go back"
-            >
-              <ChevronLeft size={20} className="text-[var(--text-strong)]" />
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={handleClose}
+            className="mr-1 -ml-1 p-1.5 rounded-lg text-[var(--muted-text)] hover:text-[var(--text-strong)] hover:bg-white/10 active:bg-white/15 transition-colors cursor-pointer shrink-0"
+            aria-label={folder ? `Back to ${folder.name}` : "Close note"}
+            title={folder ? `Back to ${folder.name}` : "Close note"}
+          >
+            <ChevronLeft size={18} />
+          </button>
           <input
             className="editor-title-input min-w-0 flex-1"
             value={draftTitle}
@@ -349,6 +358,17 @@ const EditorHeader = ({
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
+
+          {/* Close Note Button */}
+          <button
+            type="button"
+            onClick={handleClose}
+            className="editor-star-toggle flex items-center justify-center rounded-lg p-1.5 text-[var(--muted-text)] hover:text-[var(--text-strong)] hover:bg-white/5 active:bg-white/10 transition-colors cursor-pointer"
+            aria-label="Close note (Esc)"
+            title="Close note (Esc)"
+          >
+            <X size={16} />
+          </button>
         </div>
       </div>
 

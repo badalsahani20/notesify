@@ -19,7 +19,7 @@ const ActivityBar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { searchQuery, setSearchQuery } = useNoteStore();
-  const { isFolderPanelOpen, toggleFolderPanel } = usePanelStore();
+  const { isFolderPanelOpen, closeFolderPanel } = usePanelStore();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const openSettings = useSettingsUIStore((s) => s.openSettings);
 
@@ -105,18 +105,23 @@ const ActivityBar = () => {
               <div className="iris-orb" />
             </NavLink>
 
-            {/* Folders toggle */}
-            <button
-              onClick={toggleFolderPanel}
-              className={cn(
-                "nav-action-btn transition-all duration-300",
-                isFolderPanelOpen && "nav-action-btn-active"
-              )}
+            {/* Folders navigation */}
+            <NavLink
+              to={`/folders${location.search}`}
+              onClick={() => {
+                if (isFolderPanelOpen) closeFolderPanel();
+              }}
+              className={({ isActive }) =>
+                cn(
+                  "nav-action-btn transition-all duration-300",
+                  (isActive || location.pathname.startsWith("/folders")) && "nav-action-btn-active"
+                )
+              }
               style={{ "--highlight-color": "#3b82f6" } as any}
-              title="Folders"
+              title="Notebooks"
             >
               <Folders size={18} className="nav-icon" />
-            </button>
+            </NavLink>
 
             {/* Mobile search button */}
             <button

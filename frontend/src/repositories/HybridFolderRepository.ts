@@ -32,9 +32,14 @@ export class HybridFolderRepository implements IFolderRepository {
             return [];
         }
 
-        const remoteFolders = await this.remoteAPI.getFolders();
-        await this.localDB.saveMany(remoteFolders);
-        return remoteFolders;
+        try {
+            const remoteFolders = await this.remoteAPI.getFolders();
+            await this.localDB.saveMany(remoteFolders);
+            return remoteFolders;
+        } catch (error) {
+            console.warn("[HybridFolderRepository] Remote fetch failed, returning local cache:", error);
+            return localFolders;
+        }
     }
 
     async createFolder(data: {_id?: string; name: string; color?: FolderColor }): Promise<Folder> {

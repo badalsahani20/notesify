@@ -1,5 +1,5 @@
 import { Moon, Plus, Sun } from "lucide-react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import UserMenu from "@/components/header/UserMenu";
 import HeaderSearch from "@/components/header/HeaderSearch";
 import NotificationsMenu from "@/components/header/NotificationsMenu";
@@ -14,17 +14,17 @@ type AppHeaderProps = {
 };
 
 const AppHeader = ({ theme, onToggleTheme, onMenuOpen }: AppHeaderProps) => {
-  const { folderId } = useParams();
   const navigate = useNavigate();
-
   const { addFolder } = useFolderStore();
 
   const [isNewNotebookOpen, setIsNewNotebookOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  const handleCreateNote = () => {
-    navigate(folderId ? `/folders/${folderId}/note/new` : `/note/new`);
-  };
+  const isDesktop = typeof window !== "undefined" && (
+    Boolean((window as any).electronAPI) ||
+    navigator.userAgent.toLowerCase().includes("electron") ||
+    window.location.protocol === "file:"
+  );
 
   const handleCreateFolder = async (name: string) => {
     setIsSaving(true);
@@ -40,7 +40,10 @@ const AppHeader = ({ theme, onToggleTheme, onMenuOpen }: AppHeaderProps) => {
   };
 
   return (
-    <header className="desktop-header">
+    <header 
+      className={`desktop-header ${isDesktop ? "is-desktop-app" : ""}`}
+      style={isDesktop ? { paddingRight: "clamp(140px, 9.5rem, 160px)" } : undefined}
+    >
       <div
         className={`desktop-brand ${onMenuOpen ? "mobile-menu-trigger" : ""}`}
         onClick={onMenuOpen}
@@ -49,21 +52,20 @@ const AppHeader = ({ theme, onToggleTheme, onMenuOpen }: AppHeaderProps) => {
         onKeyDown={(e) => e.key === "Enter" && onMenuOpen?.()}
         aria-label={onMenuOpen ? "Open menu" : undefined}
       >
-        <div className="relative">
+        <div className="relative shrink-0">
           <div className="absolute inset-0 bg-white/5 blur-md" />
-          <div className="relative w-8 h-8 overflow-hidden bg-black shadow-[0_0_15px_rgba(255,255,255,0.05)]">
+          <div className="relative w-8 h-8 rounded-lg overflow-hidden bg-zinc-900 border border-white/10 shadow-[0_0_15px_rgba(255,255,255,0.05)] flex items-center justify-center">
             <img 
-              src="./notesify-favicon.png" 
+              src="/notesify-favicon.png" 
               alt="Notesify" 
-              width={32} 
-              height={32} 
-              className="w-full h-full" 
+              width={26} 
+              height={26} 
+              className="w-6.5 h-6.5 object-contain" 
             />
           </div>
         </div>
-        <div>
-          {/* <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--muted-text)]">Workspace</p> */}
-          <h1 className="text-[1.05rem] font-semibold tracking-[-0.04em] md:text-[1.15rem]">Notesify</h1>
+        <div className="shrink-0">
+          <h1 className="text-[1.05rem] font-semibold tracking-[-0.03em] whitespace-nowrap md:text-[1.15rem]">Notesify</h1>
         </div>
       </div>
 
@@ -85,17 +87,8 @@ const AppHeader = ({ theme, onToggleTheme, onMenuOpen }: AppHeaderProps) => {
         <div className="hidden lg:flex items-center gap-2">
           <button 
             type="button" 
-            onClick={handleCreateNote} 
-            className="ignite-button bg-[#2563eb] border-[#2563eb]/20"
-          >
-            <Plus size={18} />
-            <span className="hidden sm:inline">New Note</span>
-          </button>
-
-          <button 
-            type="button" 
             onClick={() => setIsNewNotebookOpen(true)} 
-            className="ignite-button !bg-transparent border-white/10"
+            className="ignite-button bg-[#2563eb] border-[#2563eb]/20 hover:bg-[#1d4ed8] text-white transition-colors shadow-sm"
           >
             <Plus size={18} />
             <span className="hidden sm:inline">New Notebook</span>

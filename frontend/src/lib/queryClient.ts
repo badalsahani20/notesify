@@ -10,6 +10,7 @@ export const queryClient = new QueryClient({
   }),
   defaultOptions: {
     queries: {
+      networkMode: "offlineFirst", // Run queryFn so local repository/Dexie can return cached data offline
       staleTime: 1000 * 60 * 5, // 5 minutes
       gcTime: 1000 * 60 * 30, // 30 minutes
       retry: 1,

@@ -101,7 +101,7 @@ const MobileDrawer = ({ open, onClose }: Props) => {
                   <div className="absolute inset-0 rounded-lg bg-white/5 blur-md" />
                   <div className="relative w-7 h-7 rounded-lg overflow-hidden bg-black">
                     <img
-                      src="./notesify-favicon.png"
+                      src="/notesify-favicon.png"
                       alt="Notesify"
                       width={28}
                       height={28}

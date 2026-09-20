@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { AnimatedAIChat } from "@/components/ui/animated-ai-chat";
 import { motion } from "framer-motion";
 import { useGlobalChatStore } from "@/store/useGlobalChatStore";
+import { VoiceDictationButton } from "./VoiceDictationButton";
 
 interface GlobalChatComposeProps {
   input: string;
@@ -238,6 +239,17 @@ export const GlobalChatCompose = ({
           }
         }}
         extraActionButtons={renderExtraButtons()}
+        rightActionButtons={
+          <VoiceDictationButton
+            onTranscript={(text) => {
+              setInput(input ? `${input.trim()} ${text}` : text);
+              setTimeout(() => {
+                textareaRef.current?.focus();
+              }, 60);
+            }}
+            disabled={isSending}
+          />
+        }
         commands={[
           { 
               icon: <FileText className="w-4 h-4" />, 

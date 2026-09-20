@@ -590,7 +590,6 @@ export const getAllSessionsController = catchAsync(async (req, res) => {
   const sessions = await GlobalChatSession.find({ user: req.user._id })
     .select("title updatedAt") // only what the sidebar needs
     .sort({ updatedAt: -1 }) // newest first
-    .limit(20) // cap at 20 — sidebar doesn't need more
     .lean();
 
   res.status(200).json({

@@ -5,7 +5,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { User, Type, Info, Keyboard, ChevronLeft } from "lucide-react";
+import { User, Type, Info, Keyboard, ChevronLeft, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useMediaQuery } from "@/hooks/ui/useMediaQuery";
 
@@ -49,7 +49,7 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
           "p-0 gap-0 bg-[#0f0f11] border border-white/8 text-zinc-100 shadow-2xl overflow-hidden max-h-[90vh]",
           isMobile ? "w-[95vw] h-[90vh] max-w-none rounded-xl" : "sm:max-w-2xl"
         )}
-        showCloseButton={true}
+        showCloseButton={false}
         aria-describedby={undefined}
       >
         <div className="flex h-full w-full max-h-[90vh] sm:min-h-[520px]">
@@ -59,11 +59,23 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
               "shrink-0 bg-[#0c0c0e] flex flex-col gap-0.5",
               isMobile ? "w-full py-6 px-4" : "w-44 border-r border-white/8 py-4 px-2"
             )}>
-              <DialogHeader className={cn("pb-4", isMobile ? "px-1" : "px-2")}>
-                <DialogTitle className="text-sm font-semibold text-zinc-400 tracking-wide uppercase">
-                  Settings
-                </DialogTitle>
-              </DialogHeader>
+              <div className={cn("flex items-center justify-between pb-4", isMobile ? "px-1" : "px-2")}>
+                <DialogHeader>
+                  <DialogTitle className="text-sm font-semibold text-zinc-400 tracking-wide uppercase">
+                    Settings
+                  </DialogTitle>
+                </DialogHeader>
+                {isMobile && (
+                  <button
+                    type="button"
+                    onClick={() => onOpenChange(false)}
+                    className="p-1.5 -mr-1 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
+                    aria-label="Close settings"
+                  >
+                    <X size={18} />
+                  </button>
+                )}
+              </div>
               <div className={cn("flex flex-col", isMobile ? "gap-1.5" : "gap-1")}>
                 {TABS.map(({ id, label, icon }) => (
                   <button
@@ -96,19 +108,42 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
           {(!isMobile || mobileView === "content") && (
             <div className="flex-1 min-w-0 flex flex-col relative bg-[#0f0f11]">
               {isMobile ? (
-                <div className="flex items-center gap-3 px-4 py-4 shrink-0 border-b border-white/8 bg-[#0c0c0e]">
+                <div className="flex items-center justify-between px-4 py-3.5 shrink-0 border-b border-white/8 bg-[#0c0c0e]">
                   <button
+                    type="button"
                     onClick={() => setMobileView("menu")}
-                    className="p-1.5 -ml-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
+                    className="p-1.5 -ml-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors flex items-center gap-1"
+                    aria-label="Back to settings menu"
                   >
                     <ChevronLeft size={20} />
+                    <span className="text-xs text-zinc-400 font-medium">Settings</span>
                   </button>
-                  <span className="font-semibold text-zinc-100">
+                  <span className="font-semibold text-zinc-100 text-sm">
                     {TABS.find((t) => t.id === activeTab)?.label}
                   </span>
+                  <button
+                    type="button"
+                    onClick={() => onOpenChange(false)}
+                    className="p-1.5 -mr-1 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
+                    aria-label="Close settings"
+                  >
+                    <X size={18} />
+                  </button>
                 </div>
               ) : (
-                <div className="h-10 shrink-0 w-full" />
+                <div className="flex items-center justify-between h-14 px-8 shrink-0 w-full border-b border-white/5">
+                  <span className="text-base font-semibold text-zinc-200">
+                    {TABS.find((t) => t.id === activeTab)?.label}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onOpenChange(false)}
+                    className="p-1.5 -mr-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
+                    aria-label="Close settings"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
               )}
               
               <div className={cn(

@@ -138,6 +138,43 @@ const NoteEditor = () => {
     void togglePinning({ noteId: id, version: note.version });
   }, [isNew, note, togglePinning]);
 
+  const handleCloseNote = useCallback(() => {
+    if (folderId) {
+      navigate(`/folders/${folderId}${location.search}`);
+      return;
+    }
+    if (location.pathname.startsWith("/folders")) {
+      navigate(`/folders${location.search}`);
+      return;
+    }
+    if (location.pathname.startsWith("/favorites")) {
+      navigate(`/favorites${location.search}`);
+      return;
+    }
+    if (location.pathname.startsWith("/archive")) {
+      navigate(`/archive${location.search}`);
+      return;
+    }
+    if (location.pathname.startsWith("/trash")) {
+      navigate(`/trash${location.search}`);
+      return;
+    }
+    navigate(`/${location.search}`);
+  }, [folderId, location.pathname, location.search, navigate]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (document.querySelector("[data-radix-popper-content-wrapper], [data-slot='dialog-content']")) {
+          return;
+        }
+        handleCloseNote();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleCloseNote]);
+
   const isTransitioning = isCreating || (noteId && noteId === createdNoteIdRef.current);
   if ((isNoteLoading && !isTransitioning) || (!note && !hasFetchedFolders && !isNew)) {
     return <NoteEditorSkeleton />;
@@ -193,6 +230,7 @@ const NoteEditor = () => {
           loadingAction={aiChat.loadingAction}
           onRunAction={aiChat.runAction}
           onOpenGenerateNotes={() => setIsGenerateNotesOpen(true)}
+          onClose={handleCloseNote}
         />
 
         <div 

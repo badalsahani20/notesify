@@ -51,10 +51,14 @@ const NoteCard = ({
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current);
     }
+    // If note is already in query cache, skip prefetch
+    if (queryClient.getQueryData(["note", noteId])) return;
+
     hoverTimeoutRef.current = setTimeout(() => {
       queryClient.prefetchQuery({
         queryKey: ["note", noteId],
         queryFn: () => fetchNote(noteId),
+        staleTime: 1000 * 60 * 5,
       });
     }, 150);
   }, [queryClient]);
@@ -189,4 +193,3 @@ const NoteCard = ({
 };
 
 export default React.memo(NoteCard);
-

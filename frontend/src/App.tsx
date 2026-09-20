@@ -2,7 +2,7 @@ import { Suspense, lazy, useEffect } from "react";
 import { Routes, Route } from "react-router-dom";
 import MainLayout from "./components/MainLayout";
 import { Toaster } from "sonner";
-import PrivateRoute from "./components/PrivateRoute";
+// import PrivateRoute from "./components/PrivateRoute";
 import AuthLayout from "./components/AuthLayout";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -13,13 +13,16 @@ import { WebSyncTriggers } from "./services/WebSyncTriggers";
 import { ElectronSyncTriggers } from "./services/ElectronSyncTriggers";
 import { useAuthStore } from "./store/useAuthStore";
 
-// Lazy-loaded components
+// Core layout components imported directly so offline navigation never fails on dynamic chunk fetching
+import NotesListPanel from "./components/notes/NotesListPanel";
+import FolderWorkspace from "./components/folders/FolderWorkspace";
+
+// Lazy-loaded routes
 const NoteEditor = lazy(() => import("./pages/NoteEditor"));
 const EmptyState = lazy(() => import("./components/editor/EmptyEditorState"));
 const OAuthSuccess = lazy(() => import("./pages/OAuthSuccess"));
 const SearchPage = lazy(() => import("./pages/SearchPage"));
 const ProfilePage = lazy(() => import("./pages/ProfilePage"));
-const NotesListPanel = lazy(() => import("./components/notes/NotesListPanel"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const GlobalChatPage = lazy(() => import("./pages/GlobalChatPage"));
 const SharedNotePage = lazy(() => import("./pages/SharedNotePage"));
@@ -57,14 +60,14 @@ function App() {
           <Route path="/oauth-success" element={<OAuthSuccess />} />
           <Route path="/shared/:slug" element={<SharedNotePage />} />
 
-          {/* Protected routes — redirect to /login if not authenticated */}
-          <Route element={<PrivateRoute />}>
+          {/* Protected routes — temporarily commented out PrivateRoute for UI preview */}
+          {/* <Route element={<PrivateRoute />}> */}
             <Route element={<MainLayout middlePanel={<NotesListPanel />} />}>
               <Route index element={<EmptyState />} />
               <Route path="/search" element={<SearchPage />} />
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/chat" element={<GlobalChatPage />} />
-              <Route path="/folders" element={<EmptyState />} />
+              <Route path="/folders" element={<FolderWorkspace />} />
               <Route path="/favorites" element={<EmptyState />} />
               <Route path="/favorites/note/:noteId" element={<NoteEditor />} />
               <Route path="/archive" element={<EmptyState />} />
@@ -73,9 +76,9 @@ function App() {
               <Route path="/trash/note/:noteId" element={<NoteEditor />} />
               <Route path="/note/:noteId" element={<NoteEditor />} />
               <Route path="/folders/:folderId/note/:noteId" element={<NoteEditor />} />
-              <Route path="/folders/:folderId" element={<NoteEditor />} />
+              <Route path="/folders/:folderId" element={<FolderWorkspace />} />
             </Route>
-          </Route>
+          {/* </Route> */}
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>

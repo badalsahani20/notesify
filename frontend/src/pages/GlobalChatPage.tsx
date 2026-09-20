@@ -4,7 +4,7 @@ import { useTypewriter } from "@/hooks/ui/useTypewriter";
 import { useMediaQuery } from "@/hooks/ui/useMediaQuery";
 import type { Message } from "@/components/ai/types";
 import { STUDENT_PROMPTS, DEV_PROMPTS } from "@/lib/constants";
-import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { PanelLeftOpen } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 import { GlobalChatSidebar } from "@/components/chat/GlobalChatSidebar";
@@ -42,7 +42,7 @@ const GlobalChatPage = () => {
   });
 
   const isMobile = useMediaQuery("(max-width: 960px)");
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(() => typeof window !== "undefined" && window.innerWidth > 960);
 
   // Desktop side panel resizable width (percentage)
   const [panelWidth, setPanelWidth] = useState(46);
@@ -156,14 +156,16 @@ const GlobalChatPage = () => {
           />
         </div>
 
-        {/* Floating Sidebar Toggle */}
-        <button
-          className="absolute top-4 left-4 z-50 p-2 text-white/50 hover:text-white/90 hover:bg-white/10 rounded-lg transition-colors"
-          onClick={() => setSidebarOpen((o) => !o)}
-          title={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
-        >
-          {sidebarOpen ? <PanelLeftClose size={20} /> : <PanelLeftOpen size={20} />}
-        </button>
+        {/* Floating Sidebar Toggle — visible only when sidebar is collapsed */}
+        {!sidebarOpen && (
+          <button
+            className="absolute top-3.5 left-3.5 z-40 p-2 text-zinc-400 hover:text-white hover:bg-white/[0.08] rounded-lg transition-colors cursor-pointer"
+            onClick={() => setSidebarOpen(true)}
+            title="Open sidebar"
+          >
+            <PanelLeftOpen size={18} />
+          </button>
+        )}
 
         {/* ── Horizontal Split Container (Chat on Left, Artifact Canvas on Right) ── */}
         <div

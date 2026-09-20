@@ -15,6 +15,7 @@ import { fileURLToPath } from "url";
 import publicRoute from "./src/routes/public.route.js";
 import studyRoute from "./src/routes/study.route.js";
 import userRoute from "./src/routes/user.route.js";
+import sttRoute from "./src/routes/stt.route.js";
 
 import errorMiddleware from "./src/middleware/error.middleware.js";
 
@@ -44,6 +45,7 @@ app.use("/api/ai", aiRoute);
 app.use("/api/trash", trashRoute);
 app.use("/api/study", studyRoute);
 app.use("/api/user", userRoute);
+app.use("/api/stt", sttRoute);
 
 // Keep-alive route for monitoring and preventing sleep
 app.get("/api/keep-alive", (req, res) => {

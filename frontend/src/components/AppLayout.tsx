@@ -24,19 +24,28 @@ type Props = {
 
   animationKey: string;
   isNoteEditor: boolean;
-}
+};
 
 const AppLayout = ({
-  showGlobalHeader, activityBar, showFoldersPanel, showNotesPanel,
-  showMainPanel, isMobile, header, leftPanel, middlePanel, main,
-  animationKey, isNoteEditor
+  showGlobalHeader,
+  activityBar,
+  showFoldersPanel,
+  showNotesPanel,
+  showMainPanel,
+  isMobile,
+  header,
+  leftPanel,
+  middlePanel,
+  main,
+  animationKey,
+  isNoteEditor,
 }: Props) => {
   const foldersPanelRef = useRef<PanelImperativeHandle | null>(null);
   const notesPanelRef = useRef<PanelImperativeHandle | null>(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const closeFolderPanel = usePanelStore((state) => state.closeFolderPanel);
 
-  const { defaultLayout, onLayoutChanged } = useDefaultLayout({ id: "notesify-layout-v1" });
+  const { defaultLayout, onLayoutChanged } = useDefaultLayout({ id: "notesify-layout-v6" });
 
   // Handle smooth transition when toggling panels
   useEffect(() => {
@@ -64,6 +73,9 @@ const AppLayout = ({
     if (!panel) return;
     if (showNotesPanel) {
       panel.expand();
+      if (panel.getSize().asPercentage < 26) {
+        panel.resize("27%");
+      }
     } else {
       panel.collapse();
     }
@@ -74,7 +86,12 @@ const AppLayout = ({
   useEffect(() => {
     if (isMobile) return;
     const np = notesPanelRef.current;
-    if (np && showNotesPanel && np.isCollapsed()) np.expand();
+    if (np && showNotesPanel && np.isCollapsed()) {
+      np.expand();
+      if (np.getSize().asPercentage < 26) {
+        np.resize("27%");
+      }
+    }
     const fp = foldersPanelRef.current;
     if (fp && showFoldersPanel && fp.isCollapsed()) fp.expand();
   }); // no deps — intentional
@@ -193,9 +210,9 @@ const AppLayout = ({
               {/* Notes panel: dynamic default size to prevent layout shift on mount */}
               <ResizablePanel
                 id="notes"
-                defaultSize={showNotesPanel ? "25%" : "0%"}
-                maxSize="30%"
-                minSize="25%"
+                defaultSize={showNotesPanel ? "27%" : "0%"}
+                maxSize="38%"
+                minSize="20%"
                 collapsible={true}
                 collapsedSize="0%"
                 panelRef={notesPanelRef}

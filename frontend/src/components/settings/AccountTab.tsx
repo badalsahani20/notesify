@@ -1,19 +1,8 @@
-import { CheckCircle2, ChevronRight } from "lucide-react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ChevronRight } from "lucide-react";
 import { useAuthStore } from "@/store/useAuthStore";
-import GoogleIcon from "@/assets/google.svg";
-import { cn } from "@/lib/utils";
 import { SectionLabel } from "./SettingsShared";
 import { useUserStats } from "@/hooks/user/useUserStats";
-
-const formatMemberSince = (date?: string) => {
-  if (!date) return null;
-  return new Date(date).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-};
+import { UserProfileCard, formatMemberSinceDate } from "@/components/user/UserProfileCard";
 
 export const AccountTab = () => {
   const { user } = useAuthStore();
@@ -21,49 +10,13 @@ export const AccountTab = () => {
 
   const displayName = user?.name || stats?.name || "Guest";
   const displayEmail = user?.email || stats?.email || "-";
-  const displayAvatar = user?.avatar || stats?.avatar || GoogleIcon;
   const provider = stats?.provider ?? user?.provider;
-  const isVerified = user?.isVerified ?? stats?.isVerified ?? false;
   const memberSince = stats?.memberSince ?? user?.createdAt;
-  const formattedMemberSince = formatMemberSince(memberSince);
-
-  const initials = displayName !== "Guest"
-    ? displayName.split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase()
-    : "?";
+  const formattedMemberSince = formatMemberSinceDate(memberSince, "full");
 
   return (
     <div className="space-y-1">
-      <div className="flex items-center gap-4 p-4 rounded-xl bg-white/4 border border-white/8 mb-6">
-        <Avatar className="h-14 w-14 border-2 border-indigo-500/30 shadow-lg">
-          <AvatarImage src={displayAvatar} referrerPolicy="no-referrer" />
-          <AvatarFallback className="bg-indigo-500/10 text-indigo-300 font-bold text-base">
-            {initials}
-          </AvatarFallback>
-        </Avatar>
-        <div className="min-w-0">
-          <p className="font-semibold text-white truncate">{displayName}</p>
-          <p className="text-sm text-zinc-400 truncate">{displayEmail}</p>
-          <div className="flex items-center gap-1.5 mt-1.5">
-            <span
-              className={cn(
-                "inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full",
-                isVerified
-                  ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                  : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-              )}
-            >
-              <CheckCircle2 size={10} />
-              {isVerified ? "Verified" : "Unverified"}
-            </span>
-            {provider === "google" && (
-              <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-300 border border-blue-500/20">
-                <img src={GoogleIcon} alt="" className="h-2.5 w-2.5" />
-                Google
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
+      <UserProfileCard className="mb-6" />
 
       <SectionLabel>Account Details</SectionLabel>
       <div className="rounded-xl border border-white/8 bg-white/4 overflow-hidden divide-y divide-white/5">

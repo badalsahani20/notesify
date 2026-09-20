@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { cn } from "@/lib/utils";
 import { Clock, ArrowDownAz, ListFilter } from "lucide-react";
 import NoteCard from "./NoteCard";
 import FolderCard from "../folders/FolderCard";
@@ -39,6 +38,10 @@ const isRenderableNote = (value: unknown): value is Note => {
   return typeof (value as Note)._id === "string";
 };
 
+// Preserves the rendered list window across navigation so returning to the list
+// doesn't flash/collapse back to a small slice of notes.
+let rememberedRenderLimit = 35;
+
 const NotesListPanel = () => {
   const { searchQuery, setSearchQuery } = useNoteStore();
 
@@ -62,7 +65,6 @@ const NotesListPanel = () => {
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   const [pendingDeleteNoteId, setPendingDeleteNoteId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"all" | "recent">("all");
   const [sortOrder, setSortOrder] = useState<"updatedAt" | "title">("updatedAt");
 
   const isTrashRoute = location.pathname.startsWith("/trash");
@@ -97,32 +99,21 @@ const NotesListPanel = () => {
   } = useNotesFilter(safeNotes, folders, searchQuery, trash, archivedNotes);
 
   const processedNotes = useMemo(() => {
-    let notes = [...filteredNotes];
+    const notes = [...filteredNotes];
 
-    if (activeTab === "recent") {
-      const twentyFourHoursAgo = Date.now() - 24 * 60 * 60 * 1000;
-      notes = notes
-        .filter((n) => n.lastAccessedAt && new Date(n.lastAccessedAt).getTime() > twentyFourHoursAgo)
-        .sort((a, b) => new Date(b.lastAccessedAt!).getTime() - new Date(a.lastAccessedAt!).getTime());
-    } else {
-      // Default "All" view: Favorited first, then by sortOrder
-      notes.sort((a, b) => {
-        if (a.pinned && !b.pinned) return -1;
-        if (!a.pinned && b.pinned) return 1;
-        
-        if (sortOrder === "title") {
-          return (a.title || "").localeCompare(b.title || "");
-        }
-        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-      });
-    }
-
-    if (activeTab !== "recent" && sortOrder === "title") {
-       // if we are in title sort, we still respect pinned but sort the rest by title
-    }
+    // Favorited first, then by sortOrder
+    notes.sort((a, b) => {
+      if (a.pinned && !b.pinned) return -1;
+      if (!a.pinned && b.pinned) return 1;
+      
+      if (sortOrder === "title") {
+        return (a.title || "").localeCompare(b.title || "");
+      }
+      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    });
 
     return notes;
-  }, [filteredNotes, activeTab, sortOrder]);
+  }, [filteredNotes, sortOrder]);
 
   const isInitialNotesLoad = isTrashRoute
     ? isTrashLoading
@@ -216,14 +207,22 @@ const NotesListPanel = () => {
     return () => clearInterval(interval);
   }, []);
 
-  const [renderLimit, setRenderLimit] = useState(15);
+  const [renderLimit, setRenderLimit] = useState(() =>
+    Math.max(rememberedRenderLimit, Math.min(processedNotes.length, 50))
+  );
 
   useEffect(() => {
     if (renderLimit < processedNotes.length) {
       const timer = setTimeout(() => {
-        setRenderLimit((prev) => Math.min(prev + 8, processedNotes.length));
+        setRenderLimit((prev) => {
+          const next = Math.min(prev + 20, processedNotes.length);
+          rememberedRenderLimit = next;
+          return next;
+        });
       }, 60);
       return () => clearTimeout(timer);
+    } else if (processedNotes.length > 0) {
+      rememberedRenderLimit = Math.max(rememberedRenderLimit, processedNotes.length);
     }
   }, [renderLimit, processedNotes.length]);
 
@@ -300,10 +299,10 @@ const NotesListPanel = () => {
         event.preventDefault();
         const delta = event.key === "ArrowDown" ? 1 : -1;
         const nextIndex = currentNoteIndex >= 0
-          ? Math.min(filteredNotes.length - 1, Math.max(0, currentNoteIndex + delta))
+          ? Math.min(processedNotes.length - 1, Math.max(0, currentNoteIndex + delta))
           : delta > 0
             ? 0
-            : filteredNotes.length - 1;
+            : processedNotes.length - 1;
         openNoteAtIndex(nextIndex);
         return;
       }
@@ -341,6 +340,7 @@ const NotesListPanel = () => {
           actionLabel={isTrashRoute && totalTrashCount > 0 ? "Clear All" : undefined}
           onAction={isTrashRoute && totalTrashCount > 0 ? () => void emptyTrash() : undefined}
           onClose={closeNoteList}
+          onBack={folderId ? () => navigate(`/folders/${folderId}`) : undefined}
         />
 
         <NotesPanelSearch
@@ -353,74 +353,51 @@ const NotesListPanel = () => {
           isFavoritesView={isFavoritesRoute}
         />
 
-        <div className="px-4 mb-3">
-          <div className="flex items-center justify-between">
-            <div className="flex bg-[var(--surface-ghost)] p-1 rounded-lg">
-              <button
-                onClick={() => setActiveTab("all")}
-                className={cn(
-                  "px-3 py-1 text-xs font-medium rounded-md transition-all cursor-pointer",
-                  activeTab === "all" ? "bg-[var(--panel-bg-strong)] text-[var(--accent-strong)] shadow-sm" : "text-[var(--muted-text)] hover:text-[var(--text-strong)]"
-                )}
-              >
-                All
-              </button>
-              <button
-                onClick={() => setActiveTab("recent")}
-                className={cn(
-                  "px-3 py-1 text-xs font-medium rounded-md transition-all cursor-pointer",
-                  activeTab === "recent" ? "bg-[var(--panel-bg-strong)] text-[var(--accent-strong)] shadow-sm" : "text-[var(--muted-text)] hover:text-[var(--text-strong)]"
-                )}
-              >
-                Recent
-              </button>
-            </div>
+        <div className="px-4 mb-2.5 flex items-center justify-between">
+          <span className="text-xs font-medium text-[var(--muted-text)]">
+            {isTrashRoute 
+               ? `Trash (${combinedTrashItems?.length || 0})` 
+               : `Notes (${processedNotes?.length || 0})`}
+          </span>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  className={`flex items-center gap-1 p-1.5 cursor-pointer rounded-md transition-colors text-xs font-medium ${
-                    sortOrder === "title"
-                      ? "text-[var(--accent-strong)] bg-[var(--accent-strong)]/8"
-                      : "text-[var(--muted-text)] hover:text-[var(--text-strong)] hover:bg-[var(--surface-ghost)]"
-                  }`}
-                  title="Sort notes"
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className={`flex items-center gap-1.5 p-1.5 cursor-pointer rounded-md transition-colors text-xs font-medium ${
+                  sortOrder === "title"
+                    ? "text-[var(--accent-strong)] bg-[var(--accent-strong)]/8"
+                    : "text-[var(--muted-text)] hover:text-[var(--text-strong)] hover:bg-[var(--surface-ghost)]"
+                }`}
+                title="Sort notes"
+              >
+                <ListFilter size={14} />
+                <span className="hidden sm:inline">{sortOrder === "title" ? "Alphabetical" : "Last Updated"}</span>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="end"
+              className="w-44 bg-[var(--panel-bg-strong)] border-[var(--divider)] text-[var(--text-strong)] shadow-[0_8px_30px_rgba(0,0,0,0.25)]"
+            >
+              <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-widest text-[var(--muted-text)] pb-1">Sort by</DropdownMenuLabel>
+              <DropdownMenuSeparator className="bg-[var(--divider)]" />
+              <DropdownMenuRadioGroup value={sortOrder} onValueChange={(v) => setSortOrder(v as any)}>
+                <DropdownMenuRadioItem
+                  className="cursor-pointer text-[13px] text-[var(--text-main)] focus:bg-[var(--surface-ghost)] focus:text-[var(--text-strong)] data-[state=checked]:text-[var(--accent-strong)]"
+                  value="updatedAt"
                 >
-                  <ListFilter size={14} />
-                  <span className="hidden sm:inline">{sortOrder === "title" ? "A–Z" : "Recent"}</span>
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="end"
-                className="w-44 bg-[var(--panel-bg-strong)] border-[var(--divider)] text-[var(--text-strong)] shadow-[0_8px_30px_rgba(0,0,0,0.25)]"
-              >
-                <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-widest text-[var(--muted-text)] pb-1">Sort by</DropdownMenuLabel>
-                <DropdownMenuSeparator className="bg-[var(--divider)]" />
-                <DropdownMenuRadioGroup value={sortOrder} onValueChange={(v) => setSortOrder(v as any)}>
-                  <DropdownMenuRadioItem
-                    className="cursor-pointer text-[13px] text-[var(--text-main)] focus:bg-[var(--surface-ghost)] focus:text-[var(--text-strong)] data-[state=checked]:text-[var(--accent-strong)]"
-                    value="updatedAt"
-                  >
-                    <Clock size={13} className="mr-2 opacity-60" />
-                    Last Updated
-                  </DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem
-                    className="cursor-pointer text-[13px] text-[var(--text-main)] focus:bg-[var(--surface-ghost)] focus:text-[var(--text-strong)] data-[state=checked]:text-[var(--accent-strong)]"
-                    value="title"
-                  >
-                    <ArrowDownAz size={13} className="mr-2 opacity-60" />
-                    Alphabetical
-                  </DropdownMenuRadioItem>
-                </DropdownMenuRadioGroup>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
-
-        <div className="px-4 pb-2 text-sm text-[var(--muted-text)]">
-          {isTrashRoute 
-             ? `Trash (${combinedTrashItems?.length || 0})` 
-             : `Notes (${processedNotes?.length || 0})`}
+                  <Clock size={13} className="mr-2 opacity-60" />
+                  Last Updated
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem
+                  className="cursor-pointer text-[13px] text-[var(--text-main)] focus:bg-[var(--surface-ghost)] focus:text-[var(--text-strong)] data-[state=checked]:text-[var(--accent-strong)]"
+                  value="title"
+                >
+                  <ArrowDownAz size={13} className="mr-2 opacity-60" />
+                  Alphabetical
+                </DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         <div className="custom-scrollbar mobile-notes-scroll flex-1 space-y-3 overflow-y-auto px-3 pb-4">
@@ -440,16 +417,14 @@ const NotesListPanel = () => {
               animate={{ opacity: 1, y: 0 }}
               className="empty-pane-message"
             >
-              {activeTab === "recent"
-                ? "No notes opened in the last 24 hours."
-                : location.pathname === "/favorites"
+              {location.pathname === "/favorites"
                 ? "Star a note to keep it here."
                 : location.pathname === "/archive"
                   ? "Archive a note to keep it out of your main workspace."
                   : "No notes match this view yet. Create one to start filling the workspace."}
             </motion.div>
           ) : (
-            <div key={`${activeTab}-${location.pathname}-${sortOrder}`} className="flex flex-col gap-3">
+            <div key={`${location.pathname}-${sortOrder}`} className="flex flex-col gap-3">
               {isTrashRoute
                 ? combinedTrashItems.map((entry) =>
                   entry.type === "note" ? (
@@ -476,7 +451,7 @@ const NotesListPanel = () => {
                     />
                   )
                 )
-                : filteredNotes.slice(0, renderLimit).map((note) => (
+                : processedNotes.slice(0, renderLimit).map((note) => (
                     <NoteCard
                       key={note._id}
                       note={note}

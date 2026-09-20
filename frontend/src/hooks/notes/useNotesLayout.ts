@@ -1,6 +1,5 @@
 import { useLocation, useParams } from "react-router-dom";
 import { useMediaQuery } from "@/hooks/ui/useMediaQuery";
-import { usePanelStore } from "@/store/usePanelStore";
 
 let lazyCreatedNoteId: string | null = null;
 
@@ -10,7 +9,7 @@ export const setLazyCreatedNoteId = (id: string | null) => {
 
 export const useNotesLayout = () => {
   const location = useLocation();
-  const { noteId, folderId } = useParams();
+  const { noteId } = useParams();
   const focusParam = new URLSearchParams(location.search).get("focus");
   const isEditorFocusMode = Boolean(noteId) && (focusParam === "1" || focusParam === "2");
   const isNotesHidden = Boolean(noteId) && focusParam === "2";
@@ -29,21 +28,19 @@ export const useNotesLayout = () => {
     animationKey = "note-new";
   }
 
-  // Desktop: folder panel is toggled via the activity bar icon (store state).
-  // It starts hidden and is never auto-opened by URL — user must click.
-  // In fullscreen/focus mode it's always hidden.
-  const { isFolderPanelOpen } = usePanelStore();
+  const isFolderWorkspaceRoute = location.pathname.startsWith("/folders") && !noteId;
 
+  // Desktop: FolderPanel is docked directly in middlePanel, so floating drawer is disabled
   const showFoldersPanel = isMobile
-    ? location.pathname === "/folders" && !folderId && !noteId
-    : isFolderPanelOpen;
+    ? false
+    : false;
 
   const showNotesPanel = isMobile
-    ? !noteId && !showFoldersPanel && !isSearchRoute && !isProfileRoute && !isChatRoute
+    ? !noteId && !isSearchRoute && !isProfileRoute && !isChatRoute && !isFolderWorkspaceRoute
     : !isNotesHidden && !isChatRoute;
 
   const showMainPanel = isMobile
-    ? Boolean(noteId) || isSearchRoute || isProfileRoute || isChatRoute
+    ? Boolean(noteId) || isSearchRoute || isProfileRoute || isChatRoute || isFolderWorkspaceRoute
     : true;
 
   return {
@@ -54,5 +51,6 @@ export const useNotesLayout = () => {
     isMobile,
     animationKey,
     isNoteEditor: Boolean(noteId),
+    isFolderWorkspace: isFolderWorkspaceRoute,
   };
 };

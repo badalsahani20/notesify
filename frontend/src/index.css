@@ -3211,13 +3211,14 @@ span[data-ai-ghost] {
 
 /* ─── Sidebar ─── */
 .gc-sidebar {
-  width: 240px;
+  width: 260px;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid var(--divider);
-  background: color-mix(in srgb, var(--panel-bg) 80%, #09090f);
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  background: #171717;
   overflow: hidden;
-  transition: width 0.3s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.25s ease;
+  transition: width 0.24s cubic-bezier(0.2, 0, 0, 1), opacity 0.2s ease;
+  z-index: 30;
 }
 
 .gc-sidebar-collapsed {
@@ -3228,15 +3229,32 @@ span[data-ai-ghost] {
 }
 
 .gc-sidebar-expanded {
-  width: 240px;
+  width: 260px;
   opacity: 1;
 }
 
 .gc-sidebar-inner {
-  width: 240px;
+  width: 260px;
   display: flex;
   flex-direction: column;
   height: 100%;
+}
+
+.gc-sidebar-mobile {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 60;
+  box-shadow: 6px 0 28px rgba(0, 0, 0, 0.6);
+}
+
+.gc-sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
+  z-index: 55;
 }
 
 .gc-sidebar-header {
@@ -7841,6 +7859,12 @@ html:not(.dark) .dock-btn-active {
 .desktop-header-search-slot,
 .desktop-header-actions {
   -webkit-app-region: no-drag;
+}
+
+/* Clear the native Windows minimize/maximize/close window controls in Electron */
+.is-electron .desktop-header,
+.desktop-header.is-desktop-app {
+  padding-right: clamp(140px, 9.5rem, 160px) !important;
 }
 /* ── Thin scrollbars ── */
 ::-webkit-scrollbar {

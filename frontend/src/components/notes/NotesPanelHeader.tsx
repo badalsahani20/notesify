@@ -1,4 +1,4 @@
-import { ChevronRight, X } from "lucide-react";
+import { ArrowLeft, ChevronRight, X } from "lucide-react";
 
 type NotesPanelHeaderProps = {
   breadcrumbRoot: string;
@@ -8,6 +8,7 @@ type NotesPanelHeaderProps = {
   actionLabel?: string;
   onAction?: () => void;
   onClose: () => void;
+  onBack?: () => void;
 };
 
 const NotesPanelHeader = ({
@@ -18,18 +19,31 @@ const NotesPanelHeader = ({
   actionLabel,
   onAction,
   onClose,
+  onBack,
 }: NotesPanelHeaderProps) => {
   return (
     <div className="notes-panel-header flex items-center justify-between pr-2">
-      <div className="notes-panel-breadcrumb">
-        <span>{breadcrumbRoot}</span>
-        {showChevron ? (
-          <>
-            <ChevronRight size={14} />
-            <span className="notes-panel-breadcrumb-active">{panelTitle}</span>
-          </>
-        ) : null}
-      </div>
+      {onBack ? (
+        <button
+          type="button"
+          onClick={onBack}
+          className="flex items-center gap-1.5 text-xs font-medium text-zinc-400 hover:text-white transition-colors cursor-pointer group py-0.5 min-w-0 max-w-[calc(100%-2.5rem)]"
+          title={`Back to ${breadcrumbRoot}`}
+        >
+          <ArrowLeft size={13} className="group-hover:-translate-x-0.5 transition-transform text-zinc-400 group-hover:text-white shrink-0" />
+          <span className="truncate font-semibold text-zinc-200 group-hover:text-white">{breadcrumbRoot}</span>
+        </button>
+      ) : (
+        <div className="notes-panel-breadcrumb">
+          <span>{breadcrumbRoot}</span>
+          {showChevron ? (
+            <>
+              <ChevronRight size={14} />
+              <span className="notes-panel-breadcrumb-active">{panelTitle}</span>
+            </>
+          ) : null}
+        </div>
+      )}
 
       <div className="flex items-center gap-2">
         {actionLabel && onAction ? (

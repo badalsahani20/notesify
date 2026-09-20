@@ -29,7 +29,7 @@ export const fetchNote = async (noteId: string): Promise<Note> => {
 }
 
 export const useNoteQuery = (noteId: string) => {
-    const queryClient = useQueryClient()
+    const queryClient = useQueryClient();
     return useQuery({
         queryKey: ["note", noteId],
         queryFn: () => fetchNote(noteId),
@@ -38,13 +38,14 @@ export const useNoteQuery = (noteId: string) => {
         retry: 1,
 
         initialData: () => {
-            const notes = queryClient.getQueryData<Note[]>(["notes"])
+            const notes = queryClient.getQueryData<Note[]>(["notes"]);
             return notes?.find((note) => note._id === noteId);
+        },
+        initialDataUpdatedAt: () => {
+            return queryClient.getQueryState(["notes"])?.dataUpdatedAt || Date.now();
         }
     });
-}
-
-
+};
 
 export const useTrashQuery = (enabled = true) => {
     return useQuery({
@@ -63,8 +64,7 @@ export const useTrashQuery = (enabled = true) => {
         staleTime: 1000 * 60 * 5, // 5 minutes
         retry: 1
     });
-}
-
+};
 
 export const useArchivedQuery = (enabled = true) => {
     return useQuery({
@@ -77,8 +77,7 @@ export const useArchivedQuery = (enabled = true) => {
         staleTime: 1000 * 60 * 5, // 5 minutes
         retry: 1
     });
-}
-
+};
 
 // future usage:["notes"] // all notes
 // ["notes", "folder", folderId]

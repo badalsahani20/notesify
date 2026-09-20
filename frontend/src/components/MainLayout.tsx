@@ -1,8 +1,7 @@
-import { Suspense, lazy, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Outlet } from "react-router-dom";
-import { FolderPanelSkeleton } from "@/components/ui/folderPanelSkeleton";
-
-const FoldersPanel = lazy(() => import("./folders/FolderPanel"));
+import FoldersPanel from "./folders/FolderPanel";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import AppHeader from "./header/AppHeader";
 import MobileDrawer from "./header/MobileDrawer";
 import AppLayout from "./AppLayout";
@@ -29,7 +28,8 @@ const MainLayout = ({ middlePanel }: Pops) => {
     showMainPanel,
     isMobile,
     animationKey,
-    isNoteEditor
+    isNoteEditor,
+    isFolderWorkspace,
   } = useNotesLayout();
   const { fetchFolders } = useFolderStore();
   const { isMobileDrawerOpen, setMobileDrawerOpen } = usePanelStore();
@@ -109,14 +109,22 @@ const MainLayout = ({ middlePanel }: Pops) => {
           <ActivityBar />
         }
         leftPanel={
-          <Suspense fallback={<FolderPanelSkeleton />}>
-            <FoldersPanel />
-          </Suspense>
+          isMobile ? (
+            <ErrorBoundary fallbackTitle="Notebook panel error">
+              <FoldersPanel />
+            </ErrorBoundary>
+          ) : null
         }
 
-        middlePanel={middlePanel}
+        middlePanel={
+          <ErrorBoundary fallbackTitle="Side panel error">
+            {isFolderWorkspace ? <FoldersPanel /> : middlePanel}
+          </ErrorBoundary>
+        }
         main={
-          <Outlet />
+          <ErrorBoundary fallbackTitle="Workspace error">
+            <Outlet />
+          </ErrorBoundary>
         }
       />
       {isMobile && (
