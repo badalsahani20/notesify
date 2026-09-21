@@ -132,6 +132,46 @@ export function normalizeGitHubRelease(raw: any): NormalizedRelease {
 // Built-in fallback snapshot if offline or GitHub API is unavailable
 export const FALLBACK_RELEASES: NormalizedRelease[] = [
   {
+    id: 391800000,
+    version: 'v1.2.1',
+    tagName: 'v1.2.1',
+    name: '🎙️ Notesify v1.2.1 — STT Voice Dictation & Iris Polish',
+    publishedAt: '2026-09-21T03:00:00Z',
+    publishedDateFormatted: 'Sep 21, 2026',
+    htmlUrl: 'https://github.com/badalsahani20/notesify/releases/tag/v1.2.1',
+    body: `## 🎙️ Notesify v1.2.1 — STT Voice Dictation & Iris Polish\n\nThis release introduces integrated Speech-to-Text (STT) voice dictation, a streamlined conversation sidebar with instant in-place search, and desktop application enhancements.\n\n### ✨ What's New\n\n- **STT Voice Dictation** — Instant voice transcription in the Iris compose bar powered by OpenRouter Whisper Large V3 Turbo with automatic language detection.\n- **Refined Conversation Sidebar** — Clean, minimalist dark conversation history with instant in-place search and quick session switching.\n- **Uncapped Conversations** — Seamlessly navigate and load your full conversation history without artificial session limits.\n- **Native Desktop App (v1.2.1)** — Standalone DPI-aware Windows installer with full offline-first IndexedDB synchronization.`,
+    highlights: [
+      {
+        title: 'STT Voice Dictation',
+        tag: 'Voice Engine',
+        description: 'Instant multi-lingual speech-to-text dictation directly inside the Iris compose bar powered by Whisper Large V3 Turbo.',
+      },
+      {
+        title: 'Refined Iris Conversation Sidebar',
+        tag: 'Chat UI',
+        description: 'Sleek, minimalist dark conversation history with instant in-place search and quick session switching.',
+      },
+      {
+        title: 'Native Windows Desktop Build',
+        tag: 'Desktop App',
+        description: 'DPI-aware standalone desktop installer with offline Dexie synchronization and local caching.',
+      },
+    ],
+    technicalNotes: [
+      'Seamless multi-language speech recognition with Whisper Large V3 Turbo auto-detection.',
+      'Decoupled AudioRecorder browser client with MIME candidate negotiation.',
+      'Full conversation history without artificial session caps.',
+    ],
+    assets: [
+      {
+        name: 'Notesify.Setup.1.2.1.exe',
+        size: 138248899,
+        sizeFormatted: '~131 MB',
+        downloadUrl: 'https://github.com/badalsahani20/notesify/releases/download/v1.2.1/Notesify.Setup.1.2.1.exe',
+      },
+    ],
+  },
+  {
     id: 391336472,
     version: 'v1.2.0',
     tagName: 'v1.2.0',
