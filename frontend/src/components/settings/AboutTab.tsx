@@ -1,20 +1,21 @@
 import { FileText, Shield, ChevronRight } from "lucide-react";
 import { SectionLabel } from "./SettingsShared";
+import notesifyLogo from "@/assets/notesify-favicon.png";
 
 export const AboutTab = () => (
   <div className="space-y-1">
     <div className="flex flex-col items-center gap-3 py-8 text-center">
-      <img src="./notesify-favicon.png" alt="Notesify" className="h-14 w-14 rounded-2xl shadow-lg" />
+      <img src={notesifyLogo} alt="Notesify" className="h-14 w-14 rounded-2xl shadow-lg" />
       <div>
         <p className="text-xl font-bold text-white tracking-tight">Notesify</p>
         <p className="text-sm text-zinc-500 mt-1">The AI-powered notes workspace</p>
       </div>
       <div className="flex items-center gap-2 mt-2">
         <span className="px-2.5 py-1 rounded-full bg-indigo-500/10 text-indigo-400 text-xs font-semibold border border-indigo-500/20">
-          Version 1.0
+          Version 1.2.2
         </span>
         <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-semibold border border-emerald-500/20">
-          Beta
+          Release
         </span>
       </div>
     </div>

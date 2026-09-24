@@ -6,6 +6,7 @@ import { FolderPanelSkeleton } from "@/components/ui/folderPanelSkeleton";
 import { useFolderStore } from "@/store/useFolderStore";
 import { FolderFormDialog } from "@/components/folders/FolderFormDialog";
 import { useState } from "react";
+import notesifyLogo from "@/assets/notesify-favicon.png";
 
 const FoldersPanel = lazy(() => import("@/components/folders/FolderPanel"));
 
@@ -101,7 +102,7 @@ const MobileDrawer = ({ open, onClose }: Props) => {
                   <div className="absolute inset-0 rounded-lg bg-white/5 blur-md" />
                   <div className="relative w-7 h-7 rounded-lg overflow-hidden bg-black">
                     <img
-                      src="/notesify-favicon.png"
+                      src={notesifyLogo}
                       alt="Notesify"
                       width={28}
                       height={28}
