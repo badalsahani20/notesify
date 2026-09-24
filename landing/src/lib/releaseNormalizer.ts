@@ -139,7 +139,7 @@ export const FALLBACK_RELEASES: NormalizedRelease[] = [
     publishedAt: '2026-09-24T15:30:00Z',
     publishedDateFormatted: 'Sep 24, 2026',
     htmlUrl: 'https://github.com/badalsahani20/notesify/releases/tag/v1.2.2',
-    body: `## ⚡ Notesify v1.2.2 — Streaming Iris, Reasoning & Citations\n\nThis release introduces an enhanced Iris chat experience with smooth streaming animations, collapsible AI reasoning/thought trace viewer, interactive inline note citations, and native desktop app upgrades.\n\n### ✨ What's New\n\n- **Streaming Iris & Shimmer** — Real-time response streaming with animated shimmer indicators and instant cancellation.\n- **AI Reasoning Viewer** — Collapsible thought trace viewer giving complete visibility into Iris's multi-step thinking.\n- **Inline Note Citations** — Interactive note references (\`[cite: noteId]\`) rendered directly in chat for one-click note inspection.\n- **Native Desktop App (v1.2.2)** — Standalone DPI-aware Windows installer with full offline-first IndexedDB synchronization.`,
+    body: `## ⚡ Notesify v1.2.2 — Streaming Iris, Reasoning & Citations\n\nThis release delivers an upgraded Iris chat experience featuring smooth streaming animations, a collapsible AI reasoning/thought trace viewer, interactive inline note citations, header navigation polish, and desktop application enhancements.\n\n### ✨ What's New\n\n- **Streaming Iris & Shimmer** — Real-time response streaming with animated shimmer indicators and responsive stream controls.\n- **AI Reasoning Viewer** — Collapsible thought trace viewer (\`ReasoningCollapsible\`) giving complete visibility into Iris's multi-step chain-of-thought.\n- **Inline Note Citations** — Interactive note references (\`[cite: noteId]\`) rendered directly in chat for one-click note inspection and modal preview.\n- **Header Navigation & Brand Link** — Application header logo now functions as a clean route link back to the workspace home.\n- **Native Desktop App (v1.2.2)** — Standalone DPI-aware Windows installer with bundled offline-safe assets and full IndexedDB synchronization.`,
     highlights: [
       {
         title: 'Real-time Streaming & Reasoning',
@@ -152,14 +152,20 @@ export const FALLBACK_RELEASES: NormalizedRelease[] = [
         description: 'Clickable inline citations linking conversation responses directly to your knowledge base.',
       },
       {
+        title: 'Header Navigation & UI Polish',
+        tag: 'UI / UX',
+        description: 'Direct home navigation from the brand logo and updated application release info in Settings.',
+      },
+      {
         title: 'Native Windows Desktop Build',
         tag: 'Desktop App',
         description: 'DPI-aware standalone desktop installer with offline Dexie synchronization and local caching.',
       },
     ],
     technicalNotes: [
-      'Collapsible ReasoningCollapsible UI for viewing extended model thought chains.',
+      'Collapsible ReasoningCollapsible UI for inspecting extended model thought chains.',
       'Robust citation regex resolver linking note references to workspace notes.',
+      'Header brand component converted to React Router Link with bundled asset resolution.',
       'DPI-aware Windows desktop installer packaged via Electron Builder.',
     ],
     assets: [
