@@ -8,14 +8,37 @@ import type { Note } from "@/store/useNoteStore";
 
 export const getPersistedHistoryFromMessages = (messages: Message[]) =>
   messages
+    .map((message, index) => {
+      const hasUserMessageAfter = messages
+        .slice(index + 1)
+        .some((nextMessage) => nextMessage.role === "user");
+
+      const toolCalls = message.toolCalls?.map((toolCall) => {
+        const isQuizTool =
+          toolCall.tool === "ask_question" ||
+          toolCall.tool === "render_quiz" ||
+          toolCall.tool === "generate_quiz";
+
+        // Keep the active quiz payload until the user answers. Once a later
+        // user message exists, retain only the completed tool metadata so the
+        // prompt cannot reopen after a refresh.
+        if (isQuizTool && hasUserMessageAfter && (toolCall.questions || toolCall.quizData)) {
+          const { questions, quizData, ...completedToolCall } = toolCall;
+          return { ...completedToolCall, completed: true };
+        }
+
+        return toolCall;
+      });
+
+      return {
+        id: message.id,
+        role: message.role as "user" | "assistant",
+        content: message.text,
+        ...(message.role === "assistant" && message.segments ? { segments: message.segments } : {}),
+        ...(message.role === "assistant" && toolCalls ? { toolCalls } : {}),
+      };
+    })
     .filter((message) => message.id !== "welcome")
-    .map((message) => ({
-      id: message.id,
-      role: message.role as "user" | "assistant",
-      content: message.text,
-      ...(message.role === "assistant" && message.segments ? { segments: message.segments } : {}),
-      ...(message.role === "assistant" && message.toolCalls ? { toolCalls: message.toolCalls } : {}),
-    }))
     .slice(-50);
 
 interface UseAiChatSessionOptions {
@@ -82,7 +105,9 @@ export const useAiChatSession = ({
     }
 
     const hasQuizInHistory = activeNote.chatHistory.some(
-      (m: any) => m.toolCalls?.some((tc: any) => tc.tool === "generate_quiz")
+      (m: any) => m.toolCalls?.some((tc: any) =>
+        tc.tool === "ask_question" || tc.tool === "render_quiz" || tc.tool === "generate_quiz"
+      )
     );
     if (hasQuizInHistory) {
       loadHistory();

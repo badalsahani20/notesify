@@ -11,7 +11,13 @@ export type ToolCallEvent = {
   tool: string;
   args?: Record<string, any>;
   execution?: "local" | "server" | "client";
+  purpose?: "quiz" | "clarification" | "preference" | "ranking";
+  status?: "pending" | "executing" | "success" | "error";
+  data?: any;
+  error?: string;
   quizData?: any;
+  questions?: any;
+  title?: string;
   query?: string;
   url?: string;
   citations?: WebCitation[];
@@ -79,7 +85,13 @@ export const consumeAiChatStream = async (
           tool: data.tool,
           args: (data as any).args,
           execution: (data as any).execution,
+          purpose: (data as any).purpose,
+          status: (data as any).status,
+          data: (data as any).data,
+          error: (data as any).error,
           quizData: (data as any).quizData,
+          questions: (data as any).questions ?? (data as any).quizData,
+          title: (data as any).title,
           query: (data as any).query,
           url: (data as any).url,
           citations: (data as any).citations,

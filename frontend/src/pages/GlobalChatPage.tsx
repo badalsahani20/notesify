@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { useGlobalChatStore } from "@/store/useGlobalChatStore";
 import { useTypewriter } from "@/hooks/ui/useTypewriter";
 import { useMediaQuery } from "@/hooks/ui/useMediaQuery";
@@ -11,6 +11,8 @@ import { GlobalChatSidebar } from "@/components/chat/GlobalChatSidebar";
 import { GlobalChatMessages } from "@/components/chat/GlobalChatMessages";
 import { GlobalChatCompose } from "@/components/chat/GlobalChatCompose";
 import { ChatArtifactViewer } from "@/components/chat/ChatArtifactViewer";
+import { InteractivePromptDialog } from "@/components/chat/InteractivePromptDialog";
+import type { InteractiveQuestion } from "@/components/ai/types";
 
 const GlobalChatPage = () => {
   const {
@@ -36,6 +38,7 @@ const GlobalChatPage = () => {
   } = useGlobalChatStore();
 
   const [input, setInput] = useState("");
+  const [dismissedPromptId, setDismissedPromptId] = useState<string | null>(null);
   const [prompts, setPrompts] = useState({
     students: STUDENT_PROMPTS,
     devs: DEV_PROMPTS,
@@ -77,12 +80,42 @@ const GlobalChatPage = () => {
 
   const handleSend = () => {
     if (!input.trim() && !attachedImage) return;
+    const toSend = input;
     setInput("");
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
-    sendMessage(input, attachedImage);
+    sendMessage(toSend, attachedImage);
   };
+
+  const lastAssistantMsg = messages.length > 0 ? messages[messages.length - 1] : null;
+  const activePromptToolCall = useMemo(() => {
+    return lastAssistantMsg?.role === "assistant" && dismissedPromptId !== lastAssistantMsg.id
+      ? lastAssistantMsg.toolCalls?.find(
+          (tc) => tc.tool === "ask_question" && Boolean(tc.questions || tc.quizData)
+        )
+      : null;
+  }, [lastAssistantMsg, dismissedPromptId]);
+
+  const activeQuestions = useMemo(() => {
+    return (activePromptToolCall?.questions ?? activePromptToolCall?.quizData) as
+      | InteractiveQuestion[]
+      | undefined;
+  }, [activePromptToolCall]);
+
+  const hasActivePrompt = Boolean(activeQuestions && activeQuestions.length > 0);
+
+  const handlePromptSubmit = useCallback(
+    (formatted: string) => {
+      if (lastAssistantMsg) setDismissedPromptId(lastAssistantMsg.id);
+      sendMessage(formatted);
+    },
+    [lastAssistantMsg, sendMessage]
+  );
+
+  const handlePromptDismiss = useCallback(() => {
+    if (lastAssistantMsg) setDismissedPromptId(lastAssistantMsg.id);
+  }, [lastAssistantMsg]);
 
   // Drag-to-resize handler for desktop split panel
   const handleResizeMouseDown = (e: React.MouseEvent) => {
@@ -174,35 +207,48 @@ const GlobalChatPage = () => {
         >
           {/* Left Column: Chat Messages & Compose (Always present & active) */}
           <div className="relative flex-1 flex flex-col h-full min-h-0 min-w-0 overflow-hidden">
-            <GlobalChatMessages
-              messages={messages as Message[]}
-              messagesLoading={messagesLoading}
-              streamingMessageId={streamingMessageId}
-              streamedMessageText={streamedMessageText}
-              isStreaming={isStreaming}
-              isSending={isSending}
-              sendMessage={(text) => sendMessage(text)}
-              prompts={prompts}
-              bottomRef={bottomRef}
-              fullWidthAssistant={!!activeArtifact}
-              useReasoning={useReasoning}
-            />
+            <>
+              <GlobalChatMessages
+                messages={messages as Message[]}
+                messagesLoading={messagesLoading}
+                streamingMessageId={streamingMessageId}
+                streamedMessageText={streamedMessageText}
+                isStreaming={isStreaming}
+                isSending={isSending}
+                sendMessage={sendMessage}
+                prompts={prompts}
+                bottomRef={bottomRef}
+                fullWidthAssistant={!!activeArtifact}
+                hasActivePrompt={hasActivePrompt}
+              />
 
-            <GlobalChatCompose
-              input={input}
-              setInput={setInput}
-              attachedImage={attachedImage}
-              setAttachedImage={setAttachedImage}
-              isSending={isSending}
-              imageDisabled={imageDisabled}
-              handleSend={handleSend}
-              textareaRef={textareaRef}
-              fileRef={fileRef}
-              useReasoning={useReasoning}
-              setUseReasoning={setUseReasoning}
-              useWebSearch={useWebSearch}
-              setUseWebSearch={setUseWebSearch}
-            />
+              {/* Active interactive prompt (Claude-style docked dialog above input box) */}
+              <GlobalChatCompose
+                input={input}
+                setInput={setInput}
+                attachedImage={attachedImage}
+                setAttachedImage={setAttachedImage}
+                isSending={isSending}
+                imageDisabled={imageDisabled}
+                handleSend={handleSend}
+                textareaRef={textareaRef}
+                fileRef={fileRef}
+                useReasoning={useReasoning}
+                setUseReasoning={setUseReasoning}
+                useWebSearch={useWebSearch}
+                setUseWebSearch={setUseWebSearch}
+                topSlot={
+                  hasActivePrompt && activeQuestions ? (
+                    <InteractivePromptDialog
+                      questions={activeQuestions}
+                      title={activePromptToolCall?.title}
+                      onSubmit={handlePromptSubmit}
+                      onDismiss={handlePromptDismiss}
+                    />
+                  ) : undefined
+                }
+              />
+            </>
           </div>
 
           {/* Right Column: Desktop Split Artifact Canvas (Smooth slide in & out) */}

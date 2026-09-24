@@ -54,14 +54,25 @@ export interface WebCitation {
   content?: string;
 }
 
+export interface InteractiveQuestion {
+  id: string;
+  question: string;
+  type?: "single_select" | "multi_select" | "rank_priority";
+  options: string[];
+  allowOther?: boolean;
+}
+
 export type ToolCallRecord = {
   id?: string;
   tool: string;
   args?: Record<string, any>;
   execution?: "local" | "server" | "client";
+  purpose?: "quiz" | "clarification" | "preference" | "ranking";
   data?: any;
-  status?: "pending" | "success" | "error";
+  status?: "pending" | "executing" | "success" | "error";
   quizData?: any[];
+  questions?: InteractiveQuestion[];
+  title?: string;
   query?: string;
   url?: string;
   citations?: WebCitation[];

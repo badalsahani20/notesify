@@ -253,7 +253,7 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
       const { fullText, fullThought, thinkingTime: finalThinkingTime } =
         await consumeAiChatStream(response.body, {
           throttleMs: 60,
-          onToolCall: ({ id, args, execution, tool, quizData, query, url, citations }) => {
+          onToolCall: ({ id, args, execution, purpose, status, data, error, tool, quizData, questions, title, query, url, citations }) => {
             if (execution === "local" && args) {
               executeClientTool(tool, args).then((res) => {
                 // Report verified tool execution result back to session history on server
@@ -297,11 +297,11 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
                     const idx = existing.findIndex((tc) => (id ? tc.id === id : tc.tool === tool));
                     if (idx !== -1) {
                       const updated = [...existing];
-                      updated[idx] = {
-                        ...updated[idx],
-                        data: res.data,
+                    updated[idx] = {
+                      ...updated[idx],
+                        data: res.data ?? updated[idx].data,
                         status: res.success ? "success" : "error",
-                        error: res.error,
+                        error: res.error ?? updated[idx].error,
                       };
                       return { ...m, toolCalls: updated };
                     }
@@ -322,20 +322,46 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
                     toolCalls: [...filtered, { tool, citations }],
                   };
                 }
-                const existingIdx = existingCalls.findIndex((tc) => (id ? tc.id === id : tc.tool === tool));
-                if (existingIdx !== -1) {
+                const existingIdx = id
+                  ? existingCalls.findIndex((tc) => tc.id === id)
+                  : existingCalls.findIndex((tc) => tc.tool === tool && tc.status !== "success" && tc.status !== "error");
+                const correlatedIdx = existingIdx === -1 && id
+                  ? existingCalls.findIndex((tc) => !tc.id && tc.tool === tool && tc.status !== "success" && tc.status !== "error")
+                  : existingIdx;
+                if (correlatedIdx !== -1) {
                   const updated = [...existingCalls];
-                  updated[existingIdx] = {
-                    ...updated[existingIdx],
+                  updated[correlatedIdx] = {
+                    ...updated[correlatedIdx],
+                    id: id ?? updated[correlatedIdx].id,
                     args: args ?? updated[existingIdx].args,
                     query: query ?? updated[existingIdx].query,
                     url: url ?? updated[existingIdx].url,
+                    execution: execution ?? updated[existingIdx].execution,
+                    purpose: purpose ?? updated[existingIdx].purpose,
+                    status: status ?? updated[existingIdx].status,
+                    data: data ?? updated[existingIdx].data,
+                    error: error ?? updated[existingIdx].error,
                   };
                   return { ...m, toolCalls: updated };
                 }
                 return {
                   ...m,
-                  toolCalls: [...existingCalls, { id, args, execution, tool, quizData, query, url, citations }],
+                  toolCalls: [...existingCalls, {
+                    id,
+                    args,
+                    execution,
+                    purpose,
+                    tool,
+                    status: status ?? "pending",
+                    data,
+                    error,
+                    quizData,
+                    questions: questions ?? quizData,
+                    title,
+                    query,
+                    url,
+                    citations,
+                  }],
                 };
               }),
             }));

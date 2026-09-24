@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useCallback, useState } from "react";
+import React, { useRef, useEffect, useLayoutEffect, useCallback, useState } from "react";
 import { 
     ArrowUpIcon, 
     Paperclip, 
@@ -20,7 +20,7 @@ interface UseAutoResizeTextareaProps {
 }
 
 function useAutoResizeTextarea({
-    minHeight = 52,
+    minHeight = 36,
     maxHeight = 200,
     value,
     textareaRef: externalRef,
@@ -34,24 +34,35 @@ function useAutoResizeTextarea({
             if (!textarea) return;
 
             if (reset || !textarea.value) {
-                textarea.style.height = `${minHeight}px`;
-                textarea.style.overflowY = "hidden";
+                const minHeightStr = `${minHeight}px`;
+                if (textarea.style.height !== minHeightStr) {
+                    textarea.style.height = minHeightStr;
+                }
+                if (textarea.style.overflowY !== "hidden") {
+                    textarea.style.overflowY = "hidden";
+                }
                 return;
             }
 
-            // Reset to 0px temporarily to calculate accurate content scrollHeight
-            textarea.style.height = "0px";
+            // Using 'auto' instead of '0px' prevents scroll jumps, caret loss, and violent layout collapse
+            textarea.style.height = "auto";
             const scrollHeight = textarea.scrollHeight;
             const limit = maxHeight ?? 200;
             const nextHeight = Math.max(minHeight, Math.min(scrollHeight, limit));
 
-            textarea.style.height = `${nextHeight}px`;
-            textarea.style.overflowY = scrollHeight > limit ? "auto" : "hidden";
+            const targetHeightStr = `${nextHeight}px`;
+            if (textarea.style.height !== targetHeightStr) {
+                textarea.style.height = targetHeightStr;
+            }
+            const targetOverflow = scrollHeight > limit ? "auto" : "hidden";
+            if (textarea.style.overflowY !== targetOverflow) {
+                textarea.style.overflowY = targetOverflow;
+            }
         },
         [minHeight, maxHeight, textareaRef]
     );
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         adjustHeight();
     }, [adjustHeight, value]);
 
@@ -113,6 +124,7 @@ export interface AnimatedAIChatProps {
   placeholder?: string;
   showHeading?: boolean;
   commands?: CommandSuggestion[];
+  minHeight?: number;
 }
 
 export function AnimatedAIChat({
@@ -128,13 +140,15 @@ export function AnimatedAIChat({
   textareaRef: externalTextareaRef,
   placeholder = "Ask Iris anything...",
   showHeading = false,
-  commands
+  commands,
+  minHeight = 36,
 }: AnimatedAIChatProps) {
     const [activeSuggestion, setActiveSuggestion] = useState<number>(-1);
     const [showCommandPalette, setShowCommandPalette] = useState(false);
+    const [userDismissedCommands, setUserDismissedCommands] = useState(false);
 
     const { textareaRef, adjustHeight } = useAutoResizeTextarea({
-        minHeight: 52,
+        minHeight,
         maxHeight: 200,
         value,
         textareaRef: externalTextareaRef,
@@ -164,13 +178,26 @@ export function AnimatedAIChat({
 
     const commandSuggestions = commands || defaultCommands;
 
+    // Only show command palette when user is actively typing a command prefix (no spaces or newlines)
+    const isCommandQuery = value.startsWith('/') && !value.includes(' ') && !value.includes('\n');
+    const filterQuery = isCommandQuery ? value.trim().toLowerCase() : "";
+    const filteredSuggestions = commandSuggestions.filter(s => 
+        filterQuery.length <= 1 || 
+        s.prefix.toLowerCase().startsWith(filterQuery) || 
+        s.label.toLowerCase().includes(filterQuery.slice(1))
+    );
+
     useEffect(() => {
-        if (value.startsWith('/')) {
+        if (isCommandQuery && !userDismissedCommands && filteredSuggestions.length > 0) {
             setShowCommandPalette(true);
+            setActiveSuggestion(0);
         } else {
             setShowCommandPalette(false);
+            if (!value.startsWith('/')) {
+                setUserDismissedCommands(false);
+            }
         }
-    }, [value]);
+    }, [isCommandQuery, userDismissedCommands, filteredSuggestions.length, value]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -180,6 +207,7 @@ export function AnimatedAIChat({
                 !(event.target as HTMLElement).closest('[data-command-button]')
             ) {
                 setShowCommandPalette(false);
+                setUserDismissedCommands(true);
             }
         };
 
@@ -190,21 +218,23 @@ export function AnimatedAIChat({
     }, []);
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-        if (showCommandPalette) {
+        if (showCommandPalette && filteredSuggestions.length > 0) {
             if (e.key === 'ArrowDown') {
                 e.preventDefault();
                 setActiveSuggestion(prev => 
-                    prev < commandSuggestions.length - 1 ? prev + 1 : 0
+                    prev < filteredSuggestions.length - 1 ? prev + 1 : 0
                 );
+                return;
             } else if (e.key === 'ArrowUp') {
                 e.preventDefault();
                 setActiveSuggestion(prev => 
-                    prev > 0 ? prev - 1 : commandSuggestions.length - 1
+                    prev > 0 ? prev - 1 : filteredSuggestions.length - 1
                 );
+                return;
             } else if (e.key === 'Tab' || (e.key === 'Enter' && activeSuggestion >= 0)) {
                 e.preventDefault();
-                if (activeSuggestion >= 0) {
-                    const selectedCommand = commandSuggestions[activeSuggestion];
+                if (activeSuggestion >= 0 && activeSuggestion < filteredSuggestions.length) {
+                    const selectedCommand = filteredSuggestions[activeSuggestion];
                     if (selectedCommand.onSelect) {
                         selectedCommand.onSelect();
                         onChange('');
@@ -213,11 +243,17 @@ export function AnimatedAIChat({
                     }
                     setShowCommandPalette(false);
                 }
+                return;
             } else if (e.key === 'Escape') {
                 e.preventDefault();
                 setShowCommandPalette(false);
+                setUserDismissedCommands(true);
+                return;
             }
-        } else if (e.key === "Enter" && !e.shiftKey) {
+        }
+
+        if (e.key === "Enter" && !e.shiftKey) {
+            if (e.nativeEvent.isComposing) return;
             e.preventDefault();
             if (value.trim()) {
                 onSubmit();
@@ -234,7 +270,8 @@ export function AnimatedAIChat({
     };
     
     const selectCommandSuggestion = (index: number) => {
-        const selectedCommand = commandSuggestions[index];
+        const selectedCommand = filteredSuggestions[index];
+        if (!selectedCommand) return;
         if (selectedCommand.onSelect) {
             selectedCommand.onSelect();
             onChange('');
@@ -283,7 +320,7 @@ export function AnimatedAIChat({
                     )}
 
                     <motion.div 
-                        className="relative backdrop-blur-2xl bg-[#14141a]/90 rounded-xl border border-white/10 shadow-2xl p-2.5 space-y-2"
+                        className="relative backdrop-blur-2xl bg-[#14141a]/90 rounded-xl border border-white/10 shadow-2xl px-3 py-2 space-y-1.5"
                         initial={{ scale: 0.98 }}
                         animate={{ scale: 1 }}
                         transition={{ delay: 0.1 }}
@@ -299,7 +336,7 @@ export function AnimatedAIChat({
                                     transition={{ duration: 0.15 }}
                                 >
                                     <div className="py-1 bg-black/95">
-                                        {commandSuggestions.map((suggestion, index) => (
+                                        {filteredSuggestions.map((suggestion, index) => (
                                             <motion.div
                                                 key={suggestion.prefix}
                                                 className={cn(
@@ -333,20 +370,19 @@ export function AnimatedAIChat({
                                 value={value}
                                 onChange={(e) => {
                                     onChange(e.target.value);
-                                    adjustHeight();
                                 }}
                                 onKeyDown={handleKeyDown}
                                 placeholder={placeholder}
                                 containerClassName="w-full"
                                 className={cn(
-                                    "w-full px-2 py-1.5",
+                                    "w-full px-2 py-1",
                                     "resize-none",
                                     "bg-transparent",
                                     "border-none",
                                     "text-white/90 text-sm leading-relaxed",
                                     "focus:outline-none",
                                     "placeholder:text-white/30",
-                                    "min-h-[52px]",
+                                    "min-h-[36px]",
                                     "max-h-[200px]",
                                     "max-sm:max-h-[160px]",
                                     "custom-scrollbar"
@@ -361,18 +397,18 @@ export function AnimatedAIChat({
                             </div>
                         )}
 
-                        <div className="pt-2 border-t border-white/[0.06] flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-1.5 flex-wrap">
+                        <div className="pt-1.5 border-t border-white/[0.06] flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto no-scrollbar py-0.5 min-w-0 flex-1">
                                 {onAttachClick && (
                                     <motion.button
                                         type="button"
                                         onClick={onAttachClick}
                                         whileTap={{ scale: 0.94 }}
-                                        className="px-2.5 py-1 text-white/50 hover:text-white hover:bg-white/10 rounded-md transition-colors flex items-center gap-1.5 text-xs font-medium cursor-pointer relative group"
+                                        className="p-1.5 sm:px-2.5 sm:py-1 text-white/50 hover:text-white hover:bg-white/10 active:bg-white/15 rounded-md transition-colors flex items-center gap-1 sm:gap-1.5 text-xs font-medium cursor-pointer relative group shrink-0 touch-manipulation"
                                         title="Attach file (image or PDF)"
                                     >
-                                        <Paperclip className="w-3.5 h-3.5" />
-                                        <span>Attach</span>
+                                        <Paperclip className="w-3.5 h-3.5 shrink-0" />
+                                        <span className="hidden sm:inline">Attach</span>
                                     </motion.button>
                                 )}
                                 <motion.button
@@ -384,20 +420,20 @@ export function AnimatedAIChat({
                                     }}
                                     whileTap={{ scale: 0.94 }}
                                     className={cn(
-                                        "px-2.5 py-1 text-white/50 hover:text-white hover:bg-white/10 rounded-md transition-colors flex items-center gap-1.5 text-xs font-medium cursor-pointer relative group",
+                                        "p-1.5 sm:px-2.5 sm:py-1 text-white/50 hover:text-white hover:bg-white/10 active:bg-white/15 rounded-md transition-colors flex items-center gap-1 sm:gap-1.5 text-xs font-medium cursor-pointer relative group shrink-0 touch-manipulation",
                                         showCommandPalette && "bg-white/10 text-white/90"
                                     )}
                                     title="Quick AI Commands"
                                 >
-                                    <Command className="w-3.5 h-3.5" />
-                                    <span>Tools</span>
+                                    <Command className="w-3.5 h-3.5 shrink-0" />
+                                    <span className="hidden sm:inline">Tools</span>
                                 </motion.button>
 
-                                <div className="h-3.5 w-px bg-white/10 mx-0.5"></div>
+                                <div className="h-3.5 w-px bg-white/10 mx-0.5 shrink-0"></div>
                                 {extraActionButtons}
                             </div>
                             
-                            <div className="flex items-center gap-1.5 shrink-0">
+                            <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
                                 {rightActionButtons}
                                 {isTyping && onStop ? (
                                     <motion.button
@@ -405,7 +441,7 @@ export function AnimatedAIChat({
                                         onClick={onStop}
                                         whileHover={{ scale: 1.05 }}
                                         whileTap={{ scale: 0.95 }}
-                                        className="w-8 h-8 rounded-lg text-white hover:text-red-400 bg-white/10 hover:bg-red-500/20 border border-white/10 transition-all flex items-center justify-center cursor-pointer shrink-0"
+                                        className="w-8 h-8 rounded-lg text-white hover:text-red-400 bg-white/10 hover:bg-red-500/20 border border-white/10 transition-all flex items-center justify-center cursor-pointer shrink-0 touch-manipulation"
                                         title="Stop generating"
                                     >
                                         <XIcon className="w-4 h-4" />
@@ -418,9 +454,9 @@ export function AnimatedAIChat({
                                         whileTap={{ scale: 0.95 }}
                                         disabled={isTyping || (!value.trim() && !attachments)}
                                         className={cn(
-                                            "w-8 h-8 rounded-lg transition-all flex items-center justify-center cursor-pointer shrink-0",
+                                            "w-8 h-8 rounded-lg transition-all flex items-center justify-center cursor-pointer shrink-0 touch-manipulation",
                                             value.trim() || attachments
-                                                ? "bg-white text-black shadow-md hover:bg-white/90"
+                                                ? "bg-white text-black shadow-md hover:bg-white/90 active:scale-95"
                                                 : "bg-white/5 text-white/30 cursor-not-allowed"
                                         )}
                                         title="Send message"

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import type { ReactNode, RefObject } from "react";
 import { X, FileText, Lightbulb, Globe, Search, BrainCircuit, GraduationCap } from "lucide-react";
@@ -7,6 +7,27 @@ import { AnimatedAIChat } from "@/components/ui/animated-ai-chat";
 import { motion } from "framer-motion";
 import { useGlobalChatStore } from "@/store/useGlobalChatStore";
 import { VoiceDictationButton } from "./VoiceDictationButton";
+
+const DEFAULT_CHAT_COMMANDS = [
+  { 
+      icon: <FileText className="w-4 h-4" />, 
+      label: "Summarize", 
+      description: "Summarize the current note", 
+      prefix: "/summarize" 
+  },
+  { 
+      icon: <BrainCircuit className="w-4 h-4" />, 
+      label: "Create Quiz", 
+      description: "Generate a quiz from your notes", 
+      prefix: "/quiz" 
+  },
+  { 
+      icon: <Search className="w-4 h-4" />, 
+      label: "Search", 
+      description: "Search globally across all notes", 
+      prefix: "/search" 
+  }
+];
 
 interface GlobalChatComposeProps {
   input: string;
@@ -132,7 +153,7 @@ export const GlobalChatCompose = ({
 
   const isPdf = attachedImage?.startsWith("data:application/pdf");
 
-  const renderAttachments = () => {
+  const attachments = useMemo(() => {
     if (!attachedImage) return null;
     
     return (
@@ -162,9 +183,9 @@ export const GlobalChatCompose = ({
         </div>
       </motion.div>
     );
-  };
+  }, [attachedImage, isPdf, setAttachedImage]);
 
-  const renderExtraButtons = () => {
+  const extraActionButtons = useMemo(() => {
     return (
       <>
         <button
@@ -174,22 +195,22 @@ export const GlobalChatCompose = ({
             setChatMode(nextMode);
             toast.success(`Switched to ${nextMode === "study" ? "Study" : "Casual"} Mode`);
           }}
-          className={`px-2.5 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer text-xs font-medium ${chatMode === "study" ? 'text-primary bg-primary/10 border border-primary/20' : 'text-white/40 hover:text-white/90 hover:bg-white/5'}`}
+          className={`p-1.5 sm:px-2.5 sm:py-1 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer text-xs font-medium shrink-0 touch-manipulation active:scale-95 ${chatMode === "study" ? 'text-primary bg-primary/10 border border-primary/20' : 'text-white/40 hover:text-white/90 hover:bg-white/5'}`}
           title={chatMode === "study" ? "Study Mode Active — Teaching models enabled" : "Enable Study Mode"}
         >
-          <GraduationCap className="w-3.5 h-3.5" />
-          <span>Study</span>
+          <GraduationCap className="w-3.5 h-3.5 shrink-0" />
+          <span className="hidden sm:inline">Study</span>
         </button>
 
         {setUseWebSearch && (
           <button
             type="button"
             onClick={() => setUseWebSearch(!useWebSearch)}
-            className={`px-2.5 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer text-xs font-medium ${useWebSearch ? 'text-primary bg-primary/10 border border-primary/20' : 'text-white/40 hover:text-white/90 hover:bg-white/5'}`}
+            className={`p-1.5 sm:px-2.5 sm:py-1 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer text-xs font-medium shrink-0 touch-manipulation active:scale-95 ${useWebSearch ? 'text-primary bg-primary/10 border border-primary/20' : 'text-white/40 hover:text-white/90 hover:bg-white/5'}`}
             title={useWebSearch ? "Web Search Enabled — Iris searches real-time web sources" : "Enable Web Search"}
           >
-            <Globe className="w-3.5 h-3.5" />
-            <span>Web</span>
+            <Globe className="w-3.5 h-3.5 shrink-0" />
+            <span className="hidden sm:inline">Web</span>
           </button>
         )}
         
@@ -197,19 +218,19 @@ export const GlobalChatCompose = ({
           <button
             type="button"
             onClick={() => setUseReasoning(!useReasoning)}
-            className={`px-2.5 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer text-xs font-medium ${useReasoning ? 'text-primary bg-primary/10 border border-primary/20' : 'text-white/40 hover:text-white/90 hover:bg-white/5'}`}
+            className={`p-1.5 sm:px-2.5 sm:py-1 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer text-xs font-medium shrink-0 touch-manipulation active:scale-95 ${useReasoning ? 'text-primary bg-primary/10 border border-primary/20' : 'text-white/40 hover:text-white/90 hover:bg-white/5'}`}
             title={useReasoning ? "Thinking Enabled — Iris performs deep step-by-step reasoning" : "Enable Thinking"}
           >
-            <Lightbulb className="w-3.5 h-3.5" />
-            <span>Thinking</span>
+            <Lightbulb className="w-3.5 h-3.5 shrink-0" />
+            <span className="hidden sm:inline">Thinking</span>
           </button>
         )}
       </>
     );
-  };
+  }, [chatMode, setChatMode, useWebSearch, setUseWebSearch, useReasoning, setUseReasoning]);
 
   return (
-    <div className="absolute bottom-0 left-0 w-full z-20 bg-gradient-to-t from-background via-background/95 to-transparent pt-12 pb-2 px-4 flex flex-col justify-end pointer-events-none">
+    <div className="absolute bottom-0 left-0 w-full z-20 bg-gradient-to-t from-background via-background/95 to-transparent pt-6 pb-2 px-2 sm:px-4 flex flex-col justify-end pointer-events-none">
       <div className="pointer-events-auto flex flex-col w-full max-w-3xl mx-auto">
         {topSlot}
 
@@ -230,7 +251,7 @@ export const GlobalChatCompose = ({
         placeholder={placeholder}
         textareaRef={textareaRef as any}
         showHeading={false}
-        attachments={renderAttachments()}
+        attachments={attachments}
         onAttachClick={() => {
           if (imageDisabled) {
             handleImageClick();
@@ -238,7 +259,7 @@ export const GlobalChatCompose = ({
             openFilePicker("image/*,.pdf,application/pdf");
           }
         }}
-        extraActionButtons={renderExtraButtons()}
+        extraActionButtons={extraActionButtons}
         rightActionButtons={
           <VoiceDictationButton
             onTranscript={(text) => {
@@ -250,26 +271,7 @@ export const GlobalChatCompose = ({
             disabled={isSending}
           />
         }
-        commands={[
-          { 
-              icon: <FileText className="w-4 h-4" />, 
-              label: "Summarize", 
-              description: "Summarize the current note", 
-              prefix: "/summarize" 
-          },
-          { 
-              icon: <BrainCircuit className="w-4 h-4" />, 
-              label: "Create Quiz", 
-              description: "Generate a quiz from your notes", 
-              prefix: "/quiz" 
-          },
-          { 
-              icon: <Search className="w-4 h-4" />, 
-              label: "Search", 
-              description: "Search globally across all notes", 
-              prefix: "/search" 
-          }
-        ]}
+        commands={DEFAULT_CHAT_COMMANDS}
       />
 
       {/* Lightbox — portal-rendered outside compose box */}

@@ -1,14 +1,15 @@
 import "katex/dist/katex.min.css";
-import { ChevronRight, ChevronDown, Check, Copy } from "lucide-react";
+import { ChevronDown, Check, Copy } from "lucide-react";
 import { GlobalChatEmptyState } from "@/components/chat/GlobalChatEmptyState";
 import type { Message } from "@/components/ai/types";
 import IrisMessageBody from "./IrisMessageBody";
-import { InlineQuizManager } from "./InlineQuizManager";
 import { IrisNoteCreatedCard } from "./IrisNoteCreatedCard";
 import { Tool, ToolCall, ToolStatus } from "@/components/ai/tool";
 import { parseIrisResponse } from "@/utils/parseIrisResponse";
-import { useEffect, useState, useRef, useLayoutEffect } from "react";
-import { getThinkingState } from "@/utils/getThinkingState";
+import { useEffect, useState, useRef, useLayoutEffect, memo } from "react";
+import { TextShimmer } from "@/components/ui/text-shimmer";
+import { Source, SourceTrigger, SourceContent } from "@/components/ui/source";
+import { Reasoning, ReasoningTrigger, ReasoningContent } from "@/components/ui/reasoning";
 
 
 // --- Thinking Widget ---
@@ -16,62 +17,40 @@ interface ThinkingWidgetProps {
   isThinking: boolean;
   thinkingTime?: number;
   thought?: string;
-  isReasoningOff?: boolean;
 }
 
 
-const ThinkingWidget = ({ isThinking, thinkingTime, thought, isReasoningOff }: ThinkingWidgetProps) => {
-  // If we have thought text, show it in a collapsible detail block
-  const [thinking, setThinking] = useState(getThinkingState());
-
-  useEffect(() => {
-    if (!isThinking) return;
-
-    const interval = setInterval(() => {
-      setThinking(getThinkingState());
-    }, 2500);
-    return () => clearInterval(interval);
-  }, [isThinking]);
-
+const ThinkingWidget = ({ isThinking, thinkingTime, thought }: ThinkingWidgetProps) => {
   if (thought) {
     return (
-      <details className="iris-thinking-details" open={isThinking}>
-        <summary className={`iris-thinking-summary ${!isThinking ? "iris-thinking-summary-done" : ""}`}>
-          <ChevronRight size={14} className="iris-chevron" />
-          <span>{isThinking ? (isReasoningOff ? thinking.text : "Thinking") : `Thought for ${thinkingTime}s`}</span>
-          {isThinking && (
-            <span className="iris-thinking-indicator-dots">
-              <span style={{ animationDelay: "0ms" }} />
-              <span style={{ animationDelay: "180ms" }} />
-              <span style={{ animationDelay: "360ms" }} />
-            </span>
+      <Reasoning isStreaming={isThinking}>
+        <ReasoningTrigger>
+          {isThinking ? (
+            <TextShimmer duration={2}>Thinking...</TextShimmer>
+          ) : (
+            <span>{thinkingTime && thinkingTime > 0 ? `Thought for ${thinkingTime}s` : "Thought"}</span>
           )}
-        </summary>
-        <div className="iris-thinking-content">
+        </ReasoningTrigger>
+        <ReasoningContent markdown={true}>
           {thought}
-        </div>
-      </details>
+        </ReasoningContent>
+      </Reasoning>
     );
   }
 
-  // Pure waiting state (no thoughts yet): show animated spinner
+  // Pure waiting state (no thoughts yet): show animated shimmer indicator
   if (isThinking) {
     return (
-      <div className="iris-thinking-indicator">
-        <span>{isReasoningOff ? thinking.text : "Thinking"}</span>
-        <span className="iris-thinking-indicator-dots">
-          <span style={{ animationDelay: "0ms" }} />
-          <span style={{ animationDelay: "180ms" }} />
-          <span style={{ animationDelay: "360ms" }} />
-        </span>
+      <div className="flex items-center gap-1.5 text-xs font-medium py-1 select-none">
+        <TextShimmer duration={2}>Thinking...</TextShimmer>
       </div>
     );
   }
 
   // Done: closed time badge — no content, nothing to expand
-  if (thinkingTime && thinkingTime > 0 && !isReasoningOff) {
+  if (thinkingTime && thinkingTime > 0) {
     return (
-      <div className="iris-thinking-indicator iris-thinking-indicator-done">
+      <div className="flex items-center gap-1.5 text-xs font-medium text-zinc-500 py-0.5 select-none">
         <span>Thought for {thinkingTime}s</span>
       </div>
     );
@@ -93,10 +72,10 @@ interface GlobalChatMessagesProps {
   prompts: { students: string[], devs: string[] };
   bottomRef: React.RefObject<HTMLDivElement | null>;
   fullWidthAssistant?: boolean;
-  useReasoning?: boolean;
+  hasActivePrompt?: boolean;
 }
 
-export const GlobalChatMessages = ({
+export const GlobalChatMessages = memo(({
   messages,
   messagesLoading,
   streamingMessageId,
@@ -107,7 +86,7 @@ export const GlobalChatMessages = ({
   prompts,
   bottomRef,
   fullWidthAssistant = false,
-  useReasoning = true,
+  hasActivePrompt = false,
 }: GlobalChatMessagesProps) => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [expandedUserMessages, setExpandedUserMessages] = useState<Set<string>>(new Set());
@@ -268,6 +247,16 @@ export const GlobalChatMessages = ({
     }
   }, [messages, streamedMessageText, isStreaming, isSending, userHasScrolledUp, bottomRef]);
 
+  // When an interactive question/quiz prompt opens, scroll down so the message sits above the card
+  useEffect(() => {
+    if (hasActivePrompt) {
+      const timer = setTimeout(() => {
+        bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, 120);
+      return () => clearTimeout(timer);
+    }
+  }, [hasActivePrompt, bottomRef]);
+
   const handleScroll = () => {
     const container = scrollContainerRef.current;
     if (!container) return;
@@ -358,15 +347,28 @@ export const GlobalChatMessages = ({
           const isThinking = (msg as any).isThinking ?? false;
           const thinkingTime = (msg as any).thinkingTime as number | undefined;
           const thought = (msg as any).thought as string | undefined;
-          const toolCalls = (msg as any).toolCalls as Array<{ tool: string; query?: string; url?: string; citations?: any[]; quizData?: any[] }> | undefined;
+          const toolCalls = (msg as any).toolCalls as Array<{
+            id?: string;
+            tool: string;
+            query?: string;
+            url?: string;
+            citations?: any[];
+            quizData?: any[];
+            status?: "pending" | "executing" | "success" | "error";
+          }> | undefined;
           const isWorking = (isActiveStream && (isStreaming || isSending)) || isThinking;
 
-          // Identify active agentic tasks
+          // Identify active agentic tasks for the existing streaming indicators.
           const noteReadActivity = (toolCalls ?? []).find((tc) => tc.tool === "get_note_content");
           const searchActivity = (toolCalls ?? []).find((tc) => tc.tool === "search_web");
           const crawlActivity = (toolCalls ?? []).find((tc) => tc.tool === "crawl_url");
           const memoryActivity = (toolCalls ?? []).find((tc) => tc.tool === "save_memory");
-          const hasAgenticTask = Boolean(noteReadActivity || searchActivity || crawlActivity || memoryActivity);
+          const askQuestionActivity = (toolCalls ?? []).find(
+            (tc) => tc.tool === "ask_question" || tc.tool === "render_quiz" || tc.tool === "generate_quiz"
+          );
+          const hasAgenticTask = Boolean(
+            noteReadActivity || searchActivity || crawlActivity || memoryActivity || askQuestionActivity
+          );
 
           // Extract deduplicated citations for sources list
           const citations = (() => {
@@ -389,22 +391,27 @@ export const GlobalChatMessages = ({
             <div key={msg.id} className={`gc-msg gc-msg-${msg.role}`}>
               {msg.role === "assistant" ? (
                 <div className="gc-msg-bubble gc-msg-bubble-ai">
-                  {/* Unified Agentic Task Indicators (Unboxed, No Icons, Pulsing, Bolder) */}
-                  {!displayText.trim() && isWorking && hasAgenticTask && (
-                    <div className="flex flex-col gap-1 text-xs text-neutral-200 font-semibold my-1">
+                  {/* Unified Agentic Task Indicators with TextShimmer */}
+                  {isWorking && hasAgenticTask && (
+                    <div className="flex flex-col gap-1 text-xs font-semibold my-1">
                       {noteReadActivity && (
-                        <span className="animate-pulse">Reading note...</span>
+                        <TextShimmer duration={2.5}>
+                          {noteReadActivity.status === "success" ? "Note read" : "Reading note..."}
+                        </TextShimmer>
                       )}
                       {searchActivity && (
-                        <span className="animate-pulse">
+                        <TextShimmer duration={2.5}>
                           {searchActivity.query ? `Searching the web for "${searchActivity.query}"...` : "Searching the web..."}
-                        </span>
+                        </TextShimmer>
                       )}
                       {crawlActivity && (
-                        <span className="animate-pulse">Reading webpage...</span>
+                        <TextShimmer duration={2.5}>Reading webpage...</TextShimmer>
                       )}
                       {memoryActivity && (
-                        <span className="animate-pulse">Saving memory...</span>
+                        <TextShimmer duration={2.5}>Saving memory...</TextShimmer>
+                      )}
+                      {askQuestionActivity && (
+                        <TextShimmer duration={2.5}>Generating questions...</TextShimmer>
                       )}
                     </div>
                   )}
@@ -415,7 +422,6 @@ export const GlobalChatMessages = ({
                       isThinking={isThinking || (isWorking && !displayText)}
                       thinkingTime={thinkingTime}
                       thought={thought}
-                      isReasoningOff={!useReasoning}
                     />
                   )}
 
@@ -439,18 +445,19 @@ export const GlobalChatMessages = ({
                     >
                       <IrisMessageBody
                         segments={msg.segments ?? parseIrisResponse(displayText)}
+                        citations={citations}
                         onAnswer={sendMessage}
                       />
                     </div>
                   ) : null}
 
-                      {/* Sources UI (Minimal, understated, interactive links) */}
+                      {/* Sources UI (Minimal, understated, interactive links with prompt-kit Source hover cards) */}
                       {citations.length > 0 && (
                         <div className="mt-3 pt-2.5 border-t border-white/5">
                           <div className="text-[11px] font-medium text-neutral-400 uppercase tracking-wider mb-2">
                             Sources
                           </div>
-                          <div className="flex flex-wrap gap-2.5">
+                          <div className="flex flex-wrap gap-2">
                             {citations.map((c, i) => {
                               let domain = "";
                               try {
@@ -460,29 +467,17 @@ export const GlobalChatMessages = ({
                               }
                               const title = c.title || domain;
                               return (
-                                <a
-                                  key={i}
-                                  href={c.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="iris-source-link group"
-                                  title={c.title || c.url}
-                                >
-                                  <img
-                                    src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`}
-                                    alt=""
-                                    className="w-3.5 h-3.5 rounded-sm shrink-0 opacity-70 group-hover:opacity-100 transition-opacity"
-                                    onError={(e) => {
-                                      (e.currentTarget as HTMLElement).style.display = "none";
-                                    }}
+                                <Source key={i} href={c.url}>
+                                  <SourceTrigger
+                                    label={title}
+                                    showFavicon={true}
+                                    className="max-w-[220px]"
                                   />
-                                  <span className="truncate max-w-[200px] text-neutral-300 group-hover:text-white transition-colors">
-                                    {title}
-                                  </span>
-                                  <span className="text-[10px] text-neutral-400 font-mono">
-                                    {domain}
-                                  </span>
-                                </a>
+                                  <SourceContent
+                                    title={title}
+                                    description={c.content || c.url}
+                                  />
+                                </Source>
                               );
                             })}
                           </div>
@@ -496,26 +491,21 @@ export const GlobalChatMessages = ({
                           tc.tool === "crawl_url" ||
                           tc.tool === "save_memory" ||
                           tc.tool === "web_citations" ||
-                          tc.tool === "get_note_content"
+                          tc.tool === "get_note_content" ||
+                          tc.tool === "ask_question" ||
+                          tc.tool === "render_quiz" ||
+                          tc.tool === "generate_quiz"
                         )
                           return null;
-                        if (tc.tool === "render_quiz" && tc.quizData) {
-                          return (
-                            <InlineQuizManager
-                              key={`quiz-${idx}`}
-                              questions={tc.quizData}
-                              isHistorical={msg.id !== messages[messages.length - 1].id}
-                              onComplete={(formattedAnswers) => {
-                                sendMessage(formattedAnswers);
-                              }}
-                            />
-                          );
-                        }
                         if (tc.tool === "create_note" || tc.tool === "update_note") {
                           const noteId = tc.data?._id || tc.args?.noteId || tc.args?.id;
                           const title = tc.data?.title || tc.args?.title || "Untitled Note";
                           const content = tc.data?.content || tc.args?.content;
-                          const toolState = tc.status === "error" ? "error" : "completed";
+                          const toolState = tc.status === "error"
+                            ? "error"
+                            : tc.status === "pending" || tc.status === "executing"
+                              ? "running"
+                              : "completed";
                           const isUpdate = tc.tool === "update_note";
                           return (
                             <div key={`note-tool-${idx}`} className="my-2">
@@ -627,9 +617,11 @@ export const GlobalChatMessages = ({
         })
       )}
 
-      {/* Spacer to allow scrolling past the floating input box */}
-      <div className="h-48 shrink-0" />
+      {/* Spacer to allow scrolling past the floating input box & active prompt dialog */}
+      <div className={`shrink-0 transition-all duration-300 ${hasActivePrompt ? "h-[360px] sm:h-[400px]" : "h-48"}`} />
       <div ref={bottomRef} />
     </div>
   );
-};
+});
+
+GlobalChatMessages.displayName = "GlobalChatMessages";

@@ -1,10 +1,11 @@
-import { useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
 import { FileText, Type, X, RefreshCcw, Pencil } from "lucide-react";
 import { motion } from "framer-motion";
 import { GlobalChatMessages } from "@/components/chat/GlobalChatMessages";
 import { GlobalChatCompose } from "@/components/chat/GlobalChatCompose";
+import { InteractivePromptDialog } from "@/components/chat/InteractivePromptDialog";
 import type { useAiChat } from "@/hooks/ai/useAiChat";
-import type { Message } from "../ai/types";
+import type { Message, InteractiveQuestion } from "../ai/types";
 
 type ContextualAiPanelProps = {
   aiChat: ReturnType<typeof useAiChat>;
@@ -51,7 +52,29 @@ const ContextualAiPanel = ({
 
   const prompts = useMemo(() => ({ students: [], devs: [] }), []);
 
-  // Context indicator moved to header
+  const [dismissedPromptId, setDismissedPromptId] = useState<string | null>(null);
+
+  const lastAssistantMsg = messages.length > 0 ? messages[messages.length - 1] : null;
+  const activePromptToolCall = useMemo(() => {
+    return lastAssistantMsg?.role === "assistant" && dismissedPromptId !== lastAssistantMsg.id
+      ? lastAssistantMsg.toolCalls?.find(
+          (tc) => tc.tool === "ask_question" && Boolean(tc.questions || tc.quizData)
+        )
+      : null;
+  }, [lastAssistantMsg, dismissedPromptId]);
+
+  const activeQuestions = useMemo(() => {
+    return (activePromptToolCall?.questions ?? activePromptToolCall?.quizData) as
+      | InteractiveQuestion[]
+      | undefined;
+  }, [activePromptToolCall]);
+
+  const handleSendMessage = useCallback(
+    (text?: string) => {
+      void sendChatMessage(text);
+    },
+    [sendChatMessage]
+  );
 
   return (
     <motion.aside
@@ -121,6 +144,7 @@ const ContextualAiPanel = ({
         </div>
       ) : null}
 
+      {/* Messages */}
       <GlobalChatMessages
         messages={messages as Message[]}
         messagesLoading={false}
@@ -128,11 +152,11 @@ const ContextualAiPanel = ({
         streamedMessageText={streamedMessageText}
         isStreaming={isStreaming}
         isSending={isSendingChat}
-        sendMessage={(text) => void sendChatMessage(text)}
+        sendMessage={handleSendMessage}
         prompts={prompts}
         bottomRef={bottomRef}
         fullWidthAssistant
-        useReasoning={useReasoning}
+        hasActivePrompt={Boolean(activeQuestions && activeQuestions.length > 0)}
       />
 
       <div className="relative">
@@ -152,6 +176,21 @@ const ContextualAiPanel = ({
           setUseReasoning={setUseReasoning}
           useWebSearch={useWebSearch}
           setUseWebSearch={setUseWebSearch}
+          topSlot={
+            activeQuestions && activeQuestions.length > 0 ? (
+              <InteractivePromptDialog
+                questions={activeQuestions}
+                title={activePromptToolCall?.title}
+                onSubmit={(formatted) => {
+                  if (lastAssistantMsg) setDismissedPromptId(lastAssistantMsg.id);
+                  void sendChatMessage(formatted);
+                }}
+                onDismiss={() => {
+                  if (lastAssistantMsg) setDismissedPromptId(lastAssistantMsg.id);
+                }}
+              />
+            ) : undefined
+          }
         />
       </div>
     </motion.aside>

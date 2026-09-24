@@ -71,19 +71,20 @@ export class ChatContextResolver {
     } = body || {};
 
     // Context-aware history management (Large Context Window Strategy)
-    // 1. Keep approximately the last 16 messages in full (untruncated)
-    // 2. Older messages outside the recent window are consolidated into a state-preserving rolling summary
-    const RECENT_MESSAGE_COUNT = 16;
-    const SUMMARY_TRIGGER_COUNT = 24;
+    // Retain full conversational fidelity for long sessions.
+    // Modern models have 128k - 1M context windows, and modelRouter.js overrides
+    // to large-context models if totalContextLength exceeds 150k characters.
+    const RECENT_MESSAGE_COUNT = 80;
+    const SUMMARY_TRIGGER_COUNT = 100;
 
     let effectiveHistory = history;
     let sessionSummary = summary;
 
-    if (history && history.length > RECENT_MESSAGE_COUNT) {
+    if (history && history.length >= SUMMARY_TRIGGER_COUNT) {
       const recentHistory = history.slice(-RECENT_MESSAGE_COUNT);
       const olderMessages = history.slice(0, -RECENT_MESSAGE_COUNT);
 
-      if (history.length >= SUMMARY_TRIGGER_COUNT && olderMessages.length > 0) {
+      if (olderMessages.length > 0) {
         try {
           const consolidatedSummary = await summarizeHistory(olderMessages, sessionSummary);
           if (consolidatedSummary) {

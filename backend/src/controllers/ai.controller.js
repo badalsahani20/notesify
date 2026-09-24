@@ -387,9 +387,7 @@ const persistToDb = async (
   const userTurnCount = sessionToUpdate.messages.filter((msg) => msg.role === "user").length;
   const isUntitled = !sessionToUpdate.title || sessionToUpdate.title === "New Chat";
 
-  // Generate title promptly once meaningful conversation context exists:
-  // - After first turn (1 user + 1 assistant message) if session is still untitled
-  // - Or refine once at turn 2 if initial title was a basic fallback
+
   const shouldGenerateTitle =
     (isUntitled && userTurnCount >= 1) ||
     (sessionToUpdate.title === "New Conversation" && userTurnCount === 2);

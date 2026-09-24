@@ -7,7 +7,8 @@ export const executeOpenRouter = async (
   includeReasoning = null,
   maxTokens = 5000,
   tools = null,
-  maxToolCalls = null
+  maxToolCalls = null,
+  reasoningMaxTokens = 1500
 ) => {
   const apiKey = getOpenRouterApiKey();
 
@@ -32,14 +33,18 @@ export const executeOpenRouter = async (
   if (isMandatoryReasoningModel) {
     // These models strictly require reasoning or they deny the request
     bodyPayload.include_reasoning = true;
-    bodyPayload.reasoning = { effort: includeReasoning === false ? "low" : "medium" };
+    // OpenRouter rejects reasoning.effort together with reasoning.max_tokens.
+    // Use the explicit budget for mandatory reasoning models.
+    bodyPayload.reasoning = { max_tokens: reasoningMaxTokens };
   } else if (includeReasoning === false || (!includeReasoning && isQwenFlash)) {
     // Specifically disable reasoning for Qwen 3.7 Flash and when reasoning is toggled off
     bodyPayload.include_reasoning = false;
     bodyPayload.reasoning = { effort: "none" };
   } else if (includeReasoning === true) {
     bodyPayload.include_reasoning = true;
-    bodyPayload.reasoning = { effort: "medium" };
+    // Use a hard reasoning budget instead of an effort level so long internal
+    // deliberations cannot consume the whole completion allowance.
+    bodyPayload.reasoning = { max_tokens: reasoningMaxTokens };
   }
 
   if (tools) {

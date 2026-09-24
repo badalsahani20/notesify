@@ -2,8 +2,8 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export const PRIMARY_MODEL = "deepseek/deepseek-v4-flash-0731";
 export const TEACHING_MODELS = [
-  "z-ai/glm-5.3-flash",
   "deepseek/deepseek-v4-flash-0731",
+  "z-ai/glm-5.3-flash",
 ];
 export const DEFAULT_CHAT_MODEL = "z-ai/glm-5.3-flash";
 export const QUICK_MODEL = "inclusionai/ling-3.0-flash";

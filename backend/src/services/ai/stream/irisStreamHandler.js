@@ -164,8 +164,13 @@ export class IrisStreamHandler {
               }
             }
 
-            // Custom function tools (save_memory, generate_quiz)
-            if (state.name === "generate_quiz" || tc.function?.name === "generate_quiz") {
+            // Custom function tools (save_memory, generate_quiz, ask_question)
+            if (
+              state.name === "generate_quiz" ||
+              tc.function?.name === "generate_quiz" ||
+              state.name === "ask_question" ||
+              tc.function?.name === "ask_question"
+            ) {
               quizToolIndex = toolIndex;
               if (tc.function?.arguments) quizToolArgs += tc.function.arguments;
             } else if (state.name === "save_memory" || tc.function?.name === "save_memory") {
@@ -419,18 +424,44 @@ export class IrisStreamHandler {
       try {
         const args = JSON.parse(quizToolArgs);
         if (args.questions && args.questions.length > 0) {
-          res.write(
-            `data: ${JSON.stringify({ type: "tool_call", tool: "render_quiz", quizData: args.questions })}\n\n`,
-          );
-          toolCalls.push({ tool: "render_quiz", quizData: args.questions });
+          const purpose = args.purpose || "quiz";
+          const questionLimit = purpose === "quiz" ? 15 : args.questions.length;
+          const normalizedQuestions = args.questions.slice(0, questionLimit).map((q, idx) => ({
+            id: q.id || `q${idx + 1}`,
+            question: q.question,
+            type: q.type || (q.isMultiSelect ? "multi_select" : "single_select"),
+            options: Array.isArray(q.options) ? q.options : [],
+            allowOther: q.allowOther !== false,
+          }));
+
+          const toolPayload = {
+            type: "tool_call",
+            tool: "ask_question",
+            purpose,
+            quizData: normalizedQuestions,
+            questions: normalizedQuestions,
+            title: args.title || null,
+          };
+
+          res.write(`data: ${JSON.stringify(toolPayload)}\n\n`);
+          toolCalls.push({
+            tool: "ask_question",
+            purpose,
+            quizData: normalizedQuestions,
+            questions: normalizedQuestions,
+            title: args.title || null,
+          });
         }
       } catch (err) {
         console.error(
-          `Failed to parse generate_quiz arguments: ${err.message}. Raw args:`,
+          `Failed to parse ask_question/generate_quiz arguments: ${err.message}. Raw args:`,
           quizToolArgs,
         );
       }
     }
+
+    // Clean any accidental hallucinated pseudo-tags from finalReply before saving
+    finalReply = finalReply.replace(/\[Tool requested:\s*[^\]]+\]/gi, "").trim();
 
     return { finalReply, toolCalls, serverToolCalls };
   }

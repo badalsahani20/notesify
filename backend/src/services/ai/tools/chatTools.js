@@ -27,50 +27,72 @@ export const saveMemoryTool = {
   },
 };
 
-export const quizTool = {
+export const askQuestionTool = {
   type: "function",
   function: {
-    name: "generate_quiz",
-    description: `Generate a multiple-choice quiz based on the user's request and context.
-CRITICAL: Before calling this tool, you MUST generate a conversational message (e.g. 'Here is a quick quiz to test your knowledge:'). After calling the tool, DO NOT output any more text. DO NOT include the correct answer or explanation in the tool call.
+    name: "ask_question",
+    description: `Present one or more questions to the user as an interactive dialog.
+Use this tool whenever you want to:
+- Quiz the user or test their knowledge
+- Clarify ambiguous requirements or ask the user for direction
+- Collect user preferences, choices, or design decisions
+- Ask the user to rank or prioritize alternatives
 
-MCQ GENERATION RULES:
-- Ask exactly one concept per question.
-- Question: 20-60 words (hard limit: 75).
-- Options: exactly 4.
-- Option length: 2-10 words (hard limit: 12).
-- Distractors should be plausible but clearly incorrect.
-- Prefer direct or scenario-based questions.
-- Avoid unnecessary context and filler.
-- The entire card should be readable in under 15 seconds.`,
+Supported question types:
+- "single_select": the user picks exactly one option.
+- "multi_select": the user picks one or more options.
+- "rank_priority": the user orders the options from highest to lowest priority.
+
+CRITICAL: Before calling this tool, write a brief conversational message introducing the questions. Do not repeat the questions as markdown text after calling the tool. For quizzes, do not include the correct answer or an explanation in the tool call.`,
     parameters: {
       type: "object",
       properties: {
+        purpose: {
+          type: "string",
+          enum: ["quiz", "clarification", "preference", "ranking"],
+          description: "Use 'quiz' only to test knowledge. Use 'clarification', 'preference', or 'ranking' for non-quiz questions.",
+        },
+        title: {
+          type: "string",
+          description: "Short label for this set of questions, 2-4 words",
+        },
         questions: {
           type: "array",
+          description: "The list of questions to ask the user.",
+          minItems: 1,
+          maxItems: 15,
           items: {
             type: "object",
             properties: {
               id: {
                 type: "string",
-                description: "A unique identifier for this question (e.g. q1)",
+                description: "Unique identifier for this question (e.g. 'q1')",
               },
-              question: { type: "string", description: "The quiz question" },
+              question: {
+                type: "string",
+                description: "The question or instruction prompt. Keep it to one or two sentences.",
+              },
+              type: {
+                type: "string",
+                enum: ["single_select", "multi_select", "rank_priority"],
+                description:
+                  "Question type: 'single_select' (pick one), 'multi_select' (pick one or more), or 'rank_priority' (order by priority). For rank_priority, options must be the items to rank. Never include 'all', 'none', or 'other' options.",
+              },
               options: {
                 type: "array",
                 items: { type: "string" },
-                description: "4 possible answers",
+                description:
+                  "List of options (typically 2 to 5). Keep each option under 5 words. No parenthetical explanations.",
               },
             },
             required: ["id", "question", "options"],
           },
         },
       },
-      required: ["questions"],
+      required: ["purpose", "questions"],
     },
   },
 };
-
 export const createNoteTool = {
   type: "function",
   function: {
@@ -165,7 +187,7 @@ export const getChatTools = (chatMode = "casual", options = {}) => {
       saveMemoryTool,
       getNoteContentTool,
       updateNoteTool,
-      ...(chatMode === "study" ? [quizTool] : []),
+      askQuestionTool,
     ];
   }
 
@@ -174,6 +196,6 @@ export const getChatTools = (chatMode = "casual", options = {}) => {
     getNoteContentTool,
     createNoteTool,
     updateNoteTool,
-    ...(chatMode === "study" ? [quizTool] : []),
+    askQuestionTool,
   ];
 };

@@ -30,6 +30,7 @@ const quizSchema = new mongoose.Schema({
     generatedAt: {
         type: Date,
         default: Date.now,
+        expires: 60 * 60 * 24 * 14 // 14-day TTL automatic cleanup
     }
 }, { timestamps: true, versionKey: false });
 
