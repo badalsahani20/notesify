@@ -135,12 +135,17 @@ export const FALLBACK_RELEASES: NormalizedRelease[] = [
     id: 392500000,
     version: 'v1.2.2',
     tagName: 'v1.2.2',
-    name: '⚡ Notesify v1.2.2 — Streaming Iris, Reasoning & Citations',
+    name: '⚡ Notesify v1.2.2 — Streaming Iris, Interactive Tools & Citations',
     publishedAt: '2026-09-24T15:30:00Z',
     publishedDateFormatted: 'Sep 24, 2026',
     htmlUrl: 'https://github.com/badalsahani20/notesify/releases/tag/v1.2.2',
-    body: `## ⚡ Notesify v1.2.2 — Streaming Iris, Reasoning & Citations\n\nThis release delivers an upgraded Iris chat experience featuring smooth streaming animations, a collapsible AI reasoning/thought trace viewer, interactive inline note citations, header navigation polish, and desktop application enhancements.\n\n### ✨ What's New\n\n- **Streaming Iris & Shimmer** — Real-time response streaming with animated shimmer indicators and responsive stream controls.\n- **AI Reasoning Viewer** — Collapsible thought trace viewer (\`ReasoningCollapsible\`) giving complete visibility into Iris's multi-step chain-of-thought.\n- **Inline Note Citations** — Interactive note references (\`[cite: noteId]\`) rendered directly in chat for one-click note inspection and modal preview.\n- **Header Navigation & Brand Link** — Application header logo now functions as a clean route link back to the workspace home.\n- **Native Desktop App (v1.2.2)** — Standalone DPI-aware Windows installer with bundled offline-safe assets and full IndexedDB synchronization.`,
+    body: `## ⚡ Notesify v1.2.2 — Streaming Iris, Interactive Tools & Citations\n\nThis release delivers an upgraded Iris chat experience featuring smooth streaming animations, interactive question dialogs, a collapsible AI reasoning/thought trace viewer, inline note citations, header navigation polish, and desktop application enhancements.\n\n### ✨ What's New\n\n- **Interactive Question Dialogs (\`ask_question\` Tool)** — Iris can now autonomously present rich interactive modals to quiz your knowledge, clarify ambiguous requests, gather preferences, or order priorities (single-choice, multi-select, and rank-ordering).\n- **Streaming Iris & Shimmer** — Real-time response streaming with animated shimmer indicators and responsive stream cancellation.\n- **AI Reasoning Viewer** — Collapsible thought trace viewer (\`ReasoningCollapsible\`) giving complete visibility into Iris's multi-step chain-of-thought.\n- **Inline Note Citations** — Interactive note references (\`[cite: noteId]\`) rendered directly in chat for one-click note inspection and modal preview.\n- **Header Navigation & Brand Link** — Application header logo now functions as a clean route link back to the workspace home.\n- **Native Desktop App (v1.2.2)** — Standalone DPI-aware Windows installer with bundled offline-safe assets and full IndexedDB synchronization.`,
     highlights: [
+      {
+        title: 'Interactive Ask Tool Dialogs',
+        tag: 'Agentic Tools',
+        description: 'Autonomous tool-driven quizzes, requirement clarification, and priority ranking modals directly in chat.',
+      },
       {
         title: 'Real-time Streaming & Reasoning',
         tag: 'Iris AI',
@@ -163,6 +168,8 @@ export const FALLBACK_RELEASES: NormalizedRelease[] = [
       },
     ],
     technicalNotes: [
+      'Autonomous ask_question tool schema with single-choice, multi-choice, and rank-priority modes.',
+      'InteractivePromptDialog integration for graceful user-in-the-loop clarification without disrupting chat context.',
       'Collapsible ReasoningCollapsible UI for inspecting extended model thought chains.',
       'Robust citation regex resolver linking note references to workspace notes.',
       'Header brand component converted to React Router Link with bundled asset resolution.',
