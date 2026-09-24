@@ -1,4 +1,4 @@
-import { transition, areAllTasksCompleted } from "../../src/services/ai/workflow/workflowTransitions.js";
+import { transition, areAllTasksCompleted, findTask } from "../../src/services/ai/workflow/workflowTransitions.js";
 import {
   WORKFLOW_STATUS,
   TASK_STATUS,
@@ -6,6 +6,7 @@ import {
   VERDICT,
   COMMAND,
 } from "../../src/services/ai/workflow/workflowConstants.js";
+
 
 describe("workflowTransitions", () => {
   describe("START_WORKFLOW", () => {
@@ -94,6 +95,12 @@ describe("ACTIVATE_TASK", () => {
             status: WORKFLOW_STATUS.ACTIVE,
             activeTaskId: null,
             version: 1,
+            phases: [
+                {
+                    id: "phase-1",
+                    tasks: [{ id: "task-1" }],
+                },
+            ],
             taskStates: {
                 "task-1": {
                     status: TASK_STATUS.PENDING,
@@ -110,6 +117,7 @@ describe("ACTIVATE_TASK", () => {
         );
 
         expect(next.activeTaskId).toBe("task-1");
+        expect(next.activePhaseId).toBe("phase-1");
         expect(next.taskStates["task-1"].status)
             .toBe(TASK_STATUS.ACTIVE);
 
@@ -120,6 +128,50 @@ describe("ACTIVATE_TASK", () => {
         expect(state.taskStates["task-1"].status)
             .toBe(TASK_STATUS.PENDING);
     });
+
+    it("rejects activating a task that does not exist in phases definition", () => {
+        const state = {
+            status: WORKFLOW_STATUS.ACTIVE,
+            activeTaskId: null,
+            version: 1,
+            phases: [
+                {
+                    id: "phase-1",
+                    tasks: [{ id: "task-1" }],
+                },
+            ],
+            taskStates: {},
+            checkpoints: {},
+        };
+
+        expect(() =>
+            transition(state, COMMAND.ACTIVATE_TASK, { taskId: "nonexistent-task" })
+        ).toThrow("[INVALID_TRANSITION] Task nonexistent-task does not exist in the workflow definition.");
+    });
+});
+
+it("rejects activating a task when it does not exist in any phase", () => {
+    const state = {
+        status: WORKFLOW_STATUS.ACTIVE,
+        activeTaskId: null,
+        version: 1,
+        phases: [
+            {
+                id: "phase-1", 
+                tasks: [{id: "task-1", title: "Documents"}]
+            }
+        ],
+        taskStates: {},
+        checkpoints: {},
+    }
+
+    
+    expect(() => 
+        transition(state, COMMAND.ACTIVATE_TASK, {taskId: "task-999"})
+    ).toThrow(/Task task-999 does not exist in the workflow definition/);
+    expect(state.activeTaskId).toBeNull();
+    expect(state.version).toBe(1);
+    expect(state.taskStates).toEqual({});
 });
 
 it("rejects activating another task when a task is already active", () => {
@@ -127,6 +179,12 @@ it("rejects activating another task when a task is already active", () => {
         status: WORKFLOW_STATUS.ACTIVE,
         activeTaskId: "task-1",
         version: 2,
+        phases: [
+            {
+                id: "phase-1",
+                tasks: [{ id: "task-1" }, { id: "task-2" }],
+            },
+        ],
         taskStates: {
             "task-1": {
                 status: TASK_STATUS.ACTIVE,
@@ -162,6 +220,12 @@ it("reactivates the same task when it needs review", () => {
         status: WORKFLOW_STATUS.ACTIVE,
         activeTaskId: null,
         version: 3,
+        phases: [
+            {
+                id: "phase-1",
+                tasks: [{ id: "task-1" }],
+            },
+        ],
         taskStates: {
             "task-1": {
                 status: TASK_STATUS.NEEDS_REVIEW,
@@ -192,6 +256,12 @@ it("reactivates a failed task for retry", () => {
         status: WORKFLOW_STATUS.ACTIVE,
         activeTaskId: null,
         version: 4,
+        phases: [
+            {
+                id: "phase-1",
+                tasks: [{ id: "task-1" }],
+            },
+        ],
         taskStates: {
             "task-1": {
                 status: TASK_STATUS.FAILED,
@@ -1191,4 +1261,168 @@ it.each([
     }).toThrow();
 
     expect(state.version).toBe(7);
+});
+
+it("correctly derives activePhaseId when activating tasks across different phases", () => {
+    const multiPhaseState = {
+        status: WORKFLOW_STATUS.ACTIVE,
+        activeTaskId: null,
+        activePhaseId: null,
+        version: 1,
+        phases: [
+            {
+                id: "phase-1",
+                title: "Fundamentals",
+                tasks: [
+                    { id: "task-1", title: "Intro" },
+                    { id: "task-2", title: "Documents" },
+                ],
+            },
+            {
+                id: "phase-2",
+                title: "Advanced Queries",
+                tasks: [
+                    { id: "task-3", title: "Aggregation" },
+                    { id: "task-4", title: "Indexing" },
+                ],
+            },
+        ],
+        taskStates: {},
+        checkpoints: {},
+    };
+
+    // 1. Activating task-2 in phase-1
+    const next1 = transition(multiPhaseState, COMMAND.ACTIVATE_TASK, { taskId: "task-2" });
+    expect(next1.activeTaskId).toBe("task-2");
+    expect(next1.activePhaseId).toBe("phase-1");
+
+    // 2. Activating task-4 in phase-2 (from a clean state with no active task)
+    const next2 = transition(multiPhaseState, COMMAND.ACTIVATE_TASK, { taskId: "task-4" });
+    expect(next2.activeTaskId).toBe("task-4");
+    expect(next2.activePhaseId).toBe("phase-2");
+});
+
+describe("findTask", () => {
+    const sampleState = {
+        phases: [
+            {
+                id: "phase-1",
+                tasks: [
+                    { id: "task-1", title: "Documents" },
+                    { id: "task-2", title: "Collections" },
+                ],
+            },
+            {
+                id: "phase-2",
+                tasks: [
+                    { id: "task-3", title: "Aggregation" },
+                ],
+            },
+        ],
+    };
+
+    it("finds a task in the first phase", () => {
+        const result = findTask(sampleState, "task-1");
+        expect(result).toEqual({
+            phaseId: "phase-1",
+            task: { id: "task-1", title: "Documents" },
+        });
+    });
+
+    it("finds a task in a subsequent phase", () => {
+        const result = findTask(sampleState, "task-3");
+        expect(result).toEqual({
+            phaseId: "phase-2",
+            task: { id: "task-3", title: "Aggregation" },
+        });
+    });
+
+    it("returns null when task does not exist", () => {
+        expect(findTask(sampleState, "task-999")).toBeNull();
+    });
+
+    it("handles defensive edge cases safely without crashing", () => {
+        expect(findTask(null, "task-1")).toBeNull();
+        expect(findTask({}, "task-1")).toBeNull();
+        expect(findTask(sampleState, null)).toBeNull();
+        expect(findTask(sampleState, "")).toBeNull();
+        expect(findTask({ phases: [{ id: "empty-phase" }] }, "task-1")).toBeNull();
+    });
+});
+
+it.each([
+    { initialStatus: TASK_STATUS.NEEDS_REVIEW, attempts: 2 },
+    { initialStatus: TASK_STATUS.FAILED, attempts: 3 },
+])(
+    "reactivates a task from $initialStatus to ACTIVE while preserving attempts ($attempts)",
+    ({ initialStatus, attempts }) => {
+        const state = {
+            status: WORKFLOW_STATUS.ACTIVE,
+            activeTaskId: null,
+            activePhaseId: null,
+            version: 1,
+            phases: [
+                {
+                    id: "phase-1",
+                    tasks: [{ id: "task-1" }],
+                },
+            ],
+            taskStates: {
+                "task-1": {
+                    status: initialStatus,
+                    attempts,
+                },
+            },
+            checkpoints: {},
+        };
+
+        const next = transition(state, COMMAND.ACTIVATE_TASK, { taskId: "task-1" });
+
+        // Status & identity
+        expect(next.activeTaskId).toBe("task-1");
+        expect(next.activePhaseId).toBe("phase-1");
+        expect(next.taskStates["task-1"].status).toBe(TASK_STATUS.ACTIVE);
+
+        // Core invariant: attempts must NOT reset on reactivation
+        expect(next.taskStates["task-1"].attempts).toBe(attempts);
+        expect(next.version).toBe(2);
+
+        // Invariant: original state was not mutated
+        expect(state.activeTaskId).toBeNull();
+        expect(state.taskStates["task-1"].status).toBe(initialStatus);
+        expect(state.version).toBe(1);
+    },
+);
+
+it("rejects activating a task that is already completed", () => {
+    const state = {
+        status: WORKFLOW_STATUS.ACTIVE,
+        activeTaskId: null,
+        activePhaseId: null,
+        version: 1,
+        phases: [
+            {
+                id: "phase-1",
+                tasks: [{ id: "task-1" }, { id: "task-2" }],
+            },
+        ],
+        taskStates: {
+            "task-1": {
+                status: TASK_STATUS.COMPLETED,
+                attempts: 1,
+                completedAt: new Date().toISOString(),
+            },
+        },
+        checkpoints: {},
+    };
+
+    expect(() =>
+        transition(state, COMMAND.ACTIVATE_TASK, { taskId: "task-1" })
+    ).toThrow(/task task-1 is already completed/i);
+
+    // Invariant: original state remained completely untouched
+    expect(state.activeTaskId).toBeNull();
+    expect(state.activePhaseId).toBeNull();
+    expect(state.version).toBe(1);
+    expect(state.taskStates["task-1"].status).toBe(TASK_STATUS.COMPLETED);
 });

@@ -16,6 +16,23 @@ const cloneWithNextVersion = (state) => ({
     updatedAt: new Date().toISOString(),
 });
 
+export function taskExists(state, taskId) {
+    return Boolean(findTask(state, taskId));
+}
+
+export function findTask(state, taskId) {
+    if(!taskId || !Array.isArray(state?.phases)) return null;
+
+    for(const phase of state.phases) {
+        const task = (phase.tasks || []).find((task) => task.id === taskId );
+        if(task) return { 
+            phaseId: phase.id, 
+            task
+        };
+    }
+    return null;
+}
+
 //Start workflow: Transition draft/paused -> active
 
 export const transition = (state, command, payload = {}) => {
@@ -81,6 +98,12 @@ export const transition = (state, command, payload = {}) => {
                 `Task ${currentTaskId} is already active.`,
             );
 
+            const match = findTask(state, taskId);
+            validate(
+                Boolean(match),
+                `Task ${taskId} does not exist in the workflow definition.`,
+            );  
+
             const taskState = state.taskStates[taskId] || {
                 status: TASK_STATUS.PENDING,
                 attempts: 0,
@@ -95,6 +118,7 @@ export const transition = (state, command, payload = {}) => {
                 state,
                 (next) => {
                     next.activeTaskId = taskId;
+                    next.activePhaseId = match.phaseId;
                     next.taskStates[taskId] = {
                         ...taskState,
                         status: TASK_STATUS.ACTIVE,
@@ -167,8 +191,8 @@ export const transition = (state, command, payload = {}) => {
                 `Checkpoint ${checkpointId} is not waiting for an answer.`,
             );
             validate(
-                Boolean(answer && answer.trim()),
-                "Answer cannot be empty.",
+                typeof answer === "string" && Boolean(answer.trim()),
+                "Answer must be a non-empty string.",
             );
 
             return guard(
@@ -235,6 +259,7 @@ export const transition = (state, command, payload = {}) => {
                         };
                         next.activeTaskId = null;
                         next.activeCheckpointId = null;
+                        next.activePhaseId = null;
 
                         if (areAllTasksCompleted(next)) {
                             next.status = WORKFLOW_STATUS.COMPLETED;
@@ -247,6 +272,7 @@ export const transition = (state, command, payload = {}) => {
                         };
                         next.activeTaskId = null;
                         next.activeCheckpointId = null;
+                        next.activePhaseId = null;
                     }
                 },
             );
@@ -274,6 +300,7 @@ export const transition = (state, command, payload = {}) => {
                     };
                     next.activeTaskId = null;
                     next.activeCheckpointId = null;
+                    next.activePhaseId = null;
                 },
             );
         }

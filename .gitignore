@@ -31,3 +31,4 @@ dist-desktop-new
 *.sw?
 learning_platform_todos.md
 authImplementation
+backend/src/services/ai/workflow/workflowRepository.js
