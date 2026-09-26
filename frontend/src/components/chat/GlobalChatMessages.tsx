@@ -59,6 +59,7 @@ const ThinkingWidget = ({ isThinking, thinkingTime, thought }: ThinkingWidgetPro
 
 interface AssistantMessageBodyProps {
   text: string;
+  isStreaming: boolean;
   savedSegments?: Message["segments"];
   citations: any[];
   onAnswer: (answer: string) => void;
@@ -67,7 +68,7 @@ interface AssistantMessageBodyProps {
 const EMPTY_CITATIONS: any[] = [];
 
 // Keep old assistant messages out of the streaming render loop.
-const AssistantMessageBody = memo(({ text, savedSegments, citations, onAnswer }: AssistantMessageBodyProps) => {
+const AssistantMessageBody = memo(({ text, isStreaming, savedSegments, citations, onAnswer }: AssistantMessageBodyProps) => {
   const segments = useMemo(
     () => savedSegments ?? parseIrisResponse(text),
     [savedSegments, text],
@@ -76,6 +77,7 @@ const AssistantMessageBody = memo(({ text, savedSegments, citations, onAnswer }:
   return (
     <IrisMessageBody
       segments={segments}
+      isStreaming={isStreaming}
       citations={citations}
       onAnswer={onAnswer}
     />
@@ -189,6 +191,7 @@ const ChatMessageRow = memo(({
             <div className="gc-markdown max-w-full select-text" data-ms-editor="false" spellCheck={false} translate="no">
               <AssistantMessageBody
                 text={displayText}
+                isStreaming={isStreaming && isActiveStream}
                 savedSegments={msg.segments}
                 citations={citations}
                 onAnswer={onAnswer}
@@ -397,6 +400,7 @@ export const GlobalChatMessages = memo(({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const userHasScrolledUpRef = useRef(false);
   const lastMessageCount = useRef(messages.length);
+  const scrollFrameRef = useRef<number | null>(null);
 
   const citationsByMessageId = useMemo(() => {
     const result = new Map<string, any[]>();
@@ -589,15 +593,26 @@ export const GlobalChatMessages = memo(({
     const container = scrollContainerRef.current;
     if (!container) return;
 
+    const pinToBottom = () => {
+      scrollFrameRef.current = null;
+      if (!userHasScrolledUpRef.current) {
+        container.scrollTop = container.scrollHeight;
+      }
+    };
+
+    if (scrollFrameRef.current !== null) {
+      cancelAnimationFrame(scrollFrameRef.current);
+    }
+
     if (isInitialMount.current) {
       isInitialMount.current = false;
       prevMessagesLength.current = messages.length;
-      container.scrollTop = container.scrollHeight;
+      pinToBottom();
       return;
     }
 
     if (isStreaming) {
-      container.scrollTop = container.scrollHeight;
+      scrollFrameRef.current = requestAnimationFrame(pinToBottom);
       return;
     }
 
@@ -613,6 +628,12 @@ export const GlobalChatMessages = memo(({
     isSending,
     bottomRef,
   ]);
+
+  useEffect(() => () => {
+    if (scrollFrameRef.current !== null) {
+      cancelAnimationFrame(scrollFrameRef.current);
+    }
+  }, []);
 
   // When an interactive question/quiz prompt opens, scroll down so the message sits above the card
   useEffect(() => {

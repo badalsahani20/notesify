@@ -49,7 +49,7 @@ export const MarkdownLink = ({ href, children, ...props }: any) => {
   );
 };
 
-export const sharedMarkdownComponents = {
+export const sharedMarkdownComponents = (isStreaming = false) => ({
   code({ className, children, ...props }: any) {
     const rawCode = String(children ?? "").replace(/\n$/, "");
     const language = className?.replace("language-", "") || "";
@@ -67,7 +67,7 @@ export const sharedMarkdownComponents = {
       return <MarkdownWritingBlock content={rawCode} />;
     }
 
-    return <MarkdownCodeBlock code={rawCode} language={language} />;
+    return <MarkdownCodeBlock code={rawCode} language={language} isStreaming={isStreaming} />;
   },
   a: MarkdownLink,
   table({ children, ...props }: any) {
@@ -77,4 +77,4 @@ export const sharedMarkdownComponents = {
       </div>
     );
   },
-};
+});

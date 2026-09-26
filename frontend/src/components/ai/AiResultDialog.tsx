@@ -99,7 +99,7 @@ const AiResultDialog = ({ result, onApply, onClose }: AiResultDialogProps) => {
                <ReactMarkdown
                 remarkPlugins={[remarkGfm, remarkMath]}
                 rehypePlugins={[rehypeRaw, rehypeKatex]}
-                components={sharedMarkdownComponents}
+                components={sharedMarkdownComponents()}
                >
                  {sanitizeStream(result.suggestion)}
                </ReactMarkdown>

@@ -16,12 +16,13 @@ import { sanitizeStream } from "@/utils/streamSanitizer";
 
 interface IrisMessageBodyProps {
   segments: IrisSegment[];
+  isStreaming?: boolean;
   /** Called when user answers an IRIS_ASK block — injects the reply as next user message */
   onAnswer?: (answer: string) => void;
   citations?: WebCitation[];
 }
 
-const IrisMessageBody = ({ segments, onAnswer, citations }: IrisMessageBodyProps) => {
+const IrisMessageBody = ({ segments, isStreaming = false, onAnswer, citations }: IrisMessageBodyProps) => {
   // Track answers per ask segment key — enables sequential reveal
   const [askAnswers, setAskAnswers] = useState<Record<string, string>>({});
 
@@ -40,7 +41,7 @@ const IrisMessageBody = ({ segments, onAnswer, citations }: IrisMessageBodyProps
           const key = seg.id ?? `${seg.kind}-${index}`;
 
           if (seg.kind === "text") {
-            return <MemoizedMarkdown key={key} content={seg.content} />;
+            return <MemoizedMarkdown key={key} content={seg.content} isStreaming={isStreaming} />;
           }
 
           if (seg.kind === "ask") {
@@ -81,9 +82,10 @@ export default IrisMessageBody;
 
 interface MarkdownProps {
   content: string;
+  isStreaming: boolean;
 }
 
-const MemoizedMarkdown = React.memo(({ content }: MarkdownProps) => {
+const MemoizedMarkdown = React.memo(({ content, isStreaming }: MarkdownProps) => {
   const citations = React.useContext(CitationsContext);
   const linkified = linkifyCitations(content, citations);
   const sanitized = sanitizeStream(linkified);
@@ -91,7 +93,7 @@ const MemoizedMarkdown = React.memo(({ content }: MarkdownProps) => {
     <ReactMarkdown
       remarkPlugins={[remarkGfm, remarkMath]}
       rehypePlugins={[rehypeRaw, rehypeKatex]}
-      components={sharedMarkdownComponents}
+      components={sharedMarkdownComponents(isStreaming)}
     >
       {sanitized}
     </ReactMarkdown>

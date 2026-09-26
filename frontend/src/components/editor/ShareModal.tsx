@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useToggleShareMutation } from "@/hooks/notes/useNotesMutations";
 import type { Note } from "@/store/useNoteStore";
+import { getNoteShareUrl } from "@/utils/shareUtils";
 import { toast } from "sonner";
 
 interface ShareModalProps {
@@ -39,10 +40,8 @@ export const ShareModal = ({ note, isOpen, onClose }: ShareModalProps) => {
   const [hasCopied, setHasCopied] = useState(false);
   const [selectedExpiry, setSelectedExpiry] = useState<number>(24 * 60 * 60 * 1000);
 
-  // Use current window origin + slug, or fallback to an env var
-  const shareUrl = note.shareSlug
-    ? `${window.location.origin}/shared/${note.shareSlug}`
-    : "";
+  // Generate absolute public HTTPS link (handles desktop/Electron and web)
+  const shareUrl = getNoteShareUrl(note.shareSlug);
 
   const handleToggle = () => {
     const isEnabling = !note.isShared;
@@ -143,7 +142,17 @@ export const ShareModal = ({ note, isOpen, onClose }: ShareModalProps) => {
                     asChild
                     className="h-10 w-10 shrink-0 border-zinc-200 dark:border-white/10 hover:bg-zinc-100 dark:hover:bg-white/5 transition-all rounded-lg"
                   >
-                    <a href={shareUrl} target="_blank" rel="noopener noreferrer">
+                    <a
+                      href={shareUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => {
+                        if ((window as any).electronAPI?.auth?.openExternal) {
+                          e.preventDefault();
+                          (window as any).electronAPI.auth.openExternal(shareUrl);
+                        }
+                      }}
+                    >
                       <ExternalLink size={16} />
                     </a>
                   </Button>

@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { useGlobalChatStore } from "@/store/useGlobalChatStore";
-import { useTypewriter } from "@/hooks/ui/useTypewriter";
 import { useMediaQuery } from "@/hooks/ui/useMediaQuery";
 import type { Message } from "@/components/ai/types";
 import { STUDENT_PROMPTS, DEV_PROMPTS } from "@/lib/constants";
@@ -54,10 +53,15 @@ const GlobalChatPage = () => {
   const [panelWidth, setPanelWidth] = useState(46);
   const isDraggingRef = useRef(false);
 
-  // Shared typewriter hook — no skip IDs needed for global chat
-  const { streamingMessageId, streamedMessageText, isStreaming } = useTypewriter(
-    messages as Message[],
-  );
+  // Global chat already receives throttled text updates from the SSE store.
+  // A second character-by-character layer restarted on every store update and
+  // caused the desktop stream to stutter.
+  const latestAssistant = messages[messages.length - 1]?.role === "assistant"
+    ? messages[messages.length - 1]
+    : null;
+  const isStreaming = isSending && Boolean(latestAssistant);
+  const streamingMessageId = isStreaming ? latestAssistant?.id ?? null : null;
+  const streamedMessageText = isStreaming ? latestAssistant?.text ?? "" : "";
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);

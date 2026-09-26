@@ -7,6 +7,7 @@ const ComparisonBlock = lazy(() => import("@/components/chat/viz/ComparisonBlock
 type MarkdownCodeBlockProps = {
   code: string;
   language?: string;
+  isStreaming?: boolean;
 };
 
 const escapeHtml = (value: string) =>
@@ -138,7 +139,7 @@ const getLanguageLabel = (language?: string) => {
   return normalized.toUpperCase();
 };
 
-const MarkdownCodeBlock = ({ code, language }: MarkdownCodeBlockProps) => {
+const MarkdownCodeBlock = ({ code, language, isStreaming = false }: MarkdownCodeBlockProps) => {
   const normalizedLanguage = normalizeLanguage(language);
   const [copied, setCopied] = useState(false);
   const [highlightSource, setHighlightSource] = useState(code);
@@ -147,12 +148,19 @@ const MarkdownCodeBlock = ({ code, language }: MarkdownCodeBlockProps) => {
   // escaped source immediately, but wait briefly before doing the expensive
   // token pass. The final pause highlights the complete block once.
   useEffect(() => {
+    if (!isStreaming) {
+      setHighlightSource(code);
+      return;
+    }
+
     const timer = window.setTimeout(() => setHighlightSource(code), HIGHLIGHT_DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
-  }, [code]);
+  }, [code, isStreaming]);
 
   const highlighted = useMemo(() => highlightCode(highlightSource, language), [highlightSource, language]);
-  const renderedCode = highlightSource === code ? highlighted : escapeHtml(code);
+  const renderedCode = isStreaming
+    ? escapeHtml(code)
+    : (highlightSource === code ? highlighted : escapeHtml(code));
 
   if (normalizedLanguage === "mermaid") {
     return (
