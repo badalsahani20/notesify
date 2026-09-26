@@ -96,7 +96,7 @@ function ReasoningTrigger({
     <button
       type="button"
       className={cn(
-        "flex cursor-pointer items-center gap-1.5 text-xs font-medium text-zinc-400 hover:text-zinc-200 transition-colors py-1 select-none",
+        "flex cursor-pointer items-center gap-1.5 text-xs font-medium text-white/90 hover:text-white transition-colors py-1 select-none",
         className
       )}
       onClick={() => onOpenChange(!isOpen)}
@@ -105,7 +105,7 @@ function ReasoningTrigger({
       <span>{children}</span>
       <div
         className={cn(
-          "transform transition-transform duration-200 text-zinc-500",
+          "transform transition-transform duration-200 text-white/70",
           isOpen ? "rotate-180" : ""
         )}
       >
@@ -132,7 +132,14 @@ function ReasoningContent({
   const { isOpen } = useReasoningContext()
 
   const content = markdown && typeof children === "string" ? (
-    <ReactMarkdown remarkPlugins={[remarkGfm]}>{children}</ReactMarkdown>
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      components={{
+        blockquote: ({ children }) => <div className="my-1">{children}</div>,
+      }}
+    >
+      {children}
+    </ReactMarkdown>
   ) : (
     children
   )
@@ -149,7 +156,7 @@ function ReasoningContent({
       <div className="overflow-hidden">
         <div
           className={cn(
-            "pl-3 border-l-2 border-white/15 text-zinc-400 text-xs leading-relaxed py-1.5 whitespace-pre-wrap font-sans [&>p]:my-1 [&>p:first-child]:mt-0 [&>p:last-child]:mb-0",
+            "text-white/90 text-xs leading-relaxed py-1.5 whitespace-pre-wrap font-sans [&>p]:my-1 [&>p:first-child]:mt-0 [&>p:last-child]:mb-0",
             contentClassName
           )}
         >

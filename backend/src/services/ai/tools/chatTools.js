@@ -43,18 +43,24 @@ Supported question types:
 - "multi_select": the user picks one or more options.
 - "rank_priority": the user orders the options from highest to lowest priority.
 
-CRITICAL: Before calling this tool, write a brief conversational message introducing the questions. Do not repeat the questions as markdown text after calling the tool. For quizzes, do not include the correct answer or an explanation in the tool call.`,
+Match each question's type to the overall purpose: purpose="ranking" means every question uses rank_priority. purpose="quiz", "clarification", or "preference" means every question uses single_select or multi_select, never rank_priority.
+
+CRITICAL: Respond to the user normally first, engaging with what they actually said. Then call this tool to ask your questions — do not repeat them as markdown text after calling it.
+
+Use this tool only when the user explicitly requests a quiz, survey, ranking, or multiple-choice interaction, or when several structured choices are genuinely better than a normal conversational question. For one simple clarification, ask naturally in the response instead. Do not use it for greetings or ordinary conversation. For quizzes, do not include the correct answer or an explanation in the tool call.`,
     parameters: {
       type: "object",
       properties: {
         purpose: {
           type: "string",
           enum: ["quiz", "clarification", "preference", "ranking"],
-          description: "Use 'quiz' only to test knowledge. Use 'clarification', 'preference', or 'ranking' for non-quiz questions.",
+          description:
+            "Use 'quiz' only to test knowledge. Use 'ranking' only when every question is rank_priority. Use 'clarification' or 'preference' for everything else.",
         },
         title: {
           type: "string",
-          description: "Short label for this set of questions, 2-4 words",
+          description:
+            "Short label for this set of questions, 2-4 words.",
         },
         questions: {
           type: "array",
@@ -76,16 +82,21 @@ CRITICAL: Before calling this tool, write a brief conversational message introdu
                 type: "string",
                 enum: ["single_select", "multi_select", "rank_priority"],
                 description:
-                  "Question type: 'single_select' (pick one), 'multi_select' (pick one or more), or 'rank_priority' (order by priority). For rank_priority, options must be the items to rank. Never include 'all', 'none', or 'other' options.",
+                  "Must match the call's purpose: rank_priority only when purpose='ranking'; single_select or multi_select for quiz, clarification, and preference.",
+              },
+              allowOther: {
+                type: "boolean",
+                description: "Whether the user may provide an option outside the listed choices.",
+                default: true,
               },
               options: {
                 type: "array",
                 items: { type: "string" },
                 description:
-                  "List of options (typically 2 to 5). Keep each option under 5 words. No parenthetical explanations.",
+                  "List of options (typically 2 to 5). Keep each option under 5 words. No parenthetical explanations. For rank_priority, list only the items being ranked — never add an 'all', 'none', or 'other' option.",
               },
             },
-            required: ["id", "question", "options"],
+            required: ["id", "question", "type", "options"],
           },
         },
       },
@@ -93,6 +104,7 @@ CRITICAL: Before calling this tool, write a brief conversational message introdu
     },
   },
 };
+
 export const createNoteTool = {
   type: "function",
   function: {

@@ -1,5 +1,6 @@
 import { SseStreamParser } from "../../../utils/sseParser.js";
 import { toolExecutor } from "../tools/toolExecutor.js";
+import crypto from "node:crypto";
 
 const NORMALIZE_TOOL_NAME = {
   "openrouter:web_search": "search_web",
@@ -34,8 +35,9 @@ export class IrisStreamHandler {
     const parser = new SseStreamParser();
     let memoryToolArgs = "";
     let memoryToolIndex = -1;
-    let quizToolArgs = "";
-    let quizToolIndex = -1;
+    let askQuestionToolArgs = "";
+    let askQuestionToolIndex = -1;
+    let interaction = null;
 
     // Server tools & citations tracking
     const toolCallsByIndex = new Map(); // index -> { id, name, rawArgs: "", emitted: false, parsedQuery: "", parsedUrl: "" }
@@ -164,22 +166,20 @@ export class IrisStreamHandler {
               }
             }
 
-            // Custom function tools (save_memory, generate_quiz, ask_question)
+            // Custom function tools (save_memory, ask_question)
             if (
-              state.name === "generate_quiz" ||
-              tc.function?.name === "generate_quiz" ||
               state.name === "ask_question" ||
               tc.function?.name === "ask_question"
             ) {
-              quizToolIndex = toolIndex;
-              if (tc.function?.arguments) quizToolArgs += tc.function.arguments;
+              askQuestionToolIndex = toolIndex;
+              if (tc.function?.arguments) askQuestionToolArgs += tc.function.arguments;
             } else if (state.name === "save_memory" || tc.function?.name === "save_memory") {
               memoryToolIndex = toolIndex;
               if (tc.function?.arguments) memoryToolArgs += tc.function.arguments;
             } else if (memoryToolIndex !== -1 && toolIndex === memoryToolIndex) {
               if (tc.function?.arguments) memoryToolArgs += tc.function.arguments;
-            } else if (quizToolIndex !== -1 && toolIndex === quizToolIndex) {
-              if (tc.function?.arguments) quizToolArgs += tc.function.arguments;
+            } else if (askQuestionToolIndex !== -1 && toolIndex === askQuestionToolIndex) {
+              if (tc.function?.arguments) askQuestionToolArgs += tc.function.arguments;
             }
           }
         }
@@ -420,9 +420,9 @@ export class IrisStreamHandler {
       }
     }
 
-    if (quizToolIndex !== -1 && quizToolArgs) {
+    if (askQuestionToolIndex !== -1 && askQuestionToolArgs) {
       try {
-        const args = JSON.parse(quizToolArgs);
+        const args = JSON.parse(askQuestionToolArgs);
         if (args.questions && args.questions.length > 0) {
           const purpose = args.purpose || "quiz";
           const questionLimit = purpose === "quiz" ? 15 : args.questions.length;
@@ -434,9 +434,27 @@ export class IrisStreamHandler {
             allowOther: q.allowOther !== false,
           }));
 
+          const interactionId = crypto.randomUUID();
+          const checkpointId = crypto.randomUUID();
+          const firstQuestion = normalizedQuestions[0];
+
+          interaction = {
+            interactionId,
+            checkpointId,
+            type: "ask_question",
+            purpose,
+            title: args.title || null,
+            question: firstQuestion?.question || "",
+            options: firstQuestion?.options || [],
+            questions: normalizedQuestions,
+            status: "pending",
+          };
+
           const toolPayload = {
             type: "tool_call",
             tool: "ask_question",
+            interactionId,
+            checkpointId,
             purpose,
             quizData: normalizedQuestions,
             questions: normalizedQuestions,
@@ -454,8 +472,8 @@ export class IrisStreamHandler {
         }
       } catch (err) {
         console.error(
-          `Failed to parse ask_question/generate_quiz arguments: ${err.message}. Raw args:`,
-          quizToolArgs,
+          `Failed to parse ask_question arguments: ${err.message}. Raw args:`,
+          askQuestionToolArgs,
         );
       }
     }
@@ -463,7 +481,7 @@ export class IrisStreamHandler {
     // Clean any accidental hallucinated pseudo-tags from finalReply before saving
     finalReply = finalReply.replace(/\[Tool requested:\s*[^\]]+\]/gi, "").trim();
 
-    return { finalReply, toolCalls, serverToolCalls };
+    return { finalReply, toolCalls, serverToolCalls, interaction };
   }
 }
 

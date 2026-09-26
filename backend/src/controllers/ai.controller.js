@@ -1,4 +1,4 @@
-import crypto from "crypto";
+import mongoose from "mongoose";
 import User from "../models/user.model.js";
 import Notes from "../models/notes.model.js";
 import AiAssistCache from "../models/aiAssistCache.model.js";
@@ -17,34 +17,9 @@ import { stripHtml } from "../utils/stripHtml.js";
 import { parseIrisResponse } from "../utils/parseIrisResponse.js";
 import getEffectiveDailyLimit from "../utils/getEffectiveDailyLimit.js";
 import { SseStreamParser } from "../utils/sseParser.js";
+import agentRunService from "../services/ai/agent/agentRunService.js";
+import {cleanSessionTitle, hashText} from "../utils/hashText.js"
 
-const normalizeForHash = (text = "") => text.replace(/\s+/g, " ").trim();
-
-const hashText = (text = "") =>
-  crypto
-    .createHash("sha256")
-    .update(normalizeForHash(text), "utf8")
-    .digest("hex");
-
-const cleanSessionTitle = (title = "") => {
-  const cleaned = title
-    .replace(/^title\s*:\s*/i, "")
-    .replace(/^(user|assistant|system|iris)\s*:\s*/gi, "")
-    .replace(/^["'`*_#\s]+|["'`*_#\s]+$/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-
-  if (
-    !cleaned ||
-    /^(here is|here's|untitled|task:|generate|descriptive|return only|no quotes|input content)/i.test(
-      cleaned,
-    )
-  ) {
-    return "New Chat";
-  }
-
-  return cleaned.slice(0, 54);
-};
 
 export const checkGrammarController = catchAsync(async (req, res) => {
   const { noteId } = req.params;
@@ -278,7 +253,7 @@ export const aiAssistController = catchAsync(async (req, res) => {
 
 // Chat controller helpers
 
-/* Resolve or create the global chat session and load history */
+/* Resolve or create the conversation and load history */
 const resolveSession = async (req) => {
   const { sessionId } = req.body;
   const noteId = req.body.noteId || null;
@@ -317,13 +292,34 @@ const resolveSession = async (req) => {
   if (isGlobalChat && !activeSessionId) {
     const newSession = await GlobalChatSession.create({
       user: req.user._id,
+      scope: "global",
+      noteId: null,
       messages: [],
       chatMode: req.body.chatMode || "casual",
     });
     activeSessionId = newSession._id;
     activeSession = newSession;
+  } else if (!isGlobalChat && noteId && noteId !== "new" && mongoose.isValidObjectId(noteId)) {
+    session = await GlobalChatSession.findOne({
+      user: req.user._id,
+      scope: "note",
+      noteId,
+    });
+
+    if (!session) {
+      session = await GlobalChatSession.create({
+        user: req.user._id,
+        scope: "note",
+        noteId,
+        title: "Note Chat",
+        messages: [],
+        chatMode: req.body.chatMode || "study",
+      });
+    }
+
+    activeSessionId = session._id;
+    activeSession = session;
   } else if (activeSession && req.body.chatMode && activeSession.chatMode !== req.body.chatMode) {
-    // If user changed the mode during an existing session, update it
     activeSession.chatMode = req.body.chatMode;
     await activeSession.save();
   }
@@ -348,6 +344,16 @@ const openSseConnection = (res, activeSessionId) => {
   if (activeSessionId)
     res.setHeader("X-Session-Id", activeSessionId.toString());
   res.write(": keep-alive\n\n");
+};
+
+const writeSseError = (res, message = "AI service unavailable") => {
+  if (res.writableEnded || res.destroyed) return;
+
+  try {
+    res.write(`data: ${JSON.stringify({ type: "error", message })}\n\n`);
+  } catch (writeError) {
+    console.error("❌ Failed to write SSE error:", writeError.message);
+  }
 };
 
 // Save the completed turn to the global-chat session in MongoDB
@@ -442,12 +448,24 @@ export const chatWithAiController = catchAsync(async (req, res) => {
     openSseConnection(res, activeSessionId);
   }
 
-  // 3. Resolve chat context
-  const resolvedContext = await resolveChatContext({
-    user: req.user,
-    body: req.body,
-    sessionData,
-  });
+  // 3. Resolve chat context. This happens after SSE starts, so convert any
+  // setup failure into an SSE error instead of letting Express destroy the socket.
+  let resolvedContext;
+  try {
+    resolvedContext = await resolveChatContext({
+      user: req.user,
+      body: req.body,
+      sessionData,
+    });
+  } catch (err) {
+    console.error("❌ Chat context resolution failed:", err);
+    if (isStreaming) {
+      writeSseError(res, "Unable to prepare the chat context");
+      res.end();
+      return;
+    }
+    throw err;
+  }
 
   const {
     effectiveHistory,
@@ -462,6 +480,76 @@ export const chatWithAiController = catchAsync(async (req, res) => {
   } = resolvedContext;
 
   const effectiveReasoning = useReasoning === true || useReasoning === "true";
+
+  let runId = null;
+
+  if (activeSessionId) {
+    try {
+      const run = await agentRunService.createRun({
+        conversationId: activeSessionId,
+        userId: req.user._id,
+        input: {
+          message,
+          hasImage: Boolean(imageBase64),
+          chatMode: currentMode,
+        },
+        agentState: {
+          currentRound: 0,
+          history: effectiveHistory,
+          summary: sessionSummary || "",
+          systemPrompt: finalSystemPrompt,
+          noteContext,
+          activeNoteId,
+          chatMode: currentMode,
+          useReasoning: effectiveReasoning,
+          enableWeb: shouldSearchWeb,
+          extraMessages: [],
+          noteFetched,
+          isNoteScoped,
+          tools,
+          pdfContext: pdfContext || "",
+        },
+      });
+
+      // Keep the id immediately. If starting the run fails, we can still mark
+      // the queued record as failed instead of leaving it stuck forever.
+      runId = run.runId;
+
+      console.info("[IrisRun] created", {
+        runId,
+        conversationId: activeSessionId,
+        userId: String(req.user._id),
+        scope: isNoteScoped ? "note" : "global",
+        activeNoteId: activeNoteId || null,
+      });
+
+      const startedRun = await agentRunService.startRun({
+        runId,
+        userId: req.user._id,
+      });
+
+      if (!startedRun) {
+        throw new Error("Unable to start agent run");
+      }
+    } catch (err) {
+      console.error("❌ Agent run setup failed:", err);
+
+      if (runId) {
+        await agentRunService.markFailed({
+          runId,
+          userId: req.user._id,
+          error: err.message,
+        });
+      }
+
+      if (isStreaming) {
+        writeSseError(res, "Unable to start the AI run");
+        res.end();
+        return;
+      }
+      throw err;
+    }
+  }
 
   let finalReply = "";
   let toolCalls = [];
@@ -505,13 +593,103 @@ export const chatWithAiController = catchAsync(async (req, res) => {
         ),
     });
 
+    if (runId && agentResult.status === "waiting_for_user") {
+      const interaction = {
+        ...agentResult.interaction,
+        runId,
+      };
+
+      console.info("[IrisInteraction] checkpoint created", {
+        runId,
+        interactionId: interaction.interactionId,
+        checkpointId: interaction.checkpointId,
+        conversationId: activeSessionId,
+        questionCount: interaction.questions?.length ?? 0,
+      });
+
+      const checkpoint = {
+        checkpointId: interaction.checkpointId,
+        interactionId: interaction.interactionId,
+        type: interaction.type,
+        toolName: "ask_question",
+        toolArguments: {
+          purpose: interaction.purpose,
+          title: interaction.title,
+          questions: interaction.questions,
+        },
+        assistantReply: agentResult.finalReply,
+        toolCalls: agentResult.toolCalls,
+      };
+
+      const waitingRun = await agentRunService.markWaitingForUser({
+        runId,
+        userId: req.user._id,
+        checkpoint,
+      });
+
+      if (!waitingRun) {
+        throw new Error("Unable to pause agent run");
+      }
+
+      const sessionForInteraction =
+        activeSession ||
+        (await GlobalChatSession.findOne({
+          _id: activeSessionId,
+          user: req.user._id,
+        }));
+
+      if (!sessionForInteraction) {
+        throw new Error("Conversation not found");
+      }
+
+      sessionForInteraction.pendingInteraction = interaction;
+      await sessionForInteraction.save();
+    }
+
+    if (runId && agentResult.status === "completed") {
+      await agentRunService.markCompleted({
+        runId,
+        userId: req.user._id,
+        finalReply: agentResult.finalReply,
+        toolCalls: agentResult.toolCalls,
+      });
+    }
+
     finalReply = agentResult.finalReply;
     toolCalls = agentResult.toolCalls;
     pdfContextToEmit = agentResult.pdfContext;
+
+    // Persist before closing the SSE response. If this fails, the client gets
+    // a proper SSE error event instead of a half-closed chunked response.
+    if (isGlobalChat && activeSessionId) {
+      await persistToDb(
+        message,
+        finalReply,
+        imageBase64,
+        activeSessionId,
+        activeSession,
+        sessionSummary,
+        toolCalls,
+      );
+    }
   } catch (err) {
-    console.error("❌ Controller error:", err.message);
-  } finally {
+    console.error("❌ Controller error:", err);
+
+    if (runId) {
+      await agentRunService.markFailed({
+        runId,
+        userId: req.user._id,
+        error: err.message,
+      });
+    }
+
     if (isStreaming) {
+      writeSseError(res, "The AI request could not be completed");
+    } else {
+      throw err;
+    }
+  } finally {
+    if (isStreaming && !res.writableEnded) {
       if (pdfContextToEmit) {
         res.write(
           `data: ${JSON.stringify({ type: "metadata", pdfContext: pdfContextToEmit })}\n\n`,
@@ -519,19 +697,6 @@ export const chatWithAiController = catchAsync(async (req, res) => {
       }
       res.end();
     }
-  }
-
-  // 7. Persist to DB (global chat only)
-  if (isGlobalChat && activeSessionId) {
-    await persistToDb(
-      message,
-      finalReply,
-      imageBase64,
-      activeSessionId,
-      activeSession,
-      sessionSummary,
-      toolCalls
-    );
   }
 
   if (isStreaming) return;
@@ -579,13 +744,17 @@ export const getChatSessionController = catchAsync(async (req, res) => {
       })),
       title: cleanSessionTitle(session.title),
       chatMode: session.chatMode,
+      pendingInteraction: session.pendingInteraction || null,
     },
   });
 });
 
 // GET /api/ai/sessions — sidebar: list all sessions (no messages, just metadata)
 export const getAllSessionsController = catchAsync(async (req, res) => {
-  const sessions = await GlobalChatSession.find({ user: req.user._id })
+  const sessions = await GlobalChatSession.find({
+    user: req.user._id,
+    $or: [{ scope: "global" }, { scope: { $exists: false } }],
+  })
     .select("title updatedAt") // only what the sidebar needs
     .sort({ updatedAt: -1 }) // newest first
     .lean();
@@ -709,4 +878,310 @@ export const reportToolResultController = catchAsync(async (req, res) => {
   }
 
   return res.json({ success: true, updated });
+});
+
+export const answerInteractionController = catchAsync(async (req, res) => {
+  const { answer } = req.body;
+
+  if (
+    answer === undefined ||
+    answer === null ||
+    (typeof answer === "string" && !answer.trim())
+  ) {
+    return res.status(400).json({
+      success: false,
+      message: "answer is required",
+    });
+  }
+
+  const conversation = await GlobalChatSession.findOneAndUpdate(
+    {
+      user: req.user._id,
+      "pendingInteraction.interactionId": req.params.interactionId,
+      "pendingInteraction.status": "pending",
+    },
+    {
+      $set: {
+        "pendingInteraction.status": "resuming",
+        "pendingInteraction.answer": answer,
+        "pendingInteraction.answeredAt": new Date(),
+      },
+    },
+    { new: true },
+  );
+
+  if (!conversation) {
+    console.warn("[IrisInteraction] answer rejected: not pending", {
+      interactionId: req.params.interactionId,
+      userId: String(req.user._id),
+    });
+    return res.status(409).json({
+      success: false,
+      message: "Interaction is no longer pending",
+    });
+  }
+
+  const claimedInteraction = conversation.pendingInteraction;
+  const runId = claimedInteraction.runId;
+  const answerContent =
+    typeof claimedInteraction.answer === "string"
+      ? claimedInteraction.answer
+      : JSON.stringify(claimedInteraction.answer);
+  const run = await agentRunService.getRun({
+    runId,
+    userId: req.user._id,
+  });
+
+  console.info("[IrisInteraction] answer claimed", {
+    interactionId: req.params.interactionId,
+    runId,
+    conversationId: String(conversation._id),
+    answerLength: answerContent.length,
+    runStatus: run?.status || "missing",
+  });
+
+  if (!run || run.status !== "waiting_for_user") {
+    await GlobalChatSession.findOneAndUpdate(
+      {
+        _id: conversation._id,
+        user: req.user._id,
+        "pendingInteraction.interactionId": req.params.interactionId,
+        "pendingInteraction.status": "resuming",
+      },
+      {
+        $set: {
+          "pendingInteraction.status": "pending",
+        },
+      },
+    );
+
+    return res.status(409).json({
+      success: false,
+      message: "Agent run is no longer waiting for this interaction",
+    });
+  }
+
+  const resumedRun = await agentRunService.resumeRun({
+    runId,
+    userId: req.user._id,
+  });
+
+  if (!resumedRun) {
+    console.warn("[IrisInteraction] resume rejected: already resumed", {
+      interactionId: req.params.interactionId,
+      runId,
+    });
+    return res.status(409).json({
+      success: false,
+      message: "Interaction is already being resumed",
+    });
+  }
+
+  console.info("[IrisInteraction] run resumed", {
+    interactionId: req.params.interactionId,
+    runId,
+  });
+
+  openSseConnection(res, conversation._id);
+
+  const state = run.agentState || {};
+  const checkpoint = run.checkpoint || {};
+  const toolCallId = claimedInteraction.interactionId;
+  const originalMessage = run.input?.message || "";
+
+  const initialExtraMessages = [
+    {
+      role: "user",
+      content: originalMessage,
+    },
+    {
+      role: "assistant",
+      content: checkpoint.assistantReply || null,
+      tool_calls: [
+        {
+          id: toolCallId,
+          type: "function",
+          function: {
+            name: "ask_question",
+            arguments: JSON.stringify(checkpoint.toolArguments || {}),
+          },
+        },
+      ],
+    },
+    {
+      role: "tool",
+      tool_call_id: toolCallId,
+      name: "ask_question",
+      content: JSON.stringify({ answer: claimedInteraction.answer }),
+    },
+  ];
+
+  let finalReply = "";
+  let toolCalls = [];
+
+  try {
+    const agentResult = await irisAgent.run({
+      message: originalMessage,
+      history: state.history || [],
+      summary: state.summary || "",
+      noteContext: state.noteContext || "",
+      noteFetched: Boolean(state.noteFetched),
+      systemPrompt: state.systemPrompt || "",
+      pdfContext: state.pdfContext || "",
+      stream: true,
+      useReasoning: Boolean(state.useReasoning),
+      enableWeb: Boolean(state.enableWeb),
+      chatMode: state.chatMode || "casual",
+      tools: state.tools || null,
+      isNoteScoped: Boolean(state.isNoteScoped),
+      userId: req.user._id,
+      activeNoteId: state.activeNoteId || null,
+      res,
+      initialExtraMessages,
+      startRound: 1,
+      includeCurrentMessage: false,
+      streamAiResponse: (stream, response, noteFetched, userId) =>
+        irisStreamHandler.handle({
+          stream,
+          res: response,
+          noteFetched,
+          userId,
+          fallbackNoteId: state.activeNoteId || null,
+        }),
+      executeServerTool: (toolName, args, userId, fallbackNoteId) =>
+        irisStreamHandler.executeServerTool(
+          toolName,
+          args,
+          userId,
+          fallbackNoteId || state.activeNoteId || null,
+        ),
+    });
+
+    finalReply = agentResult.finalReply || "";
+    toolCalls = agentResult.toolCalls || [];
+
+    if (agentResult.status === "waiting_for_user") {
+      const nextInteraction = {
+        ...agentResult.interaction,
+        runId,
+      };
+
+      console.info("[IrisInteraction] next checkpoint created", {
+        previousInteractionId: req.params.interactionId,
+        nextInteractionId: nextInteraction.interactionId,
+        runId,
+        questionCount: nextInteraction.questions?.length ?? 0,
+      });
+
+      const nextCheckpoint = {
+        checkpointId: nextInteraction.checkpointId,
+        interactionId: nextInteraction.interactionId,
+        type: nextInteraction.type,
+        toolName: "ask_question",
+        toolArguments: {
+          purpose: nextInteraction.purpose,
+          title: nextInteraction.title,
+          questions: nextInteraction.questions,
+        },
+        assistantReply: agentResult.finalReply,
+        toolCalls: agentResult.toolCalls,
+      };
+
+      const waitingRun = await agentRunService.markWaitingForUser({
+        runId,
+        userId: req.user._id,
+        checkpoint: nextCheckpoint,
+      });
+
+      if (!waitingRun) {
+        throw new Error("Unable to pause resumed agent run");
+      }
+
+      await persistToDb(
+        answerContent,
+        finalReply,
+        null,
+        conversation._id,
+        conversation,
+        state.summary || "",
+        toolCalls,
+      );
+
+      await GlobalChatSession.findOneAndUpdate(
+        {
+          _id: conversation._id,
+          user: req.user._id,
+          "pendingInteraction.interactionId": req.params.interactionId,
+        },
+        {
+          $set: {
+            pendingInteraction: nextInteraction,
+          },
+        },
+      );
+    } else {
+      console.info("[IrisRun] resumed run completed", {
+        interactionId: req.params.interactionId,
+        runId,
+        responseLength: finalReply.length,
+        toolCallCount: toolCalls.length,
+      });
+      await agentRunService.markCompleted({
+        runId,
+        userId: req.user._id,
+        finalReply,
+        toolCalls: [...(run.toolCalls || []), ...toolCalls],
+      });
+
+      await persistToDb(
+        answerContent,
+        finalReply,
+        null,
+        conversation._id,
+        conversation,
+        state.summary || "",
+        toolCalls,
+      );
+
+      await GlobalChatSession.findOneAndUpdate(
+        {
+          _id: conversation._id,
+          user: req.user._id,
+          "pendingInteraction.interactionId": req.params.interactionId,
+        },
+        { $set: { pendingInteraction: null } },
+      );
+    }
+  } catch (err) {
+    console.error("[IrisInteraction] resume failed", {
+      interactionId: req.params.interactionId,
+      runId,
+      error: err.message,
+    });
+
+    await agentRunService.markFailed({
+      runId,
+      userId: req.user._id,
+      error: err.message,
+    });
+
+    await GlobalChatSession.findOneAndUpdate(
+      {
+        _id: conversation._id,
+        user: req.user._id,
+        "pendingInteraction.interactionId": req.params.interactionId,
+      },
+      {
+        $set: {
+          "pendingInteraction.status": "pending",
+        },
+      },
+    );
+
+    res.write(
+      `data: ${JSON.stringify({ type: "error", message: "Unable to resume interaction" })}\n\n`,
+    );
+  } finally {
+    res.end();
+  }
 });

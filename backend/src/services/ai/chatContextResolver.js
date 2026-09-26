@@ -26,14 +26,30 @@ export const shouldFetchNote = (message = "", history = [], contextChanged = fal
  * Fetch note context from the DB or frontend payload.
  */
 export const resolveNoteContext = async ({ user, body, sessionData }) => {
-  const { noteContext: reqNoteContext, structuredContext, hasSelection, message, contextChanged, noteId: bodyNoteId } = body;
-  const noteId = bodyNoteId || sessionData?.noteId;
+  const {
+    noteContext: reqNoteContext,
+    structuredContext,
+    hasSelection,
+    message,
+    contextChanged,
+    noteId: bodyNoteId,
+    currentNote,
+  } = body;
+  const noteId = bodyNoteId || sessionData?.noteId || currentNote?.id;
   const history = sessionData?.history || [];
   let noteContext = "";
   let noteFetched = false;
+  const mentionsCurrentNote = /\b(?:this note|current note|my note|the note)\b/i.test(
+    message || "",
+  );
 
   const isNoteQuery =
-    noteId && (hasSelection || shouldFetchNote(message, history, contextChanged));
+    noteId &&
+    noteId !== "new" &&
+    (hasSelection ||
+      contextChanged ||
+      shouldFetchNote(message, history, contextChanged) ||
+      (currentNote?.id && (history.length === 0 || mentionsCurrentNote)));
   const shouldIncludeContext = Boolean(isNoteQuery);
 
   if (shouldIncludeContext) {
@@ -44,13 +60,17 @@ export const resolveNoteContext = async ({ user, body, sessionData }) => {
         ? `[User specifically highlighted this text in their editor]:\n${reqNoteContext}`
         : `[user's current editor context]:\n${reqNoteContext}`;
     } else if (user?._id) {
-      const note = await Notes.findOne({
-        _id: noteId,
-        user: user._id,
-      }).lean();
-      if (note?.content) {
-        noteContext = `Title: ${note.title || "Untitled"}\n\n${stripHtml(note.content).slice(0, 1500)}`;
-        noteFetched = true;
+      try {
+        const note = await Notes.findOne({
+          _id: noteId,
+          user: user._id,
+        }).lean();
+        if (note?.content) {
+          noteContext = `Title: ${note.title || "Untitled"}\n\n${stripHtml(note.content).slice(0, 1500)}`;
+          noteFetched = true;
+        }
+      } catch (error) {
+        console.warn("⚠️ [ChatContextResolver] Note context lookup skipped:", error.message);
       }
     }
   }
@@ -64,6 +84,7 @@ export class ChatContextResolver {
     const {
       message = "",
       noteId,
+      currentNote,
       hasSelection = false,
       contextChanged = false,
       chatMode,
@@ -127,7 +148,7 @@ export class ChatContextResolver {
 
     console.log("📊 [AI_TELEMETRY_BACKEND]", {
       userId: user?._id,
-      noteId: noteId || null,
+      noteId: noteId || currentNote?.id || null,
       hasSelection: Boolean(hasSelection),
       contextChanged: Boolean(contextChanged),
       contextLength: (noteContext || "").length,
@@ -152,8 +173,8 @@ export class ChatContextResolver {
       } catch (_) {}
     }
 
-    const activeNoteId = noteId || null;
-    let activeNoteTitle;
+    const activeNoteId = noteId || currentNote?.id || null;
+    let activeNoteTitle = currentNote?.title;
     if (activeNoteId && user?._id) {
       try {
         const existingNote = await Notes.findOne(
@@ -175,7 +196,9 @@ export class ChatContextResolver {
     const finalSystemPrompt = [userName, memoryContext, activeNoteContext].filter(Boolean).join("\n");
 
     const currentMode = activeSession?.chatMode || chatMode || "casual";
-    const isNoteScoped = !isGlobalChat || Boolean(noteId);
+    // A global chat may reference the currently open note without becoming a
+    // note-scoped conversation. Note-scoped chats are the contextual drawer.
+    const isNoteScoped = !isGlobalChat;
 
     // Available tools for current chat mode (in note editor drawer, create_note is excluded)
     const tools = getChatTools(currentMode, { isNoteScoped });

@@ -66,7 +66,7 @@ Iris AI routes requests dynamically across providers based on task type:
 |---|---|---|
 | OpenRouter | DeepSeek V4 Flash (`deepseek-v4-flash-0731`) | Primary brain for text, complex reasoning, and logic |
 | OpenRouter | Qwen 3.7 Flash (`qwen3.7-flash`) | Default high-speed conversational chat |
-| OpenRouter | GLM 5.3 Flash (`glm-5.3-flash`) | Native reasoning model and visualization diagrams |
+| OpenRouter | GLM 5.3 Flash (`z-ai/glm-5.3-flash`) | Native reasoning model and visualization diagrams |
 | OpenRouter | Ling 3.0 Flash (`ling-3.0-flash`) | Quick operations and complex document analysis |
 | OpenRouter | GPT-OSS 120B (`openai/gpt-oss-120b`) | Autonomous notes generation |
 | Groq | OpenAI GPT-OSS 120B / 20B | High-speed fallback, conversation summarization, and title generation |

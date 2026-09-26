@@ -2,7 +2,7 @@ import { Suspense, lazy, useEffect } from "react";
 import { Routes, Route } from "react-router-dom";
 import MainLayout from "./components/MainLayout";
 import { Toaster } from "sonner";
-// import PrivateRoute from "./components/PrivateRoute";
+import PrivateRoute from "./components/PrivateRoute";
 import AuthLayout from "./components/AuthLayout";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -60,8 +60,8 @@ function App() {
           <Route path="/oauth-success" element={<OAuthSuccess />} />
           <Route path="/shared/:slug" element={<SharedNotePage />} />
 
-          {/* Protected routes — temporarily commented out PrivateRoute for UI preview */}
-          {/* <Route element={<PrivateRoute />}> */}
+          {/* Protected routes — requires authentication when online, or local workspace offline */}
+          <Route element={<PrivateRoute />}>
             <Route element={<MainLayout middlePanel={<NotesListPanel />} />}>
               <Route index element={<EmptyState />} />
               <Route path="/search" element={<SearchPage />} />
@@ -78,7 +78,7 @@ function App() {
               <Route path="/folders/:folderId/note/:noteId" element={<NoteEditor />} />
               <Route path="/folders/:folderId" element={<FolderWorkspace />} />
             </Route>
-          {/* </Route> */}
+          </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>

@@ -28,6 +28,9 @@ export const executeOpenRouter = async (
     messages: messages,
     stream: stream,
     max_tokens: maxTokens,
+    provider: {
+      ignore: ["open-inference"],
+    },
   };
 
   if (isMandatoryReasoningModel) {

@@ -266,6 +266,12 @@
     @apply overflow-x-hidden;
   }
 
+  /* Keep Notesify's existing 16px rem scale. Fragments uses a 14px
+     design-system base, but its tokens must not resize the whole app. */
+  html {
+    font-size: 16px;
+  }
+
   body {
     font-family: "Manrope", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
     @apply bg-background text-foreground antialiased;
@@ -5091,9 +5097,10 @@ span[data-ai-ghost] {
 .gc-messages {
   padding: 2rem 1.4rem 1.25rem;
   gap: 1.25rem;
-  background:
-    radial-gradient(circle at 50% 18%, rgba(129, 140, 248, 0.032), transparent 26rem),
-    #050506;
+  background: transparent;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: auto;
 }
 
 .gc-msg {
@@ -7341,10 +7348,10 @@ html:not(.dark) .dock-btn-active {
   position: relative;
   margin: 1rem 0;
   border-radius: 0.85rem;
-  background: #18181b; /* Slightly darker slate/zinc for better contrast */
+  background: var(--panel-bg, #171717);
   overflow: hidden;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
-  border: none; /* Removed outer border */
+  box-shadow: none;
+  border: 1px solid var(--divider);
 }
 
 .gc-code-header {
@@ -7406,7 +7413,7 @@ html:not(.dark) .dock-btn-active {
   margin: 0;
   padding: 0.75rem 1.25rem 1.25rem;
   overflow-x: auto;
-  background: transparent;
+  background: var(--panel-bg, #171717) !important;
   border: none !important;
   outline: none !important;
   box-shadow: none !important;
@@ -7418,9 +7425,10 @@ html:not(.dark) .dock-btn-active {
   line-height: 1.65;
   font-weight: 400;
   color: rgba(255, 255, 255, 0.88);
-  background: transparent;
+  background: transparent !important;
   display: block;
 }
+
 
 /* Syntax Highlighting Tokens  */
 .gc-token-comment { color: #6a9955; font-style: italic; }

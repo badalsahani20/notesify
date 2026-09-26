@@ -15,7 +15,15 @@ export const SessionProvider = ({ children }: { children: React.ReactNode }) => 
       } catch (error: unknown) {
         const authError = error as { response?: { status?: number } };
         if ([401, 403].includes(authError.response?.status ?? 0)) {
+          const hadPreviousUser = Boolean(useAuthStore.getState().user);
           clearAuth();
+          if (hadPreviousUser) {
+            import("sonner").then(({ toast }) => {
+              toast.error("Session expired. Please log in again.", {
+                id: "session-expired",
+              });
+            });
+          }
         }
       } finally {
         markAuthChecked();

@@ -5,7 +5,12 @@ import { prepareChatImage } from "@/utils/uploadImage";
 import { consumeAiChatStream } from "@/utils/consumeAiChatStream";
 import { executeClientTool } from "@/services/ai/clientToolExecutor";
 
-import type { IrisSegment, ToolCallRecord, ChatArtifact } from "@/components/ai/types";
+import type {
+  IrisSegment,
+  ToolCallRecord,
+  ChatArtifact,
+  InteractiveQuestion,
+} from "@/components/ai/types";
 
 // Re-export so existing imports from this store path keep working
 export type { IrisSegment, ChatArtifact };
@@ -29,6 +34,22 @@ export type ChatSession = {
   updatedAt: string;
 };
 
+export type PendingInteraction = {
+  interactionId: string;
+  runId?: string;
+  type: "ask_question";
+  purpose?: "quiz" | "clarification" | "preference" | "ranking";
+  title?: string | null;
+  question: string;
+  options: string[];
+  questions?: InteractiveQuestion[];
+  status: "pending" | "resuming" | "answered" | "cancelled" | "expired";
+  answer?: unknown;
+  checkpointId: string;
+};
+
+let activeChatAbortController: AbortController | null = null;
+
 type GlobalChatStore = {
   // Sidebar
   sessions: ChatSession[];
@@ -38,6 +59,7 @@ type GlobalChatStore = {
   activeSessionId: string | null;
   messages: ChatMessage[];
   messagesLoading: boolean;
+  pendingInteraction: PendingInteraction | null;
 
   // Compose
   isSending: boolean;
@@ -56,6 +78,8 @@ type GlobalChatStore = {
   loadSession: (sessionId: string) => Promise<void>;
   startNewChat: () => void;
   sendMessage: (text: string, image?: string | null) => Promise<void>;
+  answerInteraction: (answer: string) => Promise<void>;
+  stopGeneration: () => void;
   setAttachedImage: (img: string | null) => void;
   setUseReasoning: (val: boolean) => void;
   setUseWebSearch: (val: boolean) => void;
@@ -69,6 +93,7 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
   activeSessionId: null,
   messages: [],
   messagesLoading: false,
+  pendingInteraction: null,
   isSending: false,
   attachedImage: null,
   imageDisabled: false,
@@ -91,9 +116,16 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
   },
 
   loadSession: async (sessionId: string) => {
-    set({ messagesLoading: true, activeSessionId: sessionId, messages: [] });
+    set({
+      messagesLoading: true,
+      activeSessionId: sessionId,
+      messages: [],
+      pendingInteraction: null,
+    });
     try {
       const { data } = await api.get(`/ai/chat/session/${sessionId}`);
+
+      set({ pendingInteraction: data.data.pendingInteraction || null });
       
       // Inherit the chatMode from the loaded session if available
       if (data.data.chatMode === "study" || data.data.chatMode === "casual") {
@@ -119,14 +151,181 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
       });
       set({ messages: mapped });
     } catch {
-      set({ messages: [] });
+      set({ messages: [], pendingInteraction: null });
     } finally {
       set({ messagesLoading: false });
     }
   },
 
   startNewChat: () => {
-    set({ activeSessionId: null, messages: [], attachedImage: null });
+    set({
+      activeSessionId: null,
+      messages: [],
+      pendingInteraction: null,
+      attachedImage: null,
+    });
+  },
+
+  stopGeneration: () => {
+    if (!activeChatAbortController) return;
+    console.info("[IrisChat] generation stopped by user");
+    activeChatAbortController.abort();
+  },
+
+  answerInteraction: async (answer: string) => {
+    const { activeSessionId, pendingInteraction, messages, isSending } = get();
+    if (!activeSessionId || !pendingInteraction || isSending || !answer.trim()) {
+      console.warn("[IrisInteraction] answer ignored", {
+        hasSession: Boolean(activeSessionId),
+        hasPendingInteraction: Boolean(pendingInteraction),
+        isSending,
+        hasAnswer: Boolean(answer.trim()),
+      });
+      return;
+    }
+
+    const interaction = pendingInteraction;
+    console.info("[IrisInteraction] answer submitted", {
+      interactionId: interaction.interactionId,
+      checkpointId: interaction.checkpointId,
+      sessionId: activeSessionId,
+      answerLength: answer.length,
+    });
+    const aiMsgId = crypto.randomUUID();
+    const userMsg: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: "user",
+      text: answer,
+    };
+    const aiMsg: ChatMessage = {
+      id: aiMsgId,
+      role: "assistant",
+      text: "",
+      skipAnimation: true,
+      isThinking: true,
+      thinkingTime: 0,
+    };
+
+    set({
+      messages: [...messages, userMsg, aiMsg],
+      isSending: true,
+      pendingInteraction: { ...interaction, status: "resuming", answer },
+    });
+
+    const abortController = new AbortController();
+    activeChatAbortController = abortController;
+
+    try {
+      const { accessToken } = (await import("./useAuthStore")).useAuthStore.getState();
+      const { API_BASE_URL } = await import("@/lib/api");
+      console.info("[IrisInteraction] resuming request", {
+        interactionId: interaction.interactionId,
+        endpoint: `${API_BASE_URL}/ai/interactions/:interactionId/answer`,
+      });
+      const response = await fetch(
+        `${API_BASE_URL}/ai/interactions/${interaction.interactionId}/answer`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({ answer }),
+          signal: abortController.signal,
+        },
+      );
+
+      console.info("[IrisInteraction] resume response", {
+        interactionId: interaction.interactionId,
+        status: response.status,
+        ok: response.ok,
+      });
+
+      if (!response.ok) throw new Error("This interaction is no longer available");
+      if (!response.body) throw new Error("No response body");
+
+      const { fullText, fullThought, thinkingTime: finalThinkingTime } =
+        await consumeAiChatStream(response.body, {
+          throttleMs: 60,
+          onToolCall: ({ tool, id, args, execution, purpose, status, data, error, quizData, questions, title, query, url, citations }) => {
+            set((state) => ({
+              messages: state.messages.map((message) => {
+                if (message.id !== aiMsgId) return message;
+                return {
+                  ...message,
+                  toolCalls: [
+                    ...(message.toolCalls ?? []),
+                    {
+                      id,
+                      tool,
+                      args,
+                      execution,
+                      purpose,
+                      status: status ?? "pending",
+                      data,
+                      error,
+                      quizData,
+                      questions: questions ?? quizData,
+                      title,
+                      query,
+                      url,
+                      citations,
+                    },
+                  ],
+                };
+              }),
+            }));
+          },
+          onUpdate: ({ fullText: text, fullThought, isThinking, thinkingTime }) => {
+            set((state) => ({
+              messages: state.messages.map((message) =>
+                message.id === aiMsgId
+                  ? { ...message, text, thought: fullThought, isThinking, thinkingTime }
+                  : message,
+              ),
+            }));
+          },
+        });
+
+      set((state) => ({
+        isSending: false,
+        messages: state.messages.map((message) =>
+          message.id === aiMsgId
+            ? {
+                ...message,
+                text: fullText,
+                thought: fullThought,
+                isThinking: false,
+                thinkingTime: finalThinkingTime,
+                segments: parseIrisResponse(fullText),
+              }
+            : message,
+        ),
+      }));
+      console.info("[IrisInteraction] stream completed; reloading session", {
+        interactionId: interaction.interactionId,
+        sessionId: activeSessionId,
+        responseLength: fullText.length,
+      });
+      await get().loadSession(activeSessionId);
+    } catch (error) {
+      if (abortController.signal.aborted) {
+        console.info("[IrisInteraction] resume stream stopped by user", {
+          interactionId: interaction.interactionId,
+        });
+      } else {
+        console.error("[IrisInteraction] resume failed", {
+          interactionId: interaction.interactionId,
+          error: error instanceof Error ? error.message : error,
+        });
+      }
+      set({ isSending: false });
+      await get().loadSession(activeSessionId).catch(() => {});
+    } finally {
+      if (activeChatAbortController === abortController) {
+        activeChatAbortController = null;
+      }
+    }
   },
 
   sendMessage: async (text: string, image?: string | null) => {
@@ -158,6 +357,9 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
       isSending: true, 
       attachedImage: null 
     });
+
+    const abortController = new AbortController();
+    activeChatAbortController = abortController;
 
     try {
       const { accessToken } = (await import("./useAuthStore")).useAuthStore.getState();
@@ -205,7 +407,7 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
           "Content-Type": "application/json",
           "Authorization": `Bearer ${accessToken}`,
         },
-        body: JSON.stringify({
+          body: JSON.stringify({
           message: text,
           sessionId: activeSessionId,
           imageBase64: imageForApi || undefined,
@@ -214,9 +416,10 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
           enableWeb: get().useWebSearch,
           chatMode: get().chatMode,
           currentNote: currentNoteContext,
-          clientToolResults,
-        }),
-      });
+            clientToolResults,
+          }),
+          signal: abortController.signal,
+        });
 
       if (!response.ok) throw new Error("Failed to connect to AI");
       if (!response.body) throw new Error("No response body");
@@ -253,7 +456,31 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
       const { fullText, fullThought, thinkingTime: finalThinkingTime } =
         await consumeAiChatStream(response.body, {
           throttleMs: 60,
-          onToolCall: ({ id, args, execution, purpose, status, data, error, tool, quizData, questions, title, query, url, citations }) => {
+          onToolCall: ({ id, interactionId, checkpointId, args, execution, purpose, status, data, error, tool, quizData, questions, title, query, url, citations }) => {
+            if (tool === "ask_question" && interactionId && checkpointId) {
+              const questionList = (questions ?? quizData) as InteractiveQuestion[] | undefined;
+              const firstQuestion = questionList?.[0];
+              console.info("[IrisInteraction] pending question received", {
+                interactionId,
+                checkpointId,
+                questionCount: questionList?.length ?? 0,
+                sessionId: get().activeSessionId || effectiveSessionId,
+              });
+              set({
+                pendingInteraction: {
+                  interactionId,
+                  checkpointId,
+                  type: "ask_question",
+                  purpose,
+                  title,
+                  question: firstQuestion?.question ?? "",
+                  options: firstQuestion?.options ?? [],
+                  questions: questionList,
+                  status: "pending",
+                },
+              });
+            }
+
             if (execution === "local" && args) {
               executeClientTool(tool, args).then((res) => {
                 // Report verified tool execution result back to session history on server
@@ -330,18 +557,18 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
                   : existingIdx;
                 if (correlatedIdx !== -1) {
                   const updated = [...existingCalls];
-                  updated[correlatedIdx] = {
-                    ...updated[correlatedIdx],
-                    id: id ?? updated[correlatedIdx].id,
-                    args: args ?? updated[existingIdx].args,
-                    query: query ?? updated[existingIdx].query,
-                    url: url ?? updated[existingIdx].url,
-                    execution: execution ?? updated[existingIdx].execution,
-                    purpose: purpose ?? updated[existingIdx].purpose,
-                    status: status ?? updated[existingIdx].status,
-                    data: data ?? updated[existingIdx].data,
-                    error: error ?? updated[existingIdx].error,
-                  };
+                    updated[correlatedIdx] = {
+                      ...updated[correlatedIdx],
+                      id: id ?? updated[correlatedIdx].id,
+                      args: args ?? updated[correlatedIdx].args,
+                      query: query ?? updated[correlatedIdx].query,
+                      url: url ?? updated[correlatedIdx].url,
+                      execution: execution ?? updated[correlatedIdx].execution,
+                      purpose: purpose ?? updated[correlatedIdx].purpose,
+                      status: status ?? updated[correlatedIdx].status,
+                      data: data ?? updated[correlatedIdx].data,
+                      error: error ?? updated[correlatedIdx].error,
+                    };
                   return { ...m, toolCalls: updated };
                 }
                 return {
@@ -420,12 +647,30 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
       }
 
     } catch (err: any) {
-      set((state) => ({
-        isSending: false,
-        messages: state.messages.map((m) =>
-          m.id === aiMsgId ? { ...m, text: "⚠️ Something went wrong. Please try again." } : m
-        ),
-      }));
+      if (abortController.signal.aborted) {
+        console.info("[IrisRun] chat request stopped by user");
+        set((state) => ({
+          isSending: false,
+          messages: state.messages.map((m) =>
+            m.id === aiMsgId ? { ...m, isThinking: false, skipAnimation: true } : m
+          ),
+        }));
+      } else {
+        console.error("[IrisRun] chat request failed", {
+          name: err?.name,
+          message: err?.message,
+        });
+        set((state) => ({
+          isSending: false,
+          messages: state.messages.map((m) =>
+            m.id === aiMsgId ? { ...m, text: "⚠️ Something went wrong. Please try again." } : m
+          ),
+        }));
+      }
+    } finally {
+      if (activeChatAbortController === abortController) {
+        activeChatAbortController = null;
+      }
     }
   },
 
@@ -439,6 +684,7 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
     activeSessionId: null,
     messages: [],
     messagesLoading: false,
+    pendingInteraction: null,
     isSending: false,
     attachedImage: null,
     imageDisabled: false,

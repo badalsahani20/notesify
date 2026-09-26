@@ -8,6 +8,8 @@ export type WebCitation = {
 
 export type ToolCallEvent = {
   id?: string;
+  interactionId?: string;
+  checkpointId?: string;
   tool: string;
   args?: Record<string, any>;
   execution?: "local" | "server" | "client";
@@ -82,6 +84,8 @@ export const consumeAiChatStream = async (
       if (data.type === "tool_call" && data.tool) {
         onToolCall?.({
           id: (data as any).id,
+          interactionId: (data as any).interactionId,
+          checkpointId: (data as any).checkpointId,
           tool: data.tool,
           args: (data as any).args,
           execution: (data as any).execution,

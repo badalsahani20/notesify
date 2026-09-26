@@ -8,6 +8,7 @@ import {
   getChatSessionController,
   getAllSessionsController,
   reportToolResultController,
+  answerInteractionController,
 } from "../controllers/ai.controller.js";
 
 const router = express.Router();
@@ -17,6 +18,7 @@ router.use(verifiedMiddleware);
 router.post("/check-note/:noteId", checkGrammarController);
 router.post("/assist", aiAssistController);
 router.post("/chat", chatWithAiController);
+router.post("/interactions/:interactionId/answer", answerInteractionController);
 router.post("/chat/tool-result", reportToolResultController);
 router.get("/sessions", getAllSessionsController);
 router.get("/chat/session/:sessionId", getChatSessionController);

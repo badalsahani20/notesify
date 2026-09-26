@@ -82,7 +82,10 @@ async function callOpenRouterAgent(modelId, prompt, timeoutMs = 90000) {
           { role: "user", content: prompt }
         ],
         tools: openRouterTools,
-        max_tokens: 4000
+        max_tokens: 4000,
+        provider: {
+          ignore: ["open-inference"],
+        },
       })
     });
 

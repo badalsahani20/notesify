@@ -25,15 +25,18 @@ export class IrisAgent {
     userId,
     activeNoteId = null,
     res,
+    initialExtraMessages = [],
+    startRound = 0,
+    includeCurrentMessage = true,
 
     streamAiResponse,
     executeServerTool,
   }) {
     let finalReply = "";
     const toolCalls = [];
-    const extraMessages = [];
+    const extraMessages = [...initialExtraMessages];
     let pdfContextToEmit = pdfContext || "";
-    let currentRound = 0;
+    let currentRound = startRound;
 
     while (currentRound < this.maxToolRounds) {
       currentRound++;
@@ -61,6 +64,7 @@ export class IrisAgent {
           tools,
           isNoteScoped,
           extraMessages,
+          includeCurrentMessage,
         });
       } catch (aiError) {
         console.error(
@@ -101,6 +105,16 @@ export class IrisAgent {
 
         if (responseObj.toolCalls?.length > 0) {
           toolCalls.push(...responseObj.toolCalls);
+        }
+
+        if (responseObj.interaction) {
+          return {
+            status: "waiting_for_user",
+            finalReply,
+            toolCalls,
+            interaction: responseObj.interaction,
+            pdfContext: pdfContextToEmit,
+          };
         }
 
         if (roundResult.pdfContext) {
@@ -182,6 +196,7 @@ export class IrisAgent {
     }
 
     return {
+      status: "completed",
       finalReply,
       toolCalls,
       pdfContext: pdfContextToEmit,

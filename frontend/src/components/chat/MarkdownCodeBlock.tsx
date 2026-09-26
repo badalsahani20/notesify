@@ -1,4 +1,4 @@
-import { useMemo, useState, lazy, Suspense } from "react";
+import { memo, useEffect, useMemo, useState, lazy, Suspense } from "react";
 import { CheckCheck, Copy, Code2, Loader2 } from "lucide-react";
 import IrisVisualBlock from "./IrisVisualBlock";
 
@@ -16,6 +16,10 @@ const escapeHtml = (value: string) =>
     .replace(/>/g, "&gt;");
 
 const normalizeLanguage = (language = "") => language.toLowerCase().trim();
+
+const MAX_HIGHLIGHT_CHARS = 12_000;
+const HIGHLIGHT_DEBOUNCE_MS = 90;
+const highlightCache = new Map<string, string>();
 
 const tokenPatterns: Record<string, RegExp[]> = {
   comment: [
@@ -66,11 +70,23 @@ const highlightCode = (code: string, language?: string) => {
     return escaped;
   }
 
+  // Very large blocks are expensive to tokenize and are usually logs or
+  // generated data. Keep the chat responsive and preserve the raw code.
+  if (code.length > MAX_HIGHLIGHT_CHARS) {
+    return escaped;
+  }
+
+  const cacheKey = `${lang}\u0000${code}`;
+  const cached = highlightCache.get(cacheKey);
+  if (cached) return cached;
+
   if (["html", "xml", "svg"].includes(lang)) {
-    return escaped
+    const result = escaped
       .replace(/(&lt;!--[\s\S]*?--&gt;)/g, '<span class="gc-token-comment">$1</span>')
       .replace(/(&lt;\/?)([A-Za-z][\w:-]*)/g, '$1<span class="gc-token-tag">$2</span>')
       .replace(/([A-Za-z-:]+)=(&quot;.*?&quot;)/g, '<span class="gc-token-property">$1</span>=<span class="gc-token-string">$2</span>');
+    highlightCache.set(cacheKey, result);
+    return result;
   }
 
   const placeholders: string[] = [];
@@ -106,6 +122,13 @@ const highlightCode = (code: string, language?: string) => {
     highlighted = highlighted.replace(`__TOK_${index}__`, placeholders[index]);
   }
 
+  // Bound the cache so a long conversation cannot retain every streamed
+  // intermediate forever.
+  if (highlightCache.size >= 80) {
+    const oldestKey = highlightCache.keys().next().value;
+    if (oldestKey) highlightCache.delete(oldestKey);
+  }
+  highlightCache.set(cacheKey, highlighted);
   return highlighted;
 };
 
@@ -118,7 +141,18 @@ const getLanguageLabel = (language?: string) => {
 const MarkdownCodeBlock = ({ code, language }: MarkdownCodeBlockProps) => {
   const normalizedLanguage = normalizeLanguage(language);
   const [copied, setCopied] = useState(false);
-  const highlighted = useMemo(() => highlightCode(code, language), [code, language]);
+  const [highlightSource, setHighlightSource] = useState(code);
+
+  // During streaming, code changes every few milliseconds. Show the current
+  // escaped source immediately, but wait briefly before doing the expensive
+  // token pass. The final pause highlights the complete block once.
+  useEffect(() => {
+    const timer = window.setTimeout(() => setHighlightSource(code), HIGHLIGHT_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [code]);
+
+  const highlighted = useMemo(() => highlightCode(highlightSource, language), [highlightSource, language]);
+  const renderedCode = highlightSource === code ? highlighted : escapeHtml(code);
 
   if (normalizedLanguage === "mermaid") {
     return (
@@ -172,11 +206,11 @@ const MarkdownCodeBlock = ({ code, language }: MarkdownCodeBlockProps) => {
       <pre className="gc-code-pre">
         <code
           className="gc-code-content"
-          dangerouslySetInnerHTML={{ __html: highlighted }}
+          dangerouslySetInnerHTML={{ __html: renderedCode }}
         />
       </pre>
     </div>
   );
 };
 
-export default MarkdownCodeBlock;
+export default memo(MarkdownCodeBlock);

@@ -27,7 +27,7 @@ export function TextShimmer({
         className
       )}
       style={{
-        backgroundImage: `linear-gradient(to right, var(--muted-foreground, #71717a) ${50 - dynamicSpread}%, var(--foreground, #ffffff) 50%, var(--muted-foreground, #71717a) ${50 + dynamicSpread}%)`,
+        backgroundImage: `linear-gradient(to right, rgba(255, 255, 255, 0.65) ${50 - dynamicSpread}%, #ffffff 50%, rgba(255, 255, 255, 0.65) ${50 + dynamicSpread}%)`,
         backgroundSize: "200% auto",
         animationDuration: `${duration}s`,
         ...style,

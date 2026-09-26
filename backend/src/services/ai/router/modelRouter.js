@@ -13,6 +13,7 @@ export const classifyChatIntent = (
   noteContext = "",
   pdfContext = "",
   chatMode = "casual",
+  enableWeb = false,
 ) => {
   const msg = message.toLowerCase();
 
@@ -56,7 +57,33 @@ export const classifyChatIntent = (
     return chosenModel;
   }
 
-  // 6. Default chat model
+  // 5. Coding and debugging requests benefit from the analysis model even in
+  // casual mode. Keep this after study mode so study routing remains stable.
+  const isCodingRequest =
+    /\b(code|coding|debug|debugging|bug|error|implement|function|api|typescript|javascript|python|react|node\.js|sql|regex|algorithm|stack trace)\b/.test(
+      msg,
+    );
+  if (isCodingRequest) {
+    console.log(
+      `🧑‍💻 [Coding Request] Routing to analysis model: ${COMPLEX_ANALYSIS_MODEL}`,
+    );
+    return COMPLEX_ANALYSIS_MODEL;
+  }
+
+  // 6. Current, research-heavy requests, or when Web search is toggled ON benefit from the primary model.
+  const isResearchRequest =
+    enableWeb === true ||
+    /\b(latest|today|current|recent|news|research|sources?|cite|citation|according to|compare)\b/.test(
+      msg,
+    );
+  if (isResearchRequest) {
+    console.log(
+      `🔎 [Research/Web Request] Routing to primary model: ${PRIMARY_MODEL}`,
+    );
+    return PRIMARY_MODEL;
+  }
+
+  // 7. Default chat model
   return DEFAULT_CHAT_MODEL;
 };
 

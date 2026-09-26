@@ -16,8 +16,7 @@ export const getPersistedHistoryFromMessages = (messages: Message[]) =>
       const toolCalls = message.toolCalls?.map((toolCall) => {
         const isQuizTool =
           toolCall.tool === "ask_question" ||
-          toolCall.tool === "render_quiz" ||
-          toolCall.tool === "generate_quiz";
+          toolCall.tool === "render_quiz";
 
         // Keep the active quiz payload until the user answers. Once a later
         // user message exists, retain only the completed tool metadata so the
@@ -106,7 +105,7 @@ export const useAiChatSession = ({
 
     const hasQuizInHistory = activeNote.chatHistory.some(
       (m: any) => m.toolCalls?.some((tc: any) =>
-        tc.tool === "ask_question" || tc.tool === "render_quiz" || tc.tool === "generate_quiz"
+        tc.tool === "ask_question" || tc.tool === "render_quiz"
       )
     );
     if (hasQuizInHistory) {

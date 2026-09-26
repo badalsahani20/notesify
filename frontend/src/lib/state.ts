@@ -8,15 +8,18 @@ import { db } from "@/database/database"
 
  // Completely wipes all local application state when user logs out or session expires.
 
-export const clearAllLocalState = () => {
+export const clearAllLocalState = ({ clearLocalDatabase = true }: { clearLocalDatabase?: boolean } = {}) => {
   // 1. Clear Zustand stores
   useAuthStore.getState().clearAuth();
   useNoteStore.getState().reset();
   useFolderStore.getState().reset();
   useGlobalChatStore.getState().reset();
   useNotificationStore.getState().reset();
-  db.notes.clear().catch(console.error);
-  db.folders.clear().catch(console.error);
+  
+  if (clearLocalDatabase) {
+    db.notes.clear().catch(console.error);
+    db.folders.clear().catch(console.error);
+  }
 
   // 2. Clear React Query cache
   queryClient.clear();

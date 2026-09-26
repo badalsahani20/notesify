@@ -5,11 +5,27 @@ const errorMiddleware = (err, req, res, next) => {
   }
 
   // If a streaming (SSE) response was already started, we cannot set headers or
-  // call res.json() — that's what causes ERR_HTTP_HEADERS_SENT.
-  // Destroy the socket to close the connection cleanly and bail out.
+  // call res.json(). Finish it with a valid SSE error event instead of
+  // destroying the socket, which appears in the browser as
+  // ERR_INCOMPLETE_CHUNKED_ENCODING.
   if (res.headersSent) {
-    console.error("  → headers already sent (likely mid-stream); destroying socket.");
-    req.socket?.destroy();
+    console.error("  → headers already sent (likely mid-stream); closing SSE response.");
+    if (!res.writableEnded && !res.destroyed) {
+      try {
+        const contentType = String(res.getHeader("Content-Type") || "");
+        if (contentType.includes("text/event-stream")) {
+          res.write(
+            `data: ${JSON.stringify({
+              type: "error",
+              message: err.message || "Server error",
+            })}\n\n`,
+          );
+        }
+        res.end();
+      } catch (closeError) {
+        console.error("  → failed to finish streaming response:", closeError.message);
+      }
+    }
     return;
   }
 

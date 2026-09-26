@@ -112,7 +112,8 @@ export const InteractivePromptDialog = ({
     resetDrag();
   };
 
-  const handleTouchStart = (idx: number) => {
+  const handleTouchStart = (idx: number, e: React.TouchEvent) => {
+    e.preventDefault();
     dragItem.current = idx;
     setActiveDragIdx(idx);
     dragOverItem.current = idx;
@@ -122,6 +123,7 @@ export const InteractivePromptDialog = ({
   const handleTouchMove = (e: React.TouchEvent) => {
     const touch = e.touches[0];
     if (!touch || dragItem.current === null) return;
+    e.preventDefault();
     const targetElement = document.elementFromPoint(touch.clientX, touch.clientY);
     const row = targetElement?.closest<HTMLElement>("[data-rank-idx]");
     if (row) {
@@ -403,7 +405,7 @@ export const InteractivePromptDialog = ({
           </>
         )}
 
-        {/* 3. RANK PRIORITIES (Flat strips, drag to reorder; touch drag only from the grip handle) */}
+        {/* 3. RANK PRIORITIES (Flat strips, drag to reorder from anywhere on a row) */}
         {currentType === "rank_priority" && (
           <>
             {currentOptions.map((opt, i) => {
@@ -419,8 +421,12 @@ export const InteractivePromptDialog = ({
                   onDragEnter={() => handleDragEnter(i)}
                   onDragEnd={handleDragEnd}
                   onDragOver={(e) => e.preventDefault()}
+                  onTouchStart={(e) => handleTouchStart(i, e)}
+                  onTouchMove={handleTouchMove}
+                  onTouchEnd={handleTouchEnd}
+                  onTouchCancel={resetDrag}
                   className={cn(
-                    "w-full px-3.5 sm:px-4 py-2.5 sm:py-3 flex items-center gap-2.5 sm:gap-3 transition-colors min-h-[44px] sm:min-h-[48px] select-none group cursor-grab active:cursor-grabbing",
+                    "w-full px-3.5 sm:px-4 py-2.5 sm:py-3 flex items-center gap-2.5 sm:gap-3 transition-colors min-h-[44px] sm:min-h-[48px] select-none group cursor-grab active:cursor-grabbing touch-none",
                     isBeingDragged
                       ? "bg-white/[0.08] opacity-60"
                       : isDropTarget
@@ -438,16 +444,11 @@ export const InteractivePromptDialog = ({
                     {opt}
                   </span>
 
-                  {/* Grip handle: the only touch drag target, so scrolling over rows never reorders them */}
+                  {/* Grip handle: visual hint; the entire row is touch-draggable */}
                   <div
                     className="p-2 -mr-1.5 text-zinc-400 group-hover:text-zinc-200 active:text-white flex items-center shrink-0 cursor-grab active:cursor-grabbing touch-none select-none"
-                    style={{ touchAction: "none" }}
                     title="Drag to reorder"
                     aria-label="Drag to reorder"
-                    onTouchStart={() => handleTouchStart(i)}
-                    onTouchMove={handleTouchMove}
-                    onTouchEnd={handleTouchEnd}
-                    onTouchCancel={resetDrag}
                   >
                     <GripVertical size={16} />
                   </div>

@@ -3,7 +3,7 @@ import {
     ArrowUpIcon, 
     Paperclip, 
     Command, 
-    XIcon, 
+    Square,
     LoaderIcon,
     FileText,
     BrainCircuit,
@@ -441,10 +441,10 @@ export function AnimatedAIChat({
                                         onClick={onStop}
                                         whileHover={{ scale: 1.05 }}
                                         whileTap={{ scale: 0.95 }}
-                                        className="w-8 h-8 rounded-lg text-white hover:text-red-400 bg-white/10 hover:bg-red-500/20 border border-white/10 transition-all flex items-center justify-center cursor-pointer shrink-0 touch-manipulation"
+                                        className="w-8 h-8 rounded-full text-white bg-primary hover:bg-primary/90 shadow-md transition-all flex items-center justify-center cursor-pointer shrink-0 touch-manipulation"
                                         title="Stop generating"
                                     >
-                                        <XIcon className="w-4 h-4" />
+                                        <Square className="w-3.5 h-3.5 fill-current" />
                                     </motion.button>
                                 ) : (
                                     <motion.button

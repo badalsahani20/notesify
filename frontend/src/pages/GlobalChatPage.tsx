@@ -21,6 +21,7 @@ const GlobalChatPage = () => {
     activeSessionId,
     messages,
     messagesLoading,
+    pendingInteraction,
     isSending,
     attachedImage,
     imageDisabled,
@@ -28,6 +29,8 @@ const GlobalChatPage = () => {
     loadSession,
     startNewChat,
     sendMessage,
+    answerInteraction,
+    stopGeneration,
     setAttachedImage,
     useReasoning,
     setUseReasoning,
@@ -98,24 +101,40 @@ const GlobalChatPage = () => {
   }, [lastAssistantMsg, dismissedPromptId]);
 
   const activeQuestions = useMemo(() => {
-    return (activePromptToolCall?.questions ?? activePromptToolCall?.quizData) as
+    const pendingQuestions = pendingInteraction
+      ? pendingInteraction.questions ?? [{
+          id: pendingInteraction.interactionId,
+          question: pendingInteraction.question,
+          type: "single_select" as const,
+          options: pendingInteraction.options,
+        }]
+      : undefined;
+
+    return (activePromptToolCall?.questions ?? activePromptToolCall?.quizData ?? pendingQuestions) as
       | InteractiveQuestion[]
       | undefined;
-  }, [activePromptToolCall]);
+  }, [activePromptToolCall, pendingInteraction]);
 
-  const hasActivePrompt = Boolean(activeQuestions && activeQuestions.length > 0);
+  // Hide the prompt while the answer is being resumed; the server remains the
+  // source of truth and will provide the next pending interaction if needed.
+  const hasActivePrompt = !isSending && Boolean(activeQuestions && activeQuestions.length > 0);
 
   const handlePromptSubmit = useCallback(
     (formatted: string) => {
+      if (pendingInteraction) {
+        void answerInteraction(formatted);
+        return;
+      }
       if (lastAssistantMsg) setDismissedPromptId(lastAssistantMsg.id);
       sendMessage(formatted);
     },
-    [lastAssistantMsg, sendMessage]
+    [answerInteraction, lastAssistantMsg, pendingInteraction, sendMessage]
   );
 
   const handlePromptDismiss = useCallback(() => {
+    if (pendingInteraction) return;
     if (lastAssistantMsg) setDismissedPromptId(lastAssistantMsg.id);
-  }, [lastAssistantMsg]);
+  }, [lastAssistantMsg, pendingInteraction]);
 
   // Drag-to-resize handler for desktop split panel
   const handleResizeMouseDown = (e: React.MouseEvent) => {
@@ -162,32 +181,14 @@ const GlobalChatPage = () => {
 
       {/* ── Main chat area ── */}
       <div className="gc-main relative flex-1 flex flex-col h-full min-h-0 min-w-0 overflow-hidden">
-        {/* Dim purplish gradient background — paused during streaming or artifact viewing for max scroll performance */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-          <div
-            className="absolute top-[10%] left-[10%] w-[300px] h-[300px] rounded-full bg-violet-600/10 blur-[80px] animate-blob-drift"
-            style={{
-              animationDuration: "8s",
-              animationPlayState: isStreaming || !!activeArtifact ? "paused" : "running",
-            }}
-          />
-          <div
-            className="absolute top-[40%] right-[10%] w-[250px] h-[250px] rounded-full bg-fuchsia-600/10 blur-[80px] animate-blob-drift"
-            style={{
-              animationDuration: "10s",
-              animationDelay: "1s",
-              animationPlayState: isStreaming || !!activeArtifact ? "paused" : "running",
-            }}
-          />
-          <div
-            className="absolute bottom-[10%] left-[30%] w-[350px] h-[350px] rounded-full bg-indigo-600/10 blur-[80px] animate-blob-drift"
-            style={{
-              animationDuration: "12s",
-              animationDelay: "2s",
-              animationPlayState: isStreaming || !!activeArtifact ? "paused" : "running",
-            }}
-          />
-        </div>
+        {/* Soft ambient background glow — 0 composite overhead, smooth native scrolling */}
+        <div
+          className="absolute inset-0 pointer-events-none z-0"
+          style={{
+            background:
+              "radial-gradient(circle at 18% 12%, rgba(124, 58, 237, 0.07), transparent 42%), radial-gradient(circle at 82% 40%, rgba(192, 38, 211, 0.05), transparent 36%), radial-gradient(circle at 45% 85%, rgba(99, 102, 241, 0.06), transparent 48%)",
+          }}
+        />
 
         {/* Floating Sidebar Toggle — visible only when sidebar is collapsed */}
         {!sidebarOpen && (
@@ -231,6 +232,7 @@ const GlobalChatPage = () => {
                 isSending={isSending}
                 imageDisabled={imageDisabled}
                 handleSend={handleSend}
+                onStop={stopGeneration}
                 textareaRef={textareaRef}
                 fileRef={fileRef}
                 useReasoning={useReasoning}
@@ -241,7 +243,7 @@ const GlobalChatPage = () => {
                   hasActivePrompt && activeQuestions ? (
                     <InteractivePromptDialog
                       questions={activeQuestions}
-                      title={activePromptToolCall?.title}
+                      title={activePromptToolCall?.title ?? pendingInteraction?.title ?? undefined}
                       onSubmit={handlePromptSubmit}
                       onDismiss={handlePromptDismiss}
                     />

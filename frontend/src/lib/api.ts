@@ -79,6 +79,9 @@ const isAuthRoute = (url = "") =>
 
 export const safeNavigateToLogin = () => {
   if (isPublicPage()) return;
+  import("sonner").then(({ toast }) => {
+    toast.error("Session expired. Please log in again.", { id: "session-expired" });
+  });
   if (window.location.protocol === "file:" || window.location.hash.startsWith("#")) {
     window.location.hash = "#/login";
   } else {
@@ -138,7 +141,7 @@ api.interceptors.request.use(async (config) => {
       // Only an explicit auth rejection means the session is invalid. Keep
       // local data and the sync queue intact during offline/server failures.
       if ([401, 403].includes(status ?? 0)) {
-        clearAllLocalState();
+        clearAllLocalState({ clearLocalDatabase: false });
         safeNavigateToLogin();
         throw createAuthError(config);
       }
@@ -151,7 +154,7 @@ api.interceptors.request.use(async (config) => {
     config.headers = config.headers || {};
     config.headers.Authorization = `Bearer ${token}`;
   } else if (!isAuthRoute(config.url)) {
-    clearAllLocalState();
+    clearAllLocalState({ clearLocalDatabase: false });
     safeNavigateToLogin();
     throw createAuthError(config);
   }
@@ -179,7 +182,7 @@ api.interceptors.response.use(
         // Network errors and 5xx responses are recoverable. Do not log the
         // user out or delete offline data unless refresh was rejected as auth.
         if ([401, 403].includes(status ?? 0)) {
-          clearAllLocalState();
+          clearAllLocalState({ clearLocalDatabase: false });
           safeNavigateToLogin();
         }
         return Promise.reject(refreshErr);
