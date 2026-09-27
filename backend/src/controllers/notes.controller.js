@@ -380,22 +380,26 @@ export const getSharedNote = catchAsync(async (req, res) => {
   const { slug } = req.params;
   const cacheKey = `shared_note:${slug}`;
         
-  // 1. Try serving from Redis cache
-  const cachedData = await redis.get(cacheKey);
+  // 1. Try serving from Redis cache (with graceful fallback if Redis fails)
+  try {
+    const cachedData = await redis.get(cacheKey);
 
-  if (cachedData) {
-    const parsedCache = typeof cachedData === "string" ? JSON.parse(cachedData) : cachedData;
-    
-    // Background view increment
-    if (parsedCache.noteId) {
-      Notes.updateOne({ _id: parsedCache.noteId }, { $inc: { shareViews: 1 } }).catch(console.error);
+    if (cachedData) {
+      const parsedCache = typeof cachedData === "string" ? JSON.parse(cachedData) : cachedData;
+      
+      // Background view increment
+      if (parsedCache.noteId) {
+        Notes.updateOne({ _id: parsedCache.noteId }, { $inc: { shareViews: 1 } }).catch(console.error);
+      }
+
+      return res.status(200).json({
+        title: parsedCache.title,
+        content: parsedCache.content,
+        updatedAt: parsedCache.updatedAt
+      });
     }
-
-    return res.status(200).json({
-      title: parsedCache.title,
-      content: parsedCache.content,
-      updatedAt: parsedCache.updatedAt
-    });
+  } catch (cacheErr) {
+    console.warn("[getSharedNote] Redis cache get failed, falling back to DB:", cacheErr.message || cacheErr);
   }
 
   // 2. Cache miss, fetch from DB
@@ -427,7 +431,11 @@ export const getSharedNote = catchAsync(async (req, res) => {
   }
 
   // 4. Cache the valid public note
-  await redis.set(cacheKey, JSON.stringify(responseData), { ex: ttl });
+  try {
+    await redis.set(cacheKey, JSON.stringify(responseData), { ex: ttl });
+  } catch (cacheErr) {
+    console.warn("[getSharedNote] Redis cache set failed:", cacheErr.message || cacheErr);
+  }
 
   res.status(200).json({
     title: responseData.title,

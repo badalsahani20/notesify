@@ -4,7 +4,6 @@ import {
   DEFAULT_CHAT_MODEL,
   COMPLEX_ANALYSIS_MODEL,
   VISUALIZATION_MODEL,
-  VISUALIZATION_FALLBACK_MODEL,
   getOpenRouterApiKey,
 } from "./config/aiModels.js";
 import { executeOpenRouter } from "./transport/openRouterClient.js";
@@ -358,7 +357,7 @@ When making claims based on web results, research findings, quotes, or external 
   // Tier 2: OpenRouter Fallback
   if (getOpenRouterApiKey()) {
     try {
-      const tier2Model = imageBase64 ? VISUALIZATION_FALLBACK_MODEL : PRIMARY_MODEL;
+      const tier2Model = imageBase64 ? DEFAULT_CHAT_MODEL : COMPLEX_ANALYSIS_MODEL;
       console.log(`Attempting Tier 2: OpenRouter (${tier2Model})`);
       const reply = await executeOpenRouter(
         tier2Model,

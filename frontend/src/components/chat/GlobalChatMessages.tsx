@@ -62,24 +62,24 @@ interface AssistantMessageBodyProps {
   isStreaming: boolean;
   savedSegments?: Message["segments"];
   citations: any[];
-  onAnswer: (answer: string) => void;
 }
 
 const EMPTY_CITATIONS: any[] = [];
+const EMPTY_SEGMENTS: NonNullable<Message["segments"]> = [];
 
 // Keep old assistant messages out of the streaming render loop.
-const AssistantMessageBody = memo(({ text, isStreaming, savedSegments, citations, onAnswer }: AssistantMessageBodyProps) => {
+const AssistantMessageBody = memo(({ text, isStreaming, savedSegments, citations }: AssistantMessageBodyProps) => {
   const segments = useMemo(
-    () => savedSegments ?? parseIrisResponse(text),
-    [savedSegments, text],
+    () => (isStreaming ? EMPTY_SEGMENTS : savedSegments ?? parseIrisResponse(text)),
+    [isStreaming, savedSegments, text],
   );
 
   return (
     <IrisMessageBody
       segments={segments}
       isStreaming={isStreaming}
+      streamingText={isStreaming ? text : undefined}
       citations={citations}
-      onAnswer={onAnswer}
     />
   );
 });
@@ -95,7 +95,6 @@ interface ChatMessageRowProps {
   citations: any[];
   isCopied: boolean;
   onCopy: (text: string, id: string) => void;
-  onAnswer: (answer: string) => void;
   isLong: boolean;
   isExpanded: boolean;
   onToggleExpand: (id: string) => void;
@@ -112,7 +111,6 @@ const ChatMessageRow = memo(({
   citations,
   isCopied,
   onCopy,
-  onAnswer,
   isLong,
   isExpanded,
   onToggleExpand,
@@ -194,7 +192,6 @@ const ChatMessageRow = memo(({
                 isStreaming={isStreaming && isActiveStream}
                 savedSegments={msg.segments}
                 citations={citations}
-                onAnswer={onAnswer}
               />
             </div>
           ) : null}
@@ -401,12 +398,21 @@ export const GlobalChatMessages = memo(({
   const userHasScrolledUpRef = useRef(false);
   const lastMessageCount = useRef(messages.length);
   const scrollFrameRef = useRef<number | null>(null);
+  const citationCacheRef = useRef(new Map<string, { toolCalls?: Message["toolCalls"]; citations: any[] }>());
 
   const citationsByMessageId = useMemo(() => {
     const result = new Map<string, any[]>();
+    const nextCache = new Map<string, { toolCalls?: Message["toolCalls"]; citations: any[] }>();
 
     messages.forEach((message) => {
-      const list: any[] = [];
+      const cached = citationCacheRef.current.get(message.id);
+      if (cached && cached.toolCalls === message.toolCalls) {
+        result.set(message.id, cached.citations);
+        nextCache.set(message.id, cached);
+        return;
+      }
+
+      const citations: any[] = [];
       const seen = new Set<string>();
       message.toolCalls?.forEach((toolCall: any) => {
         if (toolCall.tool !== "web_citations" || !Array.isArray(toolCall.citations)) return;
@@ -416,13 +422,17 @@ export const GlobalChatMessages = memo(({
             : "";
           if (normalizedUrl && !seen.has(normalizedUrl)) {
             seen.add(normalizedUrl);
-            list.push(citation);
+            citations.push(citation);
           }
         });
       });
-      result.set(message.id, list);
+
+      const entry = { toolCalls: message.toolCalls, citations };
+      result.set(message.id, citations);
+      nextCache.set(message.id, entry);
     });
 
+    citationCacheRef.current = nextCache;
     return result;
   }, [messages]);
 
@@ -772,7 +782,6 @@ export const GlobalChatMessages = memo(({
                 citations={citationsByMessageId.get(msg.id) ?? EMPTY_CITATIONS}
                 isCopied={copiedId === msg.id}
                 onCopy={handleCopy}
-                onAnswer={sendMessage}
                 isLong={longUserMessageIds.has(msg.id)}
                 isExpanded={expandedUserMessages.has(msg.id)}
                 onToggleExpand={handleToggleExpand}

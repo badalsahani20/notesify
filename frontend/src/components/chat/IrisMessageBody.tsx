@@ -1,13 +1,18 @@
-import React, { useState } from "react";
+import React from "react";
 import ReactMarkdown from "react-markdown";
+import { Streamdown } from "streamdown";
+import { code } from "@streamdown/code";
+import { cjk } from "@streamdown/cjk";
+import { math } from "@streamdown/math";
+import { mermaid } from "@streamdown/mermaid";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import rehypeRaw from "rehype-raw";
 import "katex/dist/katex.min.css";
+import "streamdown/styles.css";
 import { sharedMarkdownComponents } from "@/utils/sharedMarkdownComponents";
 import IrisVisualBlock from "./IrisVisualBlock";
-import IrisAskBlock from "./IrisAskBlock";
 import type { IrisSegment } from "@/store/useGlobalChatStore";
 import type { WebCitation } from "@/components/ai/types";
 import { CitationsContext } from "@/context/CitationsContext";
@@ -17,59 +22,29 @@ import { sanitizeStream } from "@/utils/streamSanitizer";
 interface IrisMessageBodyProps {
   segments: IrisSegment[];
   isStreaming?: boolean;
-  /** Called when user answers an IRIS_ASK block — injects the reply as next user message */
-  onAnswer?: (answer: string) => void;
+  streamingText?: string;
   citations?: WebCitation[];
 }
 
-const IrisMessageBody = ({ segments, isStreaming = false, onAnswer, citations }: IrisMessageBodyProps) => {
-  // Track answers per ask segment key — enables sequential reveal
-  const [askAnswers, setAskAnswers] = useState<Record<string, string>>({});
+const EMPTY_CITATIONS: WebCitation[] = [];
 
-  // Indices of all ASK segments in document order
-  const askIndices = segments
-    .map((seg, i) => (seg.kind === "ask" ? i : -1))
-    .filter((i) => i !== -1);
-
-  // The first ask segment that hasn't been answered yet
-  const firstUnansweredIndex = askIndices.find((i) => !askAnswers[`ask-${i}`]) ?? -1;
-
+const IrisMessageBody = ({ segments, isStreaming = false, streamingText, citations }: IrisMessageBodyProps) => {
   return (
-    <CitationsContext.Provider value={citations || []}>
+    <CitationsContext.Provider value={citations ?? EMPTY_CITATIONS}>
       <div className="iris-message-body">
-        {segments.map((seg, index) => {
-          const key = seg.id ?? `${seg.kind}-${index}`;
+        {isStreaming && streamingText !== undefined ? (
+          <StreamingMessageText text={streamingText} />
+        ) : (
+          segments.map((seg, index) => {
+            const key = seg.id ?? `${seg.kind}-${index}`;
 
-          if (seg.kind === "text") {
-            return <MemoizedMarkdown key={key} content={seg.content} isStreaming={isStreaming} />;
-          }
+            if (seg.kind === "text") {
+              return <MemoizedMarkdown key={key} content={seg.content} />;
+            }
 
-          if (seg.kind === "ask") {
-            const askKey    = `ask-${index}`;
-            const chosen    = askAnswers[askKey] ?? null;
-            const isAnswered = chosen !== null;
-            const isActive   = index === firstUnansweredIndex;
-            const isPending  = !isAnswered && !isActive;
-
-            // Don't render asks that aren't unlocked yet
-            if (isPending) return null;
-
-            return (
-              <IrisAskBlock
-                key={key}
-                segment={seg}
-                answered={isAnswered}
-                chosenAnswer={chosen}
-                onAnswer={(answer) => {
-                  setAskAnswers((prev) => ({ ...prev, [askKey]: answer }));
-                  onAnswer?.(answer);
-                }}
-              />
-            );
-          }
-
-          return <IrisVisualBlock key={key} visualization={seg} />;
-        })}
+            return <IrisVisualBlock key={key} visualization={seg} />;
+          })
+        )}
       </div>
     </CitationsContext.Provider>
   );
@@ -77,23 +52,41 @@ const IrisMessageBody = ({ segments, isStreaming = false, onAnswer, citations }:
 
 export default IrisMessageBody;
 
-
-
-
 interface MarkdownProps {
   content: string;
-  isStreaming: boolean;
 }
 
-const MemoizedMarkdown = React.memo(({ content, isStreaming }: MarkdownProps) => {
+const remarkPlugins = [remarkGfm, remarkMath];
+const rehypePlugins = [rehypeRaw, rehypeKatex];
+const markdownComponents = sharedMarkdownComponents(false);
+const streamingMarkdownComponents = sharedMarkdownComponents(true);
+const streamingPlugins = { code, mermaid, math, cjk };
+
+// Streamdown keeps streaming Markdown formatted while reparsing only the
+// active/incomplete block. The completed message still switches to the
+// existing renderer below so its final output remains canonical.
+const StreamingMessageText = React.memo(({ text }: { text: string }) => (
+  <Streamdown
+    animated
+    isAnimating
+    plugins={streamingPlugins}
+    components={streamingMarkdownComponents}
+    className="break-words"
+  >
+    {text}
+  </Streamdown>
+));
+
+const MemoizedMarkdown = React.memo(({ content }: MarkdownProps) => {
   const citations = React.useContext(CitationsContext);
   const linkified = linkifyCitations(content, citations);
   const sanitized = sanitizeStream(linkified);
+
   return (
     <ReactMarkdown
-      remarkPlugins={[remarkGfm, remarkMath]}
-      rehypePlugins={[rehypeRaw, rehypeKatex]}
-      components={sharedMarkdownComponents(isStreaming)}
+      remarkPlugins={remarkPlugins}
+      rehypePlugins={rehypePlugins}
+      components={markdownComponents}
     >
       {sanitized}
     </ReactMarkdown>

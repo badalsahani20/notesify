@@ -82,7 +82,6 @@ export const useAiActions = ({
         } else {
           let dialogOpened = false;
           await consumeAiChatStream(response.body, {
-            throttleMs: 40,
             onUpdate: ({ fullText }) => {
               if (!fullText) return;
               if (!dialogOpened) {

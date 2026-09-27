@@ -39,14 +39,7 @@ export interface textSegment {
   content: string;
 }
 
-export interface AskSegment {
-  id?: string;
-  kind: "ask";
-  question: string;
-  options: string[];  // may be empty — free-text answer is still allowed
-}
-
-export type IrisSegment = textSegment | VizSegment | AskSegment;
+export type IrisSegment = textSegment | VizSegment;
 
 export interface WebCitation {
   url: string;

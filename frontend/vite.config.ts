@@ -5,7 +5,8 @@ import path from 'path'
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: './',
+  // Use relative path ONLY for desktop builds; use '/' for web to ensure nested routes (/shared/:slug) resolve assets correctly
+  base: process.env.VITE_APP_TARGET === 'desktop' ? './' : '/',
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {

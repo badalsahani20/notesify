@@ -25,7 +25,6 @@ export const useAiChatStreaming = ({
 
     const { fullText, fullThought, thinkingTime: finalThinkingTime } =
       await consumeAiChatStream(responseBody, {
-        throttleMs: 40,
         onToolCall: ({ id, tool, args, execution, purpose, status, data, error, quizData, questions, title, query, url, citations }) => {
           if ((execution === "client" || execution === "local") && args) {
             import("@/services/ai/clientToolExecutor").then(({ executeClientTool }) => {

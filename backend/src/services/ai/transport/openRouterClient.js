@@ -15,23 +15,29 @@ export const executeOpenRouter = async (
   if (!apiKey) throw new Error("No OpenRouter API Key found");
 
   const isMandatoryReasoningModel =
-    modelId.toLowerCase().includes("glm") ||
-    modelId.toLowerCase().includes("r1") ||
-    modelId.toLowerCase().includes("reasoner") ||
-    modelId.toLowerCase().includes("/o1") ||
-    modelId.toLowerCase().includes("/o3");
+    modelId.toLowerCase().includes("glm");
 
-  const isQwenFlash = modelId.toLowerCase().includes("qwen");
+  const isGlm = modelId.toLowerCase().includes("glm");
+  const isDeepseek = modelId.toLowerCase().includes("deepseek");
 
   const bodyPayload = {
     model: modelId,
     messages: messages,
     stream: stream,
     max_tokens: maxTokens,
-    provider: {
-      ignore: ["open-inference"],
-    },
   };
+
+  if (isGlm) {
+    bodyPayload.provider = {
+      only: ["inference-net/fp4"],
+      allow_fallbacks: true,
+    };
+  } else if (isDeepseek) {
+    bodyPayload.provider = {
+      only: ["makora"],
+      allow_fallbacks: true,
+    };
+  }
 
   if (isMandatoryReasoningModel) {
     // These models strictly require reasoning or they deny the request
@@ -39,7 +45,7 @@ export const executeOpenRouter = async (
     // OpenRouter rejects reasoning.effort together with reasoning.max_tokens.
     // Use the explicit budget for mandatory reasoning models.
     bodyPayload.reasoning = { max_tokens: reasoningMaxTokens };
-  } else if (includeReasoning === false || (!includeReasoning && isQwenFlash)) {
+  } else if (includeReasoning === false) {
     // Specifically disable reasoning for Qwen 3.7 Flash and when reasoning is toggled off
     bodyPayload.include_reasoning = false;
     bodyPayload.reasoning = { effort: "none" };

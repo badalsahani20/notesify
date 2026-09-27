@@ -8,17 +8,6 @@ import type { IrisSegment } from "@/store/useGlobalChatStore";
  * ── IRIS_VIZ (attribute format):
  *   [IRIS_VIZ type="mermaid" title="My Title"]...data...[/IRIS_VIZ]
  *   [IRIS_VIZ:mermaid:My Title]...data...[/IRIS_VIZ]   (legacy colon format)
- *
- * ── IRIS_ASK (clarify or MCQ):
- *   [IRIS_ASK prompt="Question?"]
- *   A) Option 1
- *   B) Option 2
- *   [/IRIS_ASK]
- *
- *   [IRIS_ASK type="clarify" prompt="Question?" options="Yes,No,Maybe"][/IRIS_ASK]
- *
- * Multiple IRIS_ASK blocks are parsed in order and rendered sequentially
- * by IrisMessageBody (one revealed after the previous is answered).
  */
 export const parseIrisResponse = (text: string): IrisSegment[] => {
   // Collect all blocks with their text positions so we can sort and interleave
@@ -66,44 +55,6 @@ export const parseIrisResponse = (text: string): IrisSegment[] => {
           segment: { kind: "viz", type, title: title || "Visualization", data: data.trim(), isStreaming: true },
         });
       }
-    }
-  }
-
-  // ── IRIS_ASK ─────────────────────────────────────────────────────────────────
-  // Captures everything between [IRIS_ASK ...] and [/IRIS_ASK] as the body.
-  // Attributes are parsed from the tag's attribute string separately.
-  const askRegex = /\[(?:IRIS_ASK|\/IRIS_ASK(?=\s|:))([^\]]*)\]([\s\S]*?)\[\/IRIS_ASK\]/gi;
-
-  while ((m = askRegex.exec(text)) !== null) {
-    const attrStr = m[1] ?? "";
-    const body    = (m[2] ?? "").trim();
-
-    // ── Extract question text ──────────────────────────────────────────────
-    // Prefer `prompt=` attribute, fall back to `question=`, then raw body
-    const promptAttr = attrStr.match(/(?:prompt|question)=["']([^"']*)["']/);
-    const question   = (promptAttr?.[1] ?? body.split("\n")[0] ?? "").trim();
-
-    // ── Extract options ────────────────────────────────────────────────────
-    // Priority 1: body lines matching  A) / B) / A. / 1) etc.
-    const bodyOptionLines = body.match(/^[A-Da-d1-4][).]\s*.+/gm);
-    const bodyOptions = bodyOptionLines
-      ? bodyOptionLines.map((l) => l.replace(/^[A-Da-d1-4][).]\s*/, "").trim()).filter(Boolean)
-      : [];
-
-    // Priority 2: options="A,B,C" attribute
-    const optAttr    = attrStr.match(/options=["']([^"']*)["']/);
-    const attrOptions = optAttr
-      ? optAttr[1].split(",").map((o) => o.trim()).filter(Boolean)
-      : [];
-
-    const options = bodyOptions.length > 0 ? bodyOptions : attrOptions;
-
-    if (question) {
-      blocks.push({
-        start: m.index,
-        end: askRegex.lastIndex,
-        segment: { kind: "ask", question, options },
-      });
     }
   }
 
