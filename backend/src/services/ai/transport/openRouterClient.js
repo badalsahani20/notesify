@@ -29,12 +29,22 @@ export const executeOpenRouter = async (
 
   if (isGlm) {
     bodyPayload.provider = {
-      only: ["inference-net/fp4"],
+      order: [
+        "gmicloud/fp8",
+        "inference-net/fp4",
+        "deepinfra/fp4",
+        "novita/fp8",
+      ],
       allow_fallbacks: true,
     };
   } else if (isDeepseek) {
     bodyPayload.provider = {
-      only: ["makora"],
+      order: [
+        "deepinfra/fp8",
+        "streamlake/fp8",
+        "digitalocean",
+        "makora",
+      ],
       allow_fallbacks: true,
     };
   }
