@@ -5,6 +5,8 @@ import { jest } from '@jest/globals';
 process.env.ACCESS_SECRET = 'test_access_secret';
 process.env.REFRESH_SECRET = 'test_refresh_secret';
 process.env.JWT_SECRET = 'test_jwt_secret';
+process.env.GOOGLE_CLIENT_ID = 'test_google_client_id';
+process.env.GOOGLE_CLIENT_SECRET = 'test_google_client_secret';
 let mongod;
 
 // Start in-memory MongoDB before all tests
