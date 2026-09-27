@@ -2,7 +2,6 @@ import {
   PRIMARY_MODEL,
   TEACHING_MODELS,
   DEFAULT_CHAT_MODEL,
-  COMPLEX_ANALYSIS_MODEL,
   VISUALIZATION_MODEL,
 } from "../config/aiModels.js";
 
@@ -57,18 +56,6 @@ export const classifyChatIntent = (
     return chosenModel;
   }
 
-  // 5. Coding and debugging requests benefit from the analysis model even in
-  // casual mode. Keep this after study mode so study routing remains stable.
-  const isCodingRequest =
-    /\b(code|coding|debug|debugging|bug|error|implement|function|api|typescript|javascript|python|react|node\.js|sql|regex|algorithm|stack trace)\b/.test(
-      msg,
-    );
-  if (isCodingRequest) {
-    console.log(
-      `🧑‍💻 [Coding Request] Routing to analysis model: ${COMPLEX_ANALYSIS_MODEL}`,
-    );
-    return COMPLEX_ANALYSIS_MODEL;
-  }
 
   // 6. Current, research-heavy requests, or when Web search is toggled ON benefit from the primary model.
   const isResearchRequest =

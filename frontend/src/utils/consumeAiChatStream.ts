@@ -158,7 +158,7 @@ export const consumeAiChatStream = async (
 
         const delta = data.choices?.[0]?.delta;
         const content = delta?.content || "";
-        const reasoning = delta?.reasoning || "";
+        const reasoning = delta?.reasoning || delta?.reasoning_content || "";
 
         if (!content && !reasoning) continue;
 

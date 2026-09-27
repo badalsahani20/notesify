@@ -75,8 +75,8 @@ type GlobalChatStore = {
   setActiveArtifact: (artifact: ChatArtifact | null) => void;
 
   // Actions
-  fetchSessions: () => Promise<void>;
-  loadSession: (sessionId: string) => Promise<void>;
+  fetchSessions: (options?: { silent?: boolean }) => Promise<void>;
+  loadSession: (sessionId: string, options?: { background?: boolean }) => Promise<void>;
   startNewChat: () => void;
   sendMessage: (text: string, image?: string | null) => Promise<void>;
   answerInteraction: (answer: string) => Promise<void>;
@@ -104,25 +104,49 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
   activeArtifact: null,
   setActiveArtifact: (artifact) => set({ activeArtifact: artifact }),
 
-  fetchSessions: async () => {
-    set({ sessionsLoading: true });
+  fetchSessions: async (options?: { silent?: boolean }) => {
+    if (!options?.silent) {
+      set({ sessionsLoading: true });
+    }
     try {
       const { data } = await api.get("/ai/sessions");
-      set({ sessions: data.data.sessions });
+      const currentSessions = get().sessions;
+      const newSessions: ChatSession[] = data.data.sessions || [];
+      const hasChanged =
+        currentSessions.length !== newSessions.length ||
+        currentSessions.some(
+          (s, i) =>
+            s._id !== newSessions[i]?._id ||
+            s.title !== newSessions[i]?.title ||
+            s.updatedAt !== newSessions[i]?.updatedAt
+        );
+
+      if (hasChanged) {
+        set({ sessions: newSessions });
+      }
     } catch {
       // silently fail — sidebar just stays empty
     } finally {
-      set({ sessionsLoading: false });
+      if (!options?.silent) {
+        set({ sessionsLoading: false });
+      }
     }
   },
 
-  loadSession: async (sessionId: string) => {
-    set({
-      messagesLoading: true,
-      activeSessionId: sessionId,
-      messages: [],
-      pendingInteraction: null,
-    });
+  loadSession: async (sessionId: string, options?: { background?: boolean }) => {
+    const isSameSession = get().activeSessionId === sessionId && get().messages.length > 0;
+    const isBackground = options?.background || isSameSession;
+
+    if (!isBackground) {
+      set({
+        messagesLoading: true,
+        activeSessionId: sessionId,
+        messages: [],
+        pendingInteraction: null,
+      });
+    } else {
+      set({ activeSessionId: sessionId });
+    }
     try {
       const { data } = await api.get(`/ai/chat/session/${sessionId}`);
 
@@ -152,9 +176,13 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
       });
       set({ messages: mapped });
     } catch {
-      set({ messages: [], pendingInteraction: null });
+      if (!isBackground) {
+        set({ messages: [], pendingInteraction: null });
+      }
     } finally {
-      set({ messagesLoading: false });
+      if (!isBackground) {
+        set({ messagesLoading: false });
+      }
     }
   },
 
@@ -279,6 +307,14 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
 
       set((state) => ({
         isSending: false,
+        pendingInteraction: null,
+        sessions: activeSessionId
+          ? state.sessions.map((session) =>
+              session._id === activeSessionId
+                ? { ...session, updatedAt: new Date().toISOString() }
+                : session
+            )
+          : state.sessions,
         messages: state.messages.map((message) =>
           message.id === aiMsgId
             ? {
@@ -288,16 +324,16 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
                 isThinking: false,
                 thinkingTime: finalThinkingTime,
                 segments: parseIrisResponse(fullText),
+                skipAnimation: true,
               }
             : message,
         ),
       }));
-      console.info("[IrisInteraction] stream completed; reloading session", {
+      console.info("[IrisInteraction] stream completed", {
         interactionId: interaction.interactionId,
         sessionId: activeSessionId,
         responseLength: fullText.length,
       });
-      await get().loadSession(activeSessionId);
     } catch (error) {
       if (abortController.signal.aborted) {
         console.info("[IrisInteraction] resume stream stopped by user", {
@@ -310,7 +346,6 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
         });
       }
       set({ isSending: false });
-      await get().loadSession(activeSessionId).catch(() => {});
     } finally {
       if (activeChatAbortController === abortController) {
         activeChatAbortController = null;
@@ -350,12 +385,13 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
 
     const abortController = new AbortController();
     activeChatAbortController = abortController;
+    let effectiveSessionId = requestSessionId;
 
     try {
       const { response, accessToken, apiBaseUrl } = await startGlobalChatRequest({
         text,
         sessionId: activeSessionId,
-        imageForApi,
+        imageForApi: imageForApi || undefined,
         activeArtifact: get().activeArtifact,
         messages,
         useReasoning: get().useReasoning,
@@ -366,7 +402,7 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
 
       // 🆔 Catch early sessionId from header
       const newSessionId = response.headers.get("X-Session-Id");
-      const effectiveSessionId = newSessionId || requestSessionId;
+      effectiveSessionId = newSessionId || requestSessionId;
       if (newSessionId) {
         // Derive clean optimistic title without transcript/filler prefixes
         const cleanInitial = text
@@ -455,7 +491,7 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
       // Fetch updated sessions once title generation completes in the background.
       if (effectiveSessionId && (userTurnCount === 1 || userTurnCount === 2)) {
         window.setTimeout(() => {
-          get().fetchSessions();
+          get().fetchSessions({ silent: true });
         }, 2200);
       }
 
@@ -473,12 +509,24 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
           name: err?.name,
           message: err?.message,
         });
+        const hasStreamedContent = Boolean(get().messages.find((m) => m.id === aiMsgId)?.text);
         set((state) => ({
           isSending: false,
           messages: state.messages.map((m) =>
-            m.id === aiMsgId ? { ...m, text: "⚠️ Something went wrong. Please try again." } : m
+            m.id === aiMsgId
+              ? {
+                  ...m,
+                  isThinking: false,
+                  text: m.text ? m.text : "⚠️ Something went wrong. Please try again.",
+                }
+              : m
           ),
         }));
+
+        // Only attempt background session recovery if no content was received
+        if (effectiveSessionId && !hasStreamedContent) {
+          get().loadSession(effectiveSessionId, { background: true }).catch(() => {});
+        }
       }
     } finally {
       if (activeChatAbortController === abortController) {

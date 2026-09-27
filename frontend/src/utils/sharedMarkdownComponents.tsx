@@ -69,6 +69,9 @@ export const sharedMarkdownComponents = (isStreaming = false) => ({
 
     return <MarkdownCodeBlock code={rawCode} language={language} isStreaming={isStreaming} />;
   },
+  pre({ children }: any) {
+    return <>{children}</>;
+  },
   a: MarkdownLink,
   table({ children, ...props }: any) {
     return (

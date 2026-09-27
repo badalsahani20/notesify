@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useState, lazy, Suspense } from "react";
+import { memo, useMemo, useState, lazy, Suspense } from "react";
 import { CheckCheck, Copy, Code2, Loader2 } from "lucide-react";
 import IrisVisualBlock from "./IrisVisualBlock";
 
@@ -19,7 +19,6 @@ const escapeHtml = (value: string) =>
 const normalizeLanguage = (language = "") => language.toLowerCase().trim();
 
 const MAX_HIGHLIGHT_CHARS = 12_000;
-const HIGHLIGHT_DEBOUNCE_MS = 90;
 const highlightCache = new Map<string, string>();
 
 const tokenPatterns: Record<string, RegExp[]> = {
@@ -139,28 +138,12 @@ const getLanguageLabel = (language?: string) => {
   return normalized.toUpperCase();
 };
 
-const MarkdownCodeBlock = ({ code, language, isStreaming = false }: MarkdownCodeBlockProps) => {
+const MarkdownCodeBlock = ({ code, language, isStreaming: _isStreaming }: MarkdownCodeBlockProps) => {
   const normalizedLanguage = normalizeLanguage(language);
   const [copied, setCopied] = useState(false);
-  const [highlightSource, setHighlightSource] = useState(code);
 
-  // During streaming, code changes every few milliseconds. Show the current
-  // escaped source immediately, but wait briefly before doing the expensive
-  // token pass. The final pause highlights the complete block once.
-  useEffect(() => {
-    if (!isStreaming) {
-      setHighlightSource(code);
-      return;
-    }
-
-    const timer = window.setTimeout(() => setHighlightSource(code), HIGHLIGHT_DEBOUNCE_MS);
-    return () => window.clearTimeout(timer);
-  }, [code, isStreaming]);
-
-  const highlighted = useMemo(() => highlightCode(highlightSource, language), [highlightSource, language]);
-  const renderedCode = isStreaming
-    ? escapeHtml(code)
-    : (highlightSource === code ? highlighted : escapeHtml(code));
+  const highlighted = useMemo(() => highlightCode(code, language), [code, language]);
+  const renderedCode = highlighted || escapeHtml(code);
 
   if (normalizedLanguage === "mermaid") {
     return (

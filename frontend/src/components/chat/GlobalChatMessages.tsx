@@ -65,13 +65,12 @@ interface AssistantMessageBodyProps {
 }
 
 const EMPTY_CITATIONS: any[] = [];
-const EMPTY_SEGMENTS: NonNullable<Message["segments"]> = [];
 
 // Keep old assistant messages out of the streaming render loop.
 const AssistantMessageBody = memo(({ text, isStreaming, savedSegments, citations }: AssistantMessageBodyProps) => {
   const segments = useMemo(
-    () => (isStreaming ? EMPTY_SEGMENTS : savedSegments ?? parseIrisResponse(text)),
-    [isStreaming, savedSegments, text],
+    () => savedSegments ?? parseIrisResponse(text),
+    [savedSegments, text],
   );
 
   return (

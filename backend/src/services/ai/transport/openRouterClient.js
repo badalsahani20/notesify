@@ -30,9 +30,8 @@ export const executeOpenRouter = async (
   if (isGlm) {
     bodyPayload.provider = {
       order: [
-        "gmicloud/fp8",
-        "inference-net/fp4",
         "deepinfra/fp4",
+        "inference-net/fp4",
         "novita/fp8",
       ],
       allow_fallbacks: true,
@@ -40,9 +39,9 @@ export const executeOpenRouter = async (
   } else if (isDeepseek) {
     bodyPayload.provider = {
       order: [
+        "digitalocean",
         "deepinfra/fp8",
         "streamlake/fp8",
-        "digitalocean",
         "makora",
       ],
       allow_fallbacks: true,

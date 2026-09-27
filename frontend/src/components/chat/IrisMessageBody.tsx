@@ -29,22 +29,29 @@ interface IrisMessageBodyProps {
 const EMPTY_CITATIONS: WebCitation[] = [];
 
 const IrisMessageBody = ({ segments, isStreaming = false, streamingText, citations }: IrisMessageBodyProps) => {
+  const effectiveSegments =
+    segments && segments.length > 0
+      ? segments
+      : streamingText !== undefined
+        ? [{ kind: "text" as const, content: streamingText }]
+        : [];
+
   return (
     <CitationsContext.Provider value={citations ?? EMPTY_CITATIONS}>
       <div className="iris-message-body">
-        {isStreaming && streamingText !== undefined ? (
-          <StreamingMessageText text={streamingText} />
-        ) : (
-          segments.map((seg, index) => {
-            const key = seg.id ?? `${seg.kind}-${index}`;
+        {effectiveSegments.map((seg, index) => {
+          const key = seg.id ?? `${seg.kind}-${index}`;
 
-            if (seg.kind === "text") {
-              return <MemoizedMarkdown key={key} content={seg.content} />;
+          if (seg.kind === "text") {
+            const isLast = index === effectiveSegments.length - 1;
+            if (isStreaming && isLast) {
+              return <StreamingMessageText key={key} text={seg.content} />;
             }
+            return <MemoizedMarkdown key={key} content={seg.content} />;
+          }
 
-            return <IrisVisualBlock key={key} visualization={seg} />;
-          })
-        )}
+          return <IrisVisualBlock key={key} visualization={seg} />;
+        })}
       </div>
     </CitationsContext.Provider>
   );
@@ -65,17 +72,22 @@ const streamingPlugins = { code, mermaid, math, cjk };
 // Streamdown keeps streaming Markdown formatted while reparsing only the
 // active/incomplete block. The completed message still switches to the
 // existing renderer below so its final output remains canonical.
-const StreamingMessageText = React.memo(({ text }: { text: string }) => (
-  <Streamdown
-    animated
-    isAnimating
-    plugins={streamingPlugins}
-    components={streamingMarkdownComponents}
-    className="break-words"
-  >
-    {text}
-  </Streamdown>
-));
+const StreamingMessageText = React.memo(({ text }: { text: string }) => {
+  const citations = React.useContext(CitationsContext);
+  const linkified = React.useMemo(() => linkifyCitations(text, citations), [text, citations]);
+
+  return (
+    <Streamdown
+      animated
+      isAnimating
+      plugins={streamingPlugins}
+      components={streamingMarkdownComponents}
+      className="break-words"
+    >
+      {linkified}
+    </Streamdown>
+  );
+});
 
 const MemoizedMarkdown = React.memo(({ content }: MarkdownProps) => {
   const citations = React.useContext(CitationsContext);

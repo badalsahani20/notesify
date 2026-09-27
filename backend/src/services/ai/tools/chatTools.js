@@ -105,6 +105,201 @@ Use this tool only when the user explicitly requests a quiz, survey, ranking, or
   },
 };
 
+export const createWorkflowTool = {
+  type: "function",
+  function: {
+    name: "create_workflow",
+    description: `Create a persistent structured learning workflow for the user.
+
+Use this when the user explicitly asks to learn, study, practice, or be taught a topic as a structured multi-step program.
+
+Do not create a workflow for ordinary explanations or casual questions.
+
+The workflow should contain a sensible progression of phases and tasks. Each task must represent one concrete learning objective.`,
+    parameters: {
+      type: "object",
+      properties: {
+        title: {
+          type: "string",
+          description: "Short title for the learning workflow.",
+        },
+        phases: {
+          type: "array",
+          minItems: 1,
+          maxItems: 10,
+          description: "Ordered learning phases.",
+          items: {
+            type: "object",
+            properties: {
+              id: {
+                type: "string",
+                description: "Stable phase identifier, e.g. 'phase-1'.",
+              },
+              title: {
+                type: "string",
+                description: "Short phase title.",
+              },
+              tasks: {
+                type: "array",
+                minItems: 1,
+                maxItems: 20,
+                description: "Concrete learning tasks in this phase.",
+                items: {
+                  type: "object",
+                  properties: {
+                    id: {
+                      type: "string",
+                      description: "Stable task identifier, e.g. 'task-1'.",
+                    },
+                    title: {
+                      type: "string",
+                      description: "Short task title.",
+                    },
+                    concept: {
+                      type: "string",
+                      description: "The specific concept or learning objective.",
+                    },
+                    order: {
+                      type: "integer",
+                      minimum: 1,
+                      description: "Task order within the phase.",
+                    },
+                  },
+                  required: ["id", "title", "concept", "order"],
+                  additionalProperties: false,
+                },
+              },
+            },
+            required: ["id", "title", "tasks"],
+            additionalProperties: false,
+          },
+        },
+        sessionId: {
+          type: "string",
+          description: "Optional chat session ID to associate with the workflow.",
+        },
+      },
+      required: ["title", "phases"],
+      additionalProperties: false,
+    },
+  },
+};
+
+export const listWorkflowsTool = {
+  type: "function",
+  function: {
+    name: "list_workflows",
+    description:
+      "List the user's existing learning workflows. Use this when the user wants to resume, continue, inspect, or choose between existing learning workflows.",
+    parameters: {
+      type: "object",
+      properties: {
+        status: {
+          type: "string",
+          enum: ["DRAFT", "ACTIVE", "PAUSED", "FAILED", "COMPLETED"],
+          description: "Optional workflow status filter.",
+        },
+      },
+      additionalProperties: false,
+    },
+  },
+};
+
+export const getWorkflowTool = {
+  type: "function",
+  function: {
+    name: "get_workflow",
+    description:
+      "Retrieve the complete current state of a specific learning workflow. Use this before continuing or transitioning a workflow when its latest state/version is not already available in context.",
+    parameters: {
+      type: "object",
+      properties: {
+        workflowId: {
+          type: "string",
+          description: "The workflow's stable ID.",
+        },
+      },
+      required: ["workflowId"],
+      additionalProperties: false,
+    },
+  },
+};
+
+export const transitionWorkflowTool = {
+  type: "function",
+  function: {
+    name: "transition_workflow",
+    description: `Apply one deterministic command to a learning workflow.
+
+The workflow engine, not Iris, decides whether the transition is valid.
+
+IMPORTANT:
+- Never invent expectedVersion.
+- Use the version from the latest workflow state you received.
+- After a successful transition, use the returned workflow version for the next transition.
+- Use this tool for starting, pausing, resuming, retrying, activating tasks, presenting checkpoints, submitting answers, evaluating checkpoints, and abandoning tasks.`,
+    parameters: {
+      type: "object",
+      properties: {
+        workflowId: {
+          type: "string",
+          description: "The workflow's stable ID.",
+        },
+        command: {
+          type: "string",
+          enum: [
+            "START_WORKFLOW",
+            "PAUSE_WORKFLOW",
+            "RESUME_WORKFLOW",
+            "RETRY_WORKFLOW",
+            "ACTIVATE_TASK",
+            "PRESENT_CHECKPOINT",
+            "SUBMIT_ANSWER",
+            "EVALUATE_CHECKPOINT",
+            "ABANDON_TASK",
+          ],
+          description: "The workflow command to execute.",
+        },
+        payload: {
+          type: "object",
+          description:
+            "Command-specific parameters. For example taskId, checkpointId, question, answer, verdict, or confidence.",
+          additionalProperties: true,
+        },
+        expectedVersion: {
+          type: "integer",
+          minimum: 0,
+          description:
+            "The workflow version currently known by Iris. Must come from the latest workflow state.",
+        },
+      },
+      required: ["workflowId", "command", "expectedVersion"],
+      additionalProperties: false,
+    },
+  },
+};
+
+export const deleteWorkflowTool = {
+  type: "function",
+  function: {
+    name: "delete_workflow",
+    description: `Delete a learning workflow permanently.
+Use this only when the user explicitly asks to delete, remove, or discard a workflow.
+Do not use this to pause, abandon, or complete a workflow.`,
+    parameters: {
+      type: "object",
+      properties: {
+        workflowId: {
+          type: "string",
+          description: "The workflow's stable ID."
+        }
+      },
+      required: ["workflowId"],
+      additionalProperties: false
+    }
+  }
+};
+
 export const createNoteTool = {
   type: "function",
   function: {
@@ -194,20 +389,31 @@ export const updateNoteTool = {
 export const getChatTools = (chatMode = "casual", options = {}) => {
   const { isNoteScoped = false } = options;
 
-  if (isNoteScoped) {
+  const baseTools = isNoteScoped
+    ? [
+        saveMemoryTool,
+        getNoteContentTool,
+        updateNoteTool,
+        askQuestionTool,
+      ]
+    : [
+        saveMemoryTool,
+        getNoteContentTool,
+        createNoteTool,
+        updateNoteTool,
+        askQuestionTool,
+      ];
+
+  if (chatMode === "study") {
     return [
-      saveMemoryTool,
-      getNoteContentTool,
-      updateNoteTool,
-      askQuestionTool,
+      ...baseTools,
+      createWorkflowTool,
+      listWorkflowsTool,
+      getWorkflowTool,
+      transitionWorkflowTool,
+      deleteWorkflowTool,
     ];
   }
 
-  return [
-    saveMemoryTool,
-    getNoteContentTool,
-    createNoteTool,
-    updateNoteTool,
-    askQuestionTool,
-  ];
+  return baseTools;
 };

@@ -19,6 +19,7 @@ import getEffectiveDailyLimit from "../utils/getEffectiveDailyLimit.js";
 import { SseStreamParser } from "../utils/sseParser.js";
 import agentRunService from "../services/ai/agent/agentRunService.js";
 import {cleanSessionTitle, hashText} from "../utils/hashText.js"
+import { uploadImageToCloudinary } from "../services/imageUpload.service.js";
 
 
 export const checkGrammarController = catchAsync(async (req, res) => {
@@ -335,7 +336,7 @@ const resolveSession = async (req) => {
   };
 };
 
-// Set up SSE headers and fire the keep-alive comment
+// Set up SSE headers and fire the keep-alive comment with continuous heartbeat
 const openSseConnection = (res, activeSessionId) => {
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
@@ -344,6 +345,21 @@ const openSseConnection = (res, activeSessionId) => {
   if (activeSessionId)
     res.setHeader("X-Session-Id", activeSessionId.toString());
   res.write(": keep-alive\n\n");
+
+  const keepAliveTimer = setInterval(() => {
+    if (res.writableEnded || res.destroyed) {
+      clearInterval(keepAliveTimer);
+      return;
+    }
+    try {
+      res.write(": keep-alive\n\n");
+    } catch (_) {
+      clearInterval(keepAliveTimer);
+    }
+  }, 4000);
+
+  res.on("close", () => clearInterval(keepAliveTimer));
+  res.on("finish", () => clearInterval(keepAliveTimer));
 };
 
 const writeSseError = (res, message = "AI service unavailable") => {
@@ -446,6 +462,12 @@ export const chatWithAiController = catchAsync(async (req, res) => {
 
   if (isStreaming) {
     openSseConnection(res, activeSessionId);
+  }
+
+  // Trigger background Cloudinary upload if an unhosted image/data URI was sent
+  let cloudinaryUploadPromise = null;
+  if (imageBase64 && typeof imageBase64 === "string" && !/^https?:\/\//i.test(imageBase64)) {
+    cloudinaryUploadPromise = uploadImageToCloudinary(imageBase64);
   }
 
   // 3. Resolve chat context. This happens after SSE starts, so convert any
@@ -659,13 +681,26 @@ export const chatWithAiController = catchAsync(async (req, res) => {
     toolCalls = agentResult.toolCalls;
     pdfContextToEmit = agentResult.pdfContext;
 
+    // Resolve Cloudinary URL if uploaded in background
+    let persistedImageUrl = imageBase64;
+    if (cloudinaryUploadPromise) {
+      try {
+        const uploadedUrl = await cloudinaryUploadPromise;
+        if (uploadedUrl && /^https?:\/\//i.test(uploadedUrl)) {
+          persistedImageUrl = uploadedUrl;
+        }
+      } catch (uploadErr) {
+        console.warn("⚠️ [Cloudinary] Resolution failed before persistence:", uploadErr.message);
+      }
+    }
+
     // Persist before closing the SSE response. If this fails, the client gets
     // a proper SSE error event instead of a half-closed chunked response.
     if (isGlobalChat && activeSessionId) {
       await persistToDb(
         message,
         finalReply,
-        imageBase64,
+        persistedImageUrl,
         activeSessionId,
         activeSession,
         sessionSummary,
