@@ -6,6 +6,7 @@ import {
     COMMAND,
     ERROR_CODE,
 } from "./workflowConstants.js";
+import { normalizeEvaluationSpec } from "./evaluationSpec.js";
 
 
 const cloneWithNextVersion = (state) => ({
@@ -128,7 +129,7 @@ export const transition = (state, command, payload = {}) => {
         }
 
         case COMMAND.PRESENT_CHECKPOINT: {
-            const { taskId, checkpointId, question } = payload;
+            const { taskId, checkpointId, question, evaluationSpec } = payload;
 
             validate(
                 state.status === WORKFLOW_STATUS.ACTIVE,
@@ -164,7 +165,11 @@ export const transition = (state, command, payload = {}) => {
                         taskId,
                         question: question.trim(),
                         status: CHECKPOINT_STATUS.WAITING_FOR_ANSWER,
+                        evaluationSpec: normalizeEvaluationSpec(evaluationSpec),
+                        userAnswer: null,
+                        evaluation: null,
                         presentedAt: new Date().toISOString(),
+                        answeredAt: null,
                     };
                 },
             );
@@ -209,7 +214,14 @@ export const transition = (state, command, payload = {}) => {
         }
 
         case COMMAND.EVALUATE_CHECKPOINT: {
-            const { checkpointId, verdict, confidence = 1.0 } = payload;
+            const {
+                checkpointId,
+                verdict,
+                confidence = 1.0,
+                feedback = null,
+                misconceptions = [],
+                criterionResults = [],
+            } = payload;
             const checkpoint = state.checkpoints[checkpointId];
 
             validate(
@@ -242,6 +254,9 @@ export const transition = (state, command, payload = {}) => {
                         evaluation: {
                             verdict,
                             confidence,
+                            feedback: typeof feedback === "string" ? feedback.trim() : null,
+                            misconceptions: Array.isArray(misconceptions) ? misconceptions : [],
+                            criterionResults: Array.isArray(criterionResults) ? criterionResults : [],
                             evaluatedAt: new Date().toISOString(),
                         },
                     };

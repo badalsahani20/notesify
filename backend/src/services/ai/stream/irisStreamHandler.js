@@ -9,6 +9,14 @@ const NORMALIZE_TOOL_NAME = {
   "web_fetch": "crawl_url",
 };
 
+const WORKFLOW_SERVER_TOOLS = new Set([
+  "create_workflow",
+  "list_workflows",
+  "get_workflow",
+  "delete_workflow",
+  "transition_workflow",
+]);
+
 export class IrisStreamHandler {
   constructor({ toolExecutor: executor = toolExecutor } = {}) {
     this.toolExecutor = executor;
@@ -149,13 +157,17 @@ export class IrisStreamHandler {
                       execution: "local",
                     })}\n\n`,
                   )
-                } else if(normalizedTool === "get_note_content" && !state.emitted) {
+                } else if(
+                  (normalizedTool === "get_note_content" ||
+                    WORKFLOW_SERVER_TOOLS.has(normalizedTool)) &&
+                  !state.emitted
+                ) {
                   state.emitted = true;
                   res.write(
                     `data: ${JSON.stringify({
                       type: "tool_call",
                       id: state.id,
-                      tool: "get_note_content",
+                      tool: normalizedTool,
                       args: parsed,
                       status: "executing",
                     })}\n\n`,
@@ -246,14 +258,17 @@ export class IrisStreamHandler {
                 execution: "local",
               })}\n\n`,
             );
-          } else if(normalizedTool === "get_note_content") {
+          } else if(
+            normalizedTool === "get_note_content" ||
+            WORKFLOW_SERVER_TOOLS.has(normalizedTool)
+          ) {
             state.emitted = true;
             state.parsedArgs = parsed;
             res.write(
               `data: ${JSON.stringify({
                 type: "tool_call",
                 id: state.id,
-                tool: "get_note_content",
+                tool: normalizedTool,
                 args: parsed,
                 status: "executing",
               })}\n\n`,
@@ -353,7 +368,10 @@ export class IrisStreamHandler {
             )
           }
         }
-      } else if (normalizedTool === "get_note_content") {
+      } else if (
+        normalizedTool === "get_note_content" ||
+        WORKFLOW_SERVER_TOOLS.has(normalizedTool)
+      ) {
         let parsedArgs = state.parsedArgs;
         if (!parsedArgs && state.rawArgs) {
           try {
@@ -364,7 +382,7 @@ export class IrisStreamHandler {
         if (parsedArgs) {
           serverToolCalls.push({
             id: state.id,
-            tool: "get_note_content",
+            tool: normalizedTool,
             args: parsedArgs,
           });
         }
@@ -434,13 +452,15 @@ export class IrisStreamHandler {
             allowOther: q.allowOther !== false,
           }));
 
+          const workflowId = args.workflowId ?? args.questions[0]?.workflowId ?? null;
+          const checkpointId = args.checkpointId ?? args.questions[0]?.checkpointId ?? crypto.randomUUID();
           const interactionId = crypto.randomUUID();
-          const checkpointId = crypto.randomUUID();
           const firstQuestion = normalizedQuestions[0];
 
           interaction = {
             interactionId,
             checkpointId,
+            workflowId,
             type: "ask_question",
             purpose,
             title: args.title || null,
@@ -454,6 +474,7 @@ export class IrisStreamHandler {
             type: "tool_call",
             tool: "ask_question",
             interactionId,
+            workflowId,
             checkpointId,
             purpose,
             quizData: normalizedQuestions,
@@ -464,6 +485,8 @@ export class IrisStreamHandler {
           res.write(`data: ${JSON.stringify(toolPayload)}\n\n`);
           toolCalls.push({
             tool: "ask_question",
+            workflowId,
+            checkpointId,
             purpose,
             quizData: normalizedQuestions,
             questions: normalizedQuestions,

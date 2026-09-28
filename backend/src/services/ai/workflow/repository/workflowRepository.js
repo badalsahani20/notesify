@@ -3,11 +3,19 @@ export class WorkflowRepository {
         throw new Error("Not Implemented");
     }
 
-    async getById(workflowId) {
+    async getById(workflowId, userId) {
         throw new Error("Not implemented");
     }
 
-    async update(workflow, expectedVersion) {
+    async listByUser(userId) {
+        throw new Error("Not implemented");
+    }
+
+    async update(workflow, userId, expectedVersion) {
+        throw new Error("Not implemented");
+    }
+
+    async delete(workflowId, userId, expectedVersion) {
         throw new Error("Not implemented");
     }
 }

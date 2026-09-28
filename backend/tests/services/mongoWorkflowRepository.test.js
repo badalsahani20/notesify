@@ -1,4 +1,6 @@
+import mongoose from "mongoose";
 import { jest } from "@jest/globals";
+import Workflow from "../../src/models/workflow.model.js";
 import { MongoWorkflowRepository } from "../../src/services/ai/workflow/repository/mongoWorkflowRepository.js";
 import {
     WORKFLOW_REPOSITORY_ERROR,
@@ -42,6 +44,7 @@ describe("MongoWorkflowRepository", () => {
             findOne: jest.fn(),
             find: jest.fn(),
             findOneAndUpdate: jest.fn(),
+            findOneAndDelete: jest.fn(),
             exists: jest.fn(),
         };
 
@@ -73,6 +76,103 @@ describe("MongoWorkflowRepository", () => {
 
         expect(result.userId).toBe("user-1");
         expect(result.id).toBe("workflow-1");
+    });
+
+    it("Mongo mapping preserves evaluationSpec", async () => {
+        const wfWithCheckpoint = {
+            ...workflow,
+            checkpoints: {
+                "checkpoint-1": {
+                    id: "checkpoint-1",
+                    taskId: "task-1",
+                    question: "What is an index?",
+                    evaluationSpec: {
+                        expectedAnswer: "Quick lookup structure",
+                        keyConcepts: ["B-Tree", "Scan time"],
+                        rubric: [
+                            { criterion: "Accuracy", weight: 0.8 },
+                            { criterion: "Clarity", weight: 0.2 },
+                        ],
+                        commonMisconceptions: ["No disk usage"],
+                    },
+                    status: "WAITING_FOR_ANSWER",
+                    userAnswer: null,
+                    evaluation: null,
+                    presentedAt: new Date().toISOString(),
+                    answeredAt: null,
+                },
+            },
+        };
+
+        const doc = {
+            ...wfWithCheckpoint,
+            user: "user-1",
+            toObject: () => ({
+                ...wfWithCheckpoint,
+                user: "user-1",
+            }),
+        };
+
+        model.create.mockResolvedValue(doc);
+
+        const result = await repository.create(wfWithCheckpoint);
+
+        expect(model.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+                checkpoints: expect.objectContaining({
+                    "checkpoint-1": expect.objectContaining({
+                        evaluationSpec: expect.objectContaining({
+                            expectedAnswer: "Quick lookup structure",
+                            keyConcepts: ["B-Tree", "Scan time"],
+                            rubric: [
+                                { criterion: "Accuracy", weight: 0.8 },
+                                { criterion: "Clarity", weight: 0.2 },
+                            ],
+                            commonMisconceptions: ["No disk usage"],
+                        }),
+                    }),
+                }),
+            }),
+        );
+
+        expect(result.checkpoints["checkpoint-1"].evaluationSpec).toEqual({
+            expectedAnswer: "Quick lookup structure",
+            keyConcepts: ["B-Tree", "Scan time"],
+            rubric: [
+                { criterion: "Accuracy", weight: 0.8 },
+                { criterion: "Clarity", weight: 0.2 },
+            ],
+            commonMisconceptions: ["No disk usage"],
+        });
+    });
+
+    it("Mongo mapping preserves backwards compatibility when evaluationSpec is null", async () => {
+        const legacyWorkflow = {
+            ...workflow,
+            checkpoints: {
+                "checkpoint-old": {
+                    id: "checkpoint-old",
+                    taskId: "task-1",
+                    question: "Legacy question?",
+                    status: "WAITING_FOR_ANSWER",
+                    evaluationSpec: null,
+                },
+            },
+        };
+
+        const doc = {
+            ...legacyWorkflow,
+            user: "user-1",
+            toObject: () => ({
+                ...legacyWorkflow,
+                user: "user-1",
+            }),
+        };
+
+        model.create.mockResolvedValue(doc);
+
+        const result = await repository.create(legacyWorkflow);
+        expect(result.checkpoints["checkpoint-old"].evaluationSpec).toBeNull();
     });
 
     it("gets a workflow by id and user", async () => {
@@ -175,6 +275,7 @@ describe("MongoWorkflowRepository", () => {
 
         const result = await repository.update(
             updatedWorkflow,
+            updatedWorkflow.userId,
             0,
         );
 
@@ -206,7 +307,7 @@ describe("MongoWorkflowRepository", () => {
         model.exists.mockResolvedValue(null);
 
         await expect(
-            repository.update(workflow, 0),
+            repository.update(workflow, workflow.userId, 0),
         ).rejects.toMatchObject({
             code: WORKFLOW_REPOSITORY_ERROR.NOT_FOUND,
         });
@@ -230,6 +331,7 @@ describe("MongoWorkflowRepository", () => {
                     ...workflow,
                     version: 1,
                 },
+                workflow.userId,
                 0,
             ),
         ).rejects.toMatchObject({
@@ -261,7 +363,7 @@ describe("MongoWorkflowRepository", () => {
 
         model.findOneAndUpdate.mockResolvedValue(document);
 
-        await repository.update(nextWorkflow, 3);
+        await repository.update(nextWorkflow, nextWorkflow.userId, 3);
 
         expect(model.findOneAndUpdate).toHaveBeenCalledWith(
             expect.objectContaining({
@@ -274,5 +376,175 @@ describe("MongoWorkflowRepository", () => {
             },
             expect.any(Object),
         );
+    });
+
+    it("deletes a workflow when expectedVersion matches", async () => {
+        model.findOneAndDelete.mockResolvedValue({ id: "workflow-1" });
+
+        const result = await repository.delete("workflow-1", "user-1", 2);
+
+        expect(result).toBe(true);
+        expect(model.findOneAndDelete).toHaveBeenCalledWith({
+            id: "workflow-1",
+            user: "user-1",
+            version: 2,
+        });
+    });
+
+    it("throws NOT_FOUND when delete cannot find the workflow", async () => {
+        model.findOneAndDelete.mockResolvedValue(null);
+        model.exists.mockResolvedValue(false);
+
+        await expect(
+            repository.delete("missing-workflow", "user-1", 0),
+        ).rejects.toMatchObject({
+            code: WORKFLOW_REPOSITORY_ERROR.NOT_FOUND,
+            statusCode: 404,
+        });
+    });
+
+    it("throws VERSION_CONFLICT when workflow exists but version is stale on delete", async () => {
+        model.findOneAndDelete.mockResolvedValue(null);
+        model.exists.mockResolvedValue(true);
+
+        await expect(
+            repository.delete("workflow-1", "user-1", 1),
+        ).rejects.toMatchObject({
+            code: WORKFLOW_REPOSITORY_ERROR.VERSION_CONFLICT,
+            statusCode: 409,
+        });
+    });
+});
+
+describe("Workflow Mongoose Schema - evaluationSpec", () => {
+    const validUserId = new mongoose.Types.ObjectId();
+
+    const baseWorkflowData = {
+        id: "workflow-schema-test",
+        user: validUserId,
+        title: "Workflow Schema Test",
+        phases: [
+            {
+                id: "phase-1",
+                title: "Phase 1",
+                tasks: [
+                    {
+                        id: "task-1",
+                        title: "Task 1",
+                        concept: "Concept 1",
+                        order: 1,
+                    },
+                ],
+            },
+        ],
+        status: "ACTIVE",
+        version: 1,
+    };
+
+    it("successfully validates when evaluationSpec is null", () => {
+        const doc = new Workflow({
+            ...baseWorkflowData,
+            checkpoints: {
+                "cp-1": {
+                    id: "cp-1",
+                    taskId: "task-1",
+                    question: "Test question?",
+                    status: "WAITING_FOR_ANSWER",
+                    evaluationSpec: null,
+                },
+            },
+        });
+
+        const error = doc.validateSync();
+        expect(error).toBeUndefined();
+    });
+
+    it("successfully validates when a full valid evaluationSpec is provided", () => {
+        const doc = new Workflow({
+            ...baseWorkflowData,
+            checkpoints: {
+                "cp-1": {
+                    id: "cp-1",
+                    taskId: "task-1",
+                    question: "Test question?",
+                    status: "WAITING_FOR_ANSWER",
+                    evaluationSpec: {
+                        expectedAnswer: "An index is a B-Tree structure.",
+                        keyConcepts: ["B-Tree", "lookup"],
+                        rubric: [
+                            { criterion: "Accuracy", weight: 0.6 },
+                            { criterion: "Clarity", weight: 0.4 },
+                        ],
+                        commonMisconceptions: ["No disk usage"],
+                    },
+                },
+            },
+        });
+
+        const error = doc.validateSync();
+        expect(error).toBeUndefined();
+    });
+
+    it("fails validation when evaluationSpec is provided without expectedAnswer", () => {
+        const doc = new Workflow({
+            ...baseWorkflowData,
+            checkpoints: {
+                "cp-1": {
+                    id: "cp-1",
+                    taskId: "task-1",
+                    question: "Test question?",
+                    status: "WAITING_FOR_ANSWER",
+                    evaluationSpec: {
+                        keyConcepts: ["B-Tree"],
+                    },
+                },
+            },
+        });
+
+        const error = doc.validateSync();
+        expect(error).toBeDefined();
+        expect(error.errors["checkpoints.cp-1.evaluationSpec.expectedAnswer"]).toBeDefined();
+    });
+
+    it("fails validation when rubric criterion weight is greater than 1 or less than 0", () => {
+        const docOver = new Workflow({
+            ...baseWorkflowData,
+            checkpoints: {
+                "cp-1": {
+                    id: "cp-1",
+                    taskId: "task-1",
+                    question: "Test question?",
+                    status: "WAITING_FOR_ANSWER",
+                    evaluationSpec: {
+                        expectedAnswer: "Valid answer",
+                        rubric: [{ criterion: "Accuracy", weight: 1.5 }],
+                    },
+                },
+            },
+        });
+
+        const errorOver = docOver.validateSync();
+        expect(errorOver).toBeDefined();
+        expect(errorOver.errors["checkpoints.cp-1.evaluationSpec.rubric.0.weight"]).toBeDefined();
+
+        const docUnder = new Workflow({
+            ...baseWorkflowData,
+            checkpoints: {
+                "cp-1": {
+                    id: "cp-1",
+                    taskId: "task-1",
+                    question: "Test question?",
+                    status: "WAITING_FOR_ANSWER",
+                    evaluationSpec: {
+                        expectedAnswer: "Valid answer",
+                        rubric: [{ criterion: "Accuracy", weight: -0.1 }],
+                    },
+                },
+            },
+        });
+
+        const errorUnder = docUnder.validateSync();
+        expect(errorUnder).toBeDefined();
+        expect(errorUnder.errors["checkpoints.cp-1.evaluationSpec.rubric.0.weight"]).toBeDefined();
     });
 });

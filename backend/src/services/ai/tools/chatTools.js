@@ -62,6 +62,16 @@ Use this tool only when the user explicitly requests a quiz, survey, ranking, or
           description:
             "Short label for this set of questions, 2-4 words.",
         },
+        workflowId: {
+          type: "string",
+          description:
+            "The workflow ID if this question presents an active learning workflow checkpoint.",
+        },
+        checkpointId: {
+          type: "string",
+          description:
+            "The checkpoint ID if this question corresponds to a presented checkpoint in the workflow.",
+        },
         questions: {
           type: "array",
           description: "The list of questions to ask the user.",
@@ -73,6 +83,14 @@ Use this tool only when the user explicitly requests a quiz, survey, ranking, or
               id: {
                 type: "string",
                 description: "Unique identifier for this question (e.g. 'q1')",
+              },
+              workflowId: {
+                type: "string",
+                description: "Optional workflowId if this question belongs to an active learning workflow checkpoint.",
+              },
+              checkpointId: {
+                type: "string",
+                description: "Optional checkpointId if this question corresponds to a presented checkpoint.",
               },
               question: {
                 type: "string",
@@ -404,16 +422,13 @@ export const getChatTools = (chatMode = "casual", options = {}) => {
         askQuestionTool,
       ];
 
-  if (chatMode === "study") {
-    return [
-      ...baseTools,
-      createWorkflowTool,
-      listWorkflowsTool,
-      getWorkflowTool,
-      transitionWorkflowTool,
-      deleteWorkflowTool,
-    ];
-  }
+  const workflowTools = [
+    createWorkflowTool,
+    listWorkflowsTool,
+    getWorkflowTool,
+    deleteWorkflowTool,
+    transitionWorkflowTool,
+  ];
 
-  return baseTools;
+  return [...baseTools, ...workflowTools];
 };

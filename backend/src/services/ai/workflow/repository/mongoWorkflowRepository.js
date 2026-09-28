@@ -55,11 +55,11 @@ export class MongoWorkflowRepository {
         return docs.map((doc) => toDomainWorkflow(doc));
     }
 
-    async update(workflow, expectedVersion) {
+    async update(workflow, userId, expectedVersion) {
         const updated = await this.model.findOneAndUpdate(
             {
                 id: workflow.id,
-                user: workflow.userId,
+                user: userId,
                 version: expectedVersion,
             },
             {
@@ -88,7 +88,7 @@ export class MongoWorkflowRepository {
 
         const existing = await this.model.exists({
             id: workflow.id,
-            user: workflow.userId,
+            user: userId,
         });
 
         if (!existing) {
@@ -101,6 +101,35 @@ export class MongoWorkflowRepository {
         throw workflowRepositoryError(
             WORKFLOW_REPOSITORY_ERROR.VERSION_CONFLICT,
             `Workflow ${workflow.id} version conflict.`,
+        );
+    }
+
+    async delete(workflowId, userId, expectedVersion) {
+        const deleted = await this.model.findOneAndDelete({
+            id: workflowId,
+            user: userId,
+            version: expectedVersion,
+        });
+
+        if (deleted) {
+            return true;
+        }
+
+        const existing = await this.model.exists({
+            id: workflowId,
+            user: userId,
+        });
+
+        if (!existing) {
+            throw workflowRepositoryError(
+                WORKFLOW_REPOSITORY_ERROR.NOT_FOUND,
+                `Workflow ${workflowId} not found.`,
+            );
+        }
+
+        throw workflowRepositoryError(
+            WORKFLOW_REPOSITORY_ERROR.VERSION_CONFLICT,
+            `Workflow ${workflowId} version conflict.`,
         );
     }
 }

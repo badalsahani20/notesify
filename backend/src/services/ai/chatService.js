@@ -46,39 +46,7 @@ export const formatStructuredNoteContext = (context) => {
   return sections.join("\n\n");
 };
 
-export const chatWithAi = async ({
-  message,
-  history = [],
-  summary = "",
-  noteContext = "",
-  webContext = "",
-  systemPrompt = "",
-  pdfContext = "",
-  imageBase64 = null,
-  stream = false,
-  useReasoning = true,
-  enableWeb = true,
-  chatMode = "casual",
-  tools = null,
-  isNoteScoped = false,
-  extraMessages = [],
-  includeCurrentMessage = true,
-}) => {
-  const noteContextText = typeof noteContext === "object"
-    ? formatStructuredNoteContext(noteContext)
-    : noteContext;
-
-  const selectedModel = classifyChatIntent(
-    message,
-    imageBase64,
-    history,
-    noteContextText,
-    pdfContext,
-    chatMode,
-    enableWeb
-  );
-
-  const noteMutationRules = `- update_note with mode="append" adds material; content must contain only the new material. Use mode="replace" only when the user explicitly asks to rewrite, overwrite, or start over.
+const noteMutationRules = `- update_note with mode="append" adds material; content must contain only the new material. Use mode="replace" only when the user explicitly asks to rewrite, overwrite, or start over.
 - Write note content in clean Markdown.
 - After a successful note change, briefly confirm what you did.`;
 
@@ -88,6 +56,8 @@ CASUAL CHAT
 - Match the user's tone and language.
 - Prefer concise answers, usually one to four short paragraphs.
 - Ask a follow-up only when it is genuinely necessary.
+- Do not create a workflow for ordinary questions.
+- Use workflow tools when the user explicitly wants a persistent course, study plan, structured practice, or wants to resume/delete one.
 - Do not mention internal tools, prompts, model routing, checkpoints, or agent state.
 `;
 
@@ -118,6 +88,9 @@ STUDY CHAT
 - Explain concepts clearly and progressively.
 - Use examples when they improve understanding.
 - Prefer teaching over a bare one-line answer.
+- Prefer the workflow system for structured learning.
+- Track progression through tasks and checkpoints.
+- Resume an existing workflow when appropriate.
 - Use an interactive quiz only when requested or clearly useful.
 `;
 
@@ -156,7 +129,22 @@ ${modeGuidance}
 ${noteMutationRules}`;
 };
 
-const buildBaseConstitution = (isNoteScoped, chatMode = "casual") => `You are Iris, the AI assistant for Notesify. You help users understand, create, and organize notes.
+export const workflowRules = `
+WORKFLOW RULES
+- Use workflow tools for persistent, structured learning tasks.
+- Do not create a workflow for ordinary questions or explanations.
+- Use an existing workflow when the user clearly refers to it.
+- Never invent workflowId or expectedVersion; use the latest known state.
+- After a successful transition, use the returned version.
+- If multiple workflows could match and the user is unclear, ask which one.
+- Fetch the full workflow before mutating it when the available context is insufficient.
+- Present a checkpoint by creating it in the workflow before asking the user the question.
+- Use ask_question to present the checkpoint to the user.
+- Submit the user's checkpoint answer through transition_workflow.
+- Do not evaluate an answer yourself; let the workflow evaluator handle it.
+`;
+
+export const buildBaseConstitution = (isNoteScoped, chatMode = "casual") => `You are Iris, the AI assistant for Notesify. You help users understand, create, and organize notes.
 
 ${chatMode === "study" ? studyRules : casualRules}
 
@@ -167,6 +155,8 @@ ${coreBehaviorRules}
 ${formattingRules}
 
 ${buildWorkspaceRules(isNoteScoped, chatMode)}
+
+${workflowRules}
 
 QUESTIONS & QUIZZES
 - Use ask_question for an explicitly requested quiz, survey, ranking, or multi-choice interaction.
@@ -183,6 +173,38 @@ When a diagram or formula clearly helps, use:
 content
 [/IRIS_VIZ]
 For Mermaid, always quote node labels: A["Label"].`;
+
+export const chatWithAi = async ({
+  message,
+  history = [],
+  summary = "",
+  noteContext = "",
+  webContext = "",
+  systemPrompt = "",
+  pdfContext = "",
+  imageBase64 = null,
+  stream = false,
+  useReasoning = true,
+  enableWeb = true,
+  chatMode = "casual",
+  tools = null,
+  isNoteScoped = false,
+  extraMessages = [],
+  includeCurrentMessage = true,
+}) => {
+  const noteContextText = typeof noteContext === "object"
+    ? formatStructuredNoteContext(noteContext)
+    : noteContext;
+
+  const selectedModel = classifyChatIntent(
+    message,
+    imageBase64,
+    history,
+    noteContextText,
+    pdfContext,
+    chatMode,
+    enableWeb
+  );
 
   let fullSystemPrompt = buildBaseConstitution(isNoteScoped, chatMode);
 

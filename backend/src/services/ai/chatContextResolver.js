@@ -4,13 +4,22 @@ import { stripHtml } from "../../utils/stripHtml.js";
 import { summarizeHistory } from "../../utils/summarizeHistory.js";
 import { formatStructuredNoteContext } from "./chatService.js";
 import { getChatTools } from "./tools/chatTools.js";
+import {
+  resolveWorkflowContext,
+  formatWorkflowPromptContext,
+} from "./workflow/workflowContextResolver.js";
+import { workflowService as defaultWorkflowService } from "./workflow/index.js";
 
 /**
  * Fetch note context when the message is plausibly about the note.
  * First turn always fetches. Follow-ups fetch on broad note-related keywords.
  * Clearly off-topic messages (greetings, math, general questions) are skipped.
  */
-export const shouldFetchNote = (message = "", history = [], contextChanged = false) => {
+export const shouldFetchNote = (
+  message = "",
+  history = [],
+  contextChanged = false,
+) => {
   // If the frontend explicitly tells us the editor content changed, we must include it!
   if (contextChanged) return true;
 
@@ -39,9 +48,8 @@ export const resolveNoteContext = async ({ user, body, sessionData }) => {
   const history = sessionData?.history || [];
   let noteContext = "";
   let noteFetched = false;
-  const mentionsCurrentNote = /\b(?:this note|current note|my note|the note)\b/i.test(
-    message || "",
-  );
+  const mentionsCurrentNote =
+    /\b(?:this note|current note|my note|the note)\b/i.test(message || "");
 
   const isNoteQuery =
     noteId &&
@@ -70,7 +78,10 @@ export const resolveNoteContext = async ({ user, body, sessionData }) => {
           noteFetched = true;
         }
       } catch (error) {
-        console.warn("⚠️ [ChatContextResolver] Note context lookup skipped:", error.message);
+        console.warn(
+          "⚠️ [ChatContextResolver] Note context lookup skipped:",
+          error.message,
+        );
       }
     }
   }
@@ -79,8 +90,17 @@ export const resolveNoteContext = async ({ user, body, sessionData }) => {
 };
 
 export class ChatContextResolver {
+  constructor({ workflowService = defaultWorkflowService } = {}) {
+    this.workflowService = workflowService;
+  }
+
   async resolve({ user, body, sessionData }) {
-    const { history = [], summary = "", activeSession, isGlobalChat } = sessionData || {};
+    const {
+      history = [],
+      summary = "",
+      activeSession,
+      isGlobalChat,
+    } = sessionData || {};
     const {
       message = "",
       noteId,
@@ -107,7 +127,10 @@ export class ChatContextResolver {
 
       if (olderMessages.length > 0) {
         try {
-          const consolidatedSummary = await summarizeHistory(olderMessages, sessionSummary);
+          const consolidatedSummary = await summarizeHistory(
+            olderMessages,
+            sessionSummary,
+          );
           if (consolidatedSummary) {
             sessionSummary = consolidatedSummary;
             if (activeSession) {
@@ -115,7 +138,10 @@ export class ChatContextResolver {
             }
           }
         } catch (sumErr) {
-          console.warn("⚠️ [ChatContextResolver] Conversation summarization failed:", sumErr.message);
+          console.warn(
+            "⚠️ [ChatContextResolver] Conversation summarization failed:",
+            sumErr.message,
+          );
         }
       }
 
@@ -123,12 +149,19 @@ export class ChatContextResolver {
     }
 
     // Merge any verified client-side tool execution results into history
-    if (Array.isArray(clientToolResults) && clientToolResults.length > 0 && effectiveHistory) {
+    if (
+      Array.isArray(clientToolResults) &&
+      clientToolResults.length > 0 &&
+      effectiveHistory
+    ) {
       for (const ctr of clientToolResults) {
         for (const h of effectiveHistory) {
           if (h.role === "assistant" && Array.isArray(h.toolCalls)) {
             for (const tc of h.toolCalls) {
-              if ((ctr.toolCallId && tc.id === ctr.toolCallId) || (!ctr.toolCallId && tc.tool === ctr.tool)) {
+              if (
+                (ctr.toolCallId && tc.id === ctr.toolCallId) ||
+                (!ctr.toolCallId && tc.tool === ctr.tool)
+              ) {
                 tc.status = ctr.status;
                 if (ctr.data) tc.data = ctr.data;
                 if (ctr.error) tc.error = ctr.error;
@@ -179,7 +212,7 @@ export class ChatContextResolver {
       try {
         const existingNote = await Notes.findOne(
           { _id: activeNoteId, user: user._id },
-          "title"
+          "title",
         ).lean();
         if (existingNote) {
           activeNoteTitle = existingNote.title;
@@ -192,8 +225,38 @@ export class ChatContextResolver {
       activeNoteContext = `\n\n[ACTIVE NOTE]\nid: ${activeNoteId}\ntitle: "${activeNoteTitle || "Untitled"}"\n[/ACTIVE NOTE]`;
     }
 
+    const userId = (user?._id || user?.id || user?.userId)?.toString?.() || null;
+    const sessionId = (activeSession?._id || activeSession?.id || body?.sessionId)?.toString?.() || null;
+    const workflowId = body?.workflowId || sessionData?.workflowId || null;
+
+    let workflowContext = { activeWorkflow: null, candidates: [] };
+    if (userId) {
+      try {
+        workflowContext = await resolveWorkflowContext({
+          workflowService: this.workflowService,
+          userId,
+          sessionId,
+          workflowId,
+        });
+      } catch (err) {
+        console.warn(
+          "⚠️ [ChatContextResolver] Workflow context resolution skipped:",
+          err.message,
+        );
+      }
+    }
+
+    const workflowPromptContext = formatWorkflowPromptContext(workflowContext);
+
     const userName = user?.name ? `User: ${user.name}` : "";
-    const finalSystemPrompt = [userName, memoryContext, activeNoteContext].filter(Boolean).join("\n");
+    const finalSystemPrompt = [
+      userName,
+      memoryContext,
+      activeNoteContext,
+      workflowPromptContext,
+    ]
+      .filter(Boolean)
+      .join("\n");
 
     const currentMode = activeSession?.chatMode || chatMode || "casual";
     // A global chat may reference the currently open note without becoming a
@@ -212,6 +275,7 @@ export class ChatContextResolver {
       currentMode,
       isNoteScoped,
       activeNoteId,
+      workflowContext,
       tools,
     };
   }

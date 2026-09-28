@@ -15,6 +15,7 @@ export const GRAMMAR_MODEL = "meta-llama/llama-3.1-8b-instruct"
 export const FALLBACK_MODEL = "openai/gpt-oss-120b";
 export const GROQ_CHEAP_MODEL = "openai/gpt-oss-20b";
 export const GROQ_STRONG_MODEL = "openai/gpt-oss-120b";
+export const JEV_MODEL = process.env.JEV_MODEL || "typesafe/jev-1.13";
 
 export const getGeminiClient = () => {
   if (!process.env.GEMINI_API_KEY) return null;

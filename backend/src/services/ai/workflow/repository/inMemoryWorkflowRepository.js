@@ -25,14 +25,14 @@ export class InMemoryWorkflowRepository {
             .map((workflow) => structuredClone(workflow));
     }
 
-    async update(workflow, expectedVersion) {
+    async update(workflow, userId, expectedVersion) {
         const existing = this.workflows.get(workflow.id);
 
-        if (!existing || existing.userId !== workflow.userId) {
+        if (!existing || existing.userId !== userId) {
             throw workflowRepositoryError(
                 WORKFLOW_REPOSITORY_ERROR.NOT_FOUND,
                 `Workflow ${workflow.id} not found.`
-            )
+            );
         }
 
         if (existing.version !== expectedVersion) {
@@ -45,5 +45,26 @@ export class InMemoryWorkflowRepository {
         this.workflows.set(workflow.id, structuredClone(workflow));
 
         return structuredClone(workflow);
+    }
+
+    async delete(workflowId, userId, expectedVersion) {
+        const existing = this.workflows.get(workflowId);
+
+        if (!existing || existing.userId !== userId) {
+            throw workflowRepositoryError(
+                WORKFLOW_REPOSITORY_ERROR.NOT_FOUND,
+                `Workflow ${workflowId} not found.`,
+            );
+        }
+
+        if (existing.version !== expectedVersion) {
+            throw workflowRepositoryError(
+                WORKFLOW_REPOSITORY_ERROR.VERSION_CONFLICT,
+                `Workflow ${workflowId} version conflict.`,
+            );
+        }
+
+        this.workflows.delete(workflowId);
+        return true;
     }
 }

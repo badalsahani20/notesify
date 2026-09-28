@@ -56,6 +56,7 @@ const pendingInteractionSchema = new mongoose.Schema(
     },
     answer: { type: mongoose.Schema.Types.Mixed, default: null },
     checkpointId: { type: String, required: true },
+    workflowId: { type: String, default: null },
     createdAt: { type: Date, default: Date.now },
     answeredAt: { type: Date, default: null },
   },

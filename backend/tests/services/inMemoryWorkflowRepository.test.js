@@ -86,7 +86,7 @@ describe("InMemoryWorkflowRepository", () => {
             version: 1,
         };
 
-        const result = await repository.update(updated, 0);
+        const result = await repository.update(updated, workflow.userId, 0);
 
         expect(result).toEqual(updated);
 
@@ -106,7 +106,7 @@ describe("InMemoryWorkflowRepository", () => {
         };
 
         await expect(
-            repository.update(updated, 0),
+            repository.update(updated, workflow.userId, 0),
         ).rejects.toMatchObject({
             code: WORKFLOW_REPOSITORY_ERROR.NOT_FOUND,
         });
@@ -124,6 +124,7 @@ describe("InMemoryWorkflowRepository", () => {
                     ...workflow,
                     version: 3,
                 },
+                workflow.userId,
                 1,
             ),
         ).rejects.toMatchObject({
@@ -156,6 +157,7 @@ describe("InMemoryWorkflowRepository", () => {
                     ...workflow,
                     id: "missing-workflow",
                 },
+                workflow.userId,
                 0,
             ),
         ).rejects.toMatchObject({
@@ -176,11 +178,120 @@ describe("InMemoryWorkflowRepository", () => {
                     ...workflow,
                     version: 3,
                 },
+                workflow.userId,
                 1,
             ),
         ).rejects.toMatchObject({
             code: WORKFLOW_REPOSITORY_ERROR.VERSION_CONFLICT,
             statusCode: 409,
         });
+    });
+
+    it("deletes a workflow when expectedVersion matches", async () => {
+        await repository.create(workflow);
+
+        const result = await repository.delete(workflow.id, workflow.userId, 0);
+        expect(result).toBe(true);
+
+        const stored = await repository.getById(workflow.id, workflow.userId);
+        expect(stored).toBeNull();
+    });
+
+    it("rejects delete when workflow does not exist", async () => {
+        await expect(
+            repository.delete("missing-workflow", workflow.userId, 0),
+        ).rejects.toMatchObject({
+            code: WORKFLOW_REPOSITORY_ERROR.NOT_FOUND,
+            statusCode: 404,
+        });
+    });
+
+    it("rejects delete when version conflict occurs", async () => {
+        await repository.create({
+            ...workflow,
+            version: 2,
+        });
+
+        await expect(
+            repository.delete(workflow.id, workflow.userId, 1),
+        ).rejects.toMatchObject({
+            code: WORKFLOW_REPOSITORY_ERROR.VERSION_CONFLICT,
+            statusCode: 409,
+        });
+    });
+
+    it("evaluationSpec survives repository round-trip", async () => {
+        const evaluationSpec = {
+            expectedAnswer: "Indexes provide O(log n) lookups using B-Trees.",
+            keyConcepts: ["B-Tree", "lookup performance"],
+            rubric: [
+                { criterion: "Mentions B-Tree", weight: 0.5 },
+                { criterion: "Explains performance benefit", weight: 0.5 },
+            ],
+            commonMisconceptions: ["Indexes speed up all write operations"],
+        };
+
+        const workflowWithSpec = {
+            ...workflow,
+            checkpoints: {
+                "checkpoint-1": {
+                    id: "checkpoint-1",
+                    taskId: "task-1",
+                    question: "How do indexes optimize query execution?",
+                    status: "WAITING_FOR_ANSWER",
+                    evaluationSpec,
+                    userAnswer: null,
+                    evaluation: null,
+                    presentedAt: new Date().toISOString(),
+                    answeredAt: null,
+                },
+            },
+        };
+
+        await repository.create(workflowWithSpec);
+
+        // Retrieve and verify
+        const fetched = await repository.getById(workflow.id, workflow.userId);
+        expect(fetched.checkpoints["checkpoint-1"].evaluationSpec).toEqual(evaluationSpec);
+
+        // Update and verify persistence
+        const updated = {
+            ...fetched,
+            version: 1,
+            checkpoints: {
+                ...fetched.checkpoints,
+                "checkpoint-1": {
+                    ...fetched.checkpoints["checkpoint-1"],
+                    status: "ANSWERED",
+                    userAnswer: "They use B-Trees to avoid full collection scans.",
+                },
+            },
+        };
+
+        const updateResult = await repository.update(updated, workflow.userId, 0);
+        expect(updateResult.checkpoints["checkpoint-1"].evaluationSpec).toEqual(evaluationSpec);
+
+        const fetchedAfterUpdate = await repository.getById(workflow.id, workflow.userId);
+        expect(fetchedAfterUpdate.checkpoints["checkpoint-1"].evaluationSpec).toEqual(evaluationSpec);
+    });
+
+    it("preserves backwards compatibility when evaluationSpec is null", async () => {
+        const legacyWorkflow = {
+            ...workflow,
+            checkpoints: {
+                "checkpoint-old": {
+                    id: "checkpoint-old",
+                    taskId: "task-1",
+                    question: "Legacy question?",
+                    status: "WAITING_FOR_ANSWER",
+                    evaluationSpec: null,
+                },
+            },
+        };
+
+        await repository.create(legacyWorkflow);
+
+        const fetched = await repository.getById(workflow.id, workflow.userId);
+        expect(fetched.checkpoints["checkpoint-old"].evaluationSpec).toBeNull();
     });
 });

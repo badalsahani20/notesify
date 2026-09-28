@@ -3,8 +3,12 @@ import { chatWithAi } from "../chatService.js";
 const DEFAULT_MAX_TOOL_ROUNDS = 3;
 
 export class IrisAgent {
-  constructor({ maxToolRounds = DEFAULT_MAX_TOOL_ROUNDS } = {}) {
+  constructor({
+    maxToolRounds = DEFAULT_MAX_TOOL_ROUNDS,
+    chatService = chatWithAi,
+  } = {}) {
     this.maxToolRounds = maxToolRounds;
+    this.chatService = chatService;
   }
 
   async run({
@@ -48,7 +52,7 @@ export class IrisAgent {
       let roundResult;
 
       try {
-        roundResult = await chatWithAi({
+        roundResult = await this.chatService({
           message,
           history,
           summary,

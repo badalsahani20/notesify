@@ -330,6 +330,94 @@ describe("PRESENT_CHECKPOINT", () => {
         expect(state.checkpoints).toEqual({});
         expect(state.version).toBe(5);
     });
+
+    it("PRESENT_CHECKPOINT persists evaluationSpec", () => {
+        const state = {
+            status: WORKFLOW_STATUS.ACTIVE,
+            activeTaskId: "task-1",
+            activeCheckpointId: null,
+            version: 5,
+            taskStates: {
+                "task-1": {
+                    status: TASK_STATUS.ACTIVE,
+                    attempts: 0,
+                },
+            },
+            checkpoints: {},
+        };
+
+        const evaluationSpec = {
+            expectedAnswer: "Indexes provide quick lookups.",
+            keyConcepts: ["B-Tree", "Scan time"],
+            rubric: [
+                { criterion: "Accurate definition", weight: 0.7 },
+                { criterion: "Performance mention", weight: 0.3 },
+            ],
+            commonMisconceptions: ["Indexes don't cost disk space"],
+        };
+
+        const next = transition(
+            state,
+            COMMAND.PRESENT_CHECKPOINT,
+            {
+                taskId: "task-1",
+                checkpointId: "checkpoint-1",
+                question: "What is a MongoDB index?",
+                evaluationSpec,
+            },
+        );
+
+        expect(next.checkpoints["checkpoint-1"]).toEqual({
+            id: "checkpoint-1",
+            taskId: "task-1",
+            question: "What is a MongoDB index?",
+            status: CHECKPOINT_STATUS.WAITING_FOR_ANSWER,
+            evaluationSpec: {
+                expectedAnswer: "Indexes provide quick lookups.",
+                keyConcepts: ["B-Tree", "Scan time"],
+                rubric: [
+                    { criterion: "Accurate definition", weight: 0.7 },
+                    { criterion: "Performance mention", weight: 0.3 },
+                ],
+                commonMisconceptions: ["Indexes don't cost disk space"],
+            },
+            userAnswer: null,
+            evaluation: null,
+            presentedAt: expect.any(String),
+            answeredAt: null,
+        });
+    });
+
+    it("defaults evaluationSpec to null for backwards compatibility when omitted", () => {
+        const state = {
+            status: WORKFLOW_STATUS.ACTIVE,
+            activeTaskId: "task-1",
+            activeCheckpointId: null,
+            version: 5,
+            taskStates: {
+                "task-1": {
+                    status: TASK_STATUS.ACTIVE,
+                    attempts: 0,
+                },
+            },
+            checkpoints: {},
+        };
+
+        const next = transition(
+            state,
+            COMMAND.PRESENT_CHECKPOINT,
+            {
+                taskId: "task-1",
+                checkpointId: "checkpoint-1",
+                question: "What is a MongoDB index?",
+            },
+        );
+
+        expect(next.checkpoints["checkpoint-1"].evaluationSpec).toBeNull();
+        expect(next.checkpoints["checkpoint-1"].userAnswer).toBeNull();
+        expect(next.checkpoints["checkpoint-1"].evaluation).toBeNull();
+        expect(next.checkpoints["checkpoint-1"].answeredAt).toBeNull();
+    });
 });
 
 it("rejects presenting another checkpoint while one is active", () => {
@@ -645,6 +733,9 @@ describe("EVALUATE_CHECKPOINT", () => {
             expect.objectContaining({
                 verdict: VERDICT.PASSED,
                 confidence: 0.95,
+                feedback: null,
+                misconceptions: [],
+                criterionResults: [],
             }),
         );
 
