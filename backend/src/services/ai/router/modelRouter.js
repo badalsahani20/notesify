@@ -40,13 +40,6 @@ export const classifyChatIntent = (
     return PRIMARY_MODEL;
   }
 
-  // 3. DIAGRAMS / GRAPHS / CHARTS
-  const isDiagramOrGraph =
-    /\b(diagram|chart|graph|flowchart|wireframe|mockup|screenshot|visualize|architecture|workflow|sequence diagram|erd|uml|mindmap|tree)\b/.test(
-      msg,
-    );
-  if (isDiagramOrGraph) return PRIMARY_MODEL;
-
   // 4. STUDY MODE
   if (chatMode === "study") {
     const chosenModel = TEACHING_MODELS[0];

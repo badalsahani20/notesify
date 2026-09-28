@@ -3,18 +3,18 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 export const PRIMARY_MODEL = "deepseek/deepseek-v4-flash-0731";
 export const TEACHING_MODELS = [
   "deepseek/deepseek-v4-flash-0731",
-  "xiaomi/mimo-v2.6-flash",
 ];
-export const DEFAULT_CHAT_MODEL = "z-ai/glm-5.3-flash";
+export const DEFAULT_CHAT_MODEL = "inclusionai/ling-3.0-flash";
 export const QUICK_MODEL = "inclusionai/ling-3.0-flash";
 export const TITLE_GENERATION_MODEL = "meta-llama/llama-3.1-8b-instruct";
-export const COMPLEX_ANALYSIS_MODEL = "xiaomi/mimo-v2.6-flash";
+export const COMPLEX_ANALYSIS_MODEL = "z-ai/glm-5.3-flash";
 export const VISUALIZATION_MODEL = "z-ai/glm-5.3-flash";
 export const NOTES_GENERATION_MODEL = "openai/gpt-oss-120b";
 export const GRAMMAR_MODEL = "meta-llama/llama-3.1-8b-instruct"
 export const FALLBACK_MODEL = "openai/gpt-oss-120b";
 export const GROQ_CHEAP_MODEL = "openai/gpt-oss-20b";
 export const GROQ_STRONG_MODEL = "openai/gpt-oss-120b";
+export const JEV_MODEL = process.env.JEV_MODEL || "typesafe/jev-1.13";
 
 export const getGeminiClient = () => {
   if (!process.env.GEMINI_API_KEY) return null;

@@ -6,10 +6,12 @@ import IrisMessageBody from "./IrisMessageBody";
 import { IrisNoteCreatedCard } from "./IrisNoteCreatedCard";
 import { Tool, ToolCall, ToolStatus } from "@/components/ai/tool";
 import { parseIrisResponse } from "@/utils/parseIrisResponse";
-import { useEffect, useState, useRef, useLayoutEffect, memo, useCallback, useMemo } from "react";
+import { useEffect, useState, useRef, memo, useCallback, useMemo } from "react";
 import { TextShimmer } from "@/components/ui/text-shimmer";
 import { Source, SourceTrigger, SourceContent } from "@/components/ui/source";
 import { Reasoning, ReasoningTrigger, ReasoningContent } from "@/components/ui/reasoning";
+import { MessageScroller } from "@/components/agents/message-scroller";
+import { StreamingResponse } from "@/components/agents/streaming-response";
 
 // --- Thinking Widget ---
 interface ThinkingWidgetProps {
@@ -147,8 +149,8 @@ const ChatMessageRow = memo(({
     );
 
     return (
-      <div className="gc-msg gc-msg-assistant">
-        <div className="gc-msg-bubble gc-msg-bubble-ai">
+      <div className="gc-msg gc-msg-assistant" data-slot="message" data-from="assistant">
+        <div className="gc-msg-bubble gc-msg-bubble-ai" data-slot="message-bubble-content">
           {/* Unified Agentic Task Indicators with TextShimmer */}
           {isWorking && hasAgenticTask && (
             <div className="flex flex-col gap-1 text-xs font-semibold my-1 text-white">
@@ -183,19 +185,26 @@ const ChatMessageRow = memo(({
             />
           )}
 
-          {/* Message content */}
+          {/* Message content with StreamingResponse */}
           {displayText ? (
             <div className="gc-markdown max-w-full select-text" data-ms-editor="false" spellCheck={false} translate="no">
-              <AssistantMessageBody
-                text={displayText}
-                isStreaming={isStreaming && isActiveStream}
-                savedSegments={msg.segments}
-                citations={citations}
-              />
+              <StreamingResponse
+                status={isActiveStream && isStreaming ? "streaming" : "complete"}
+                copyText={displayText}
+                onCopy={() => onCopy(displayText, msg.id)}
+                className="w-full"
+              >
+                <AssistantMessageBody
+                  text={displayText}
+                  isStreaming={isStreaming && isActiveStream}
+                  savedSegments={msg.segments}
+                  citations={citations}
+                />
+              </StreamingResponse>
             </div>
           ) : null}
 
-          {/* Sources UI */}
+          {/* Existing Sources UI */}
           {citations.length > 0 && (
             <div className="mt-3 pt-2.5 border-t border-white/5">
               <div className="text-[11px] font-medium text-neutral-400 uppercase tracking-wider mb-2">
@@ -270,23 +279,6 @@ const ChatMessageRow = memo(({
             return null;
           })}
 
-          {/* Copy response button once generation completes */}
-          {!(isActiveStream && isStreaming) && (
-            <div className="flex items-center gap-2 mt-2 pt-2 border-t border-white/5 text-white/40">
-              <button
-                onClick={() => onCopy(displayText, msg.id)}
-                className="p-1 rounded-md hover:bg-white/5 hover:text-white transition-colors flex items-center justify-center cursor-pointer"
-                title="Copy response"
-              >
-                {isCopied ? (
-                  <Check size={14} className="text-emerald-500" />
-                ) : (
-                  <Copy size={14} />
-                )}
-              </button>
-            </div>
-          )}
-
           {isActiveStream && isStreaming && displayText && <span className="gc-cursor" />}
         </div>
       </div>
@@ -295,8 +287,8 @@ const ChatMessageRow = memo(({
 
   // User Message
   return (
-    <div className="gc-msg gc-msg-user">
-      <div className="gc-msg-bubble gc-msg-bubble-user group relative">
+    <div className="gc-msg gc-msg-user" data-slot="message" data-from="user">
+      <div className="gc-msg-bubble gc-msg-bubble-user group relative" data-slot="message-bubble-content">
         {msg.imageUrl && (
           <a
             href={msg.imageUrl}
@@ -394,9 +386,6 @@ export const GlobalChatMessages = memo(({
   const [longUserMessageIds, setLongUserMessageIds] = useState<Set<string>>(new Set());
   const userMessageRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const userHasScrolledUpRef = useRef(false);
-  const lastMessageCount = useRef(messages.length);
-  const scrollFrameRef = useRef<number | null>(null);
   const citationCacheRef = useRef(new Map<string, { toolCalls?: Message["toolCalls"]; citations: any[] }>());
 
   const citationsByMessageId = useMemo(() => {
@@ -457,7 +446,7 @@ export const GlobalChatMessages = memo(({
       }
     });
     setLongUserMessageIds(nextLongMessageIds);
-  }, [userMessageMeasureKey]);
+  }, [userMessageMeasureKey, messages]);
 
   useEffect(() => {
     const nextHeights: Record<string, number> = {};
@@ -571,79 +560,6 @@ export const GlobalChatMessages = memo(({
     };
   }, [handleSelectionCheck, updateSelectionToolbar]);
 
-  const isInitialMount = useRef(true);
-  const prevMessagesLength = useRef(messages.length);
-
-  // Pin scroll container on initial mount
-  useLayoutEffect(() => {
-    const container = scrollContainerRef.current;
-    if (container && messages.length > 0) {
-      container.scrollTop = container.scrollHeight;
-    }
-  }, []);
-
-  useEffect(() => {
-    if (messagesLoading) {
-      isInitialMount.current = true;
-    }
-  }, [messagesLoading]);
-
-  useEffect(() => {
-    if (messages.length > lastMessageCount.current || isSending) {
-      userHasScrolledUpRef.current = false;
-    }
-    lastMessageCount.current = messages.length;
-  }, [messages.length, isSending]);
-
-  // Auto-scroll logic during streaming and message addition
-  useEffect(() => {
-    if (userHasScrolledUpRef.current) return;
-
-    const container = scrollContainerRef.current;
-    if (!container) return;
-
-    const pinToBottom = () => {
-      scrollFrameRef.current = null;
-      if (!userHasScrolledUpRef.current) {
-        container.scrollTop = container.scrollHeight;
-      }
-    };
-
-    if (scrollFrameRef.current !== null) {
-      cancelAnimationFrame(scrollFrameRef.current);
-    }
-
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      prevMessagesLength.current = messages.length;
-      pinToBottom();
-      return;
-    }
-
-    if (isStreaming) {
-      scrollFrameRef.current = requestAnimationFrame(pinToBottom);
-      return;
-    }
-
-    if (messages.length > prevMessagesLength.current) {
-      prevMessagesLength.current = messages.length;
-      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [
-    messages.length,
-    messagesLoading,
-    streamedMessageText,
-    isStreaming,
-    isSending,
-    bottomRef,
-  ]);
-
-  useEffect(() => () => {
-    if (scrollFrameRef.current !== null) {
-      cancelAnimationFrame(scrollFrameRef.current);
-    }
-  }, []);
-
   // When an interactive question/quiz prompt opens, scroll down so the message sits above the card
   useEffect(() => {
     if (hasActivePrompt) {
@@ -653,14 +569,6 @@ export const GlobalChatMessages = memo(({
       return () => clearTimeout(timer);
     }
   }, [hasActivePrompt, bottomRef]);
-
-  const handleScroll = useCallback(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-
-    const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 60;
-    userHasScrolledUpRef.current = !isNearBottom;
-  }, []);
 
   const handleCopy = useCallback((text: string, id: string) => {
     if (!text) return;
@@ -747,11 +655,19 @@ export const GlobalChatMessages = memo(({
         </div>
       )}
 
-      {/* Main Native Scroll Container */}
-      <div
-        className={`gc-messages custom-scrollbar relative${fullWidthAssistant ? " gc-messages-fullwidth-assistant" : ""}`}
-        ref={scrollContainerRef}
-        onScroll={handleScroll}
+      {/* Reader-Aware Message Scroller Viewport */}
+      <MessageScroller
+        followOutput={true}
+        followThreshold={64}
+        smooth={!isStreaming}
+        busy={isStreaming}
+        navigation={fullWidthAssistant ? undefined : "rail"}
+        navigationLabel="Chat navigation"
+        railClassName={hasActivePrompt ? "!bottom-[360px]" : "!bottom-[104px]"}
+        viewportRef={scrollContainerRef}
+        viewportClassName={`gc-messages relative${fullWidthAssistant ? " gc-messages-fullwidth-assistant" : ""} [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden`}
+        contentClassName="flex flex-col gap-4 w-full min-w-0"
+        className="h-full flex-1 min-h-0 overflow-hidden"
       >
         {messagesLoading ? (
           <div className="gc-loading-wrap">
@@ -794,7 +710,7 @@ export const GlobalChatMessages = memo(({
         {/* Spacer to allow scrolling past floating input box & active prompt dialog */}
         <div className={`shrink-0 transition-all duration-300 ${hasActivePrompt ? "h-[360px] sm:h-[400px]" : "h-48"}`} />
         <div ref={bottomRef} />
-      </div>
+      </MessageScroller>
     </div>
   );
 });

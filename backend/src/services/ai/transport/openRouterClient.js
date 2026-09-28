@@ -19,6 +19,7 @@ export const executeOpenRouter = async (
 
   const isGlm = modelId.toLowerCase().includes("glm");
   const isDeepseek = modelId.toLowerCase().includes("deepseek");
+  const isLing = modelId.toLowerCase().includes("ling");
 
   const bodyPayload = {
     model: modelId,
@@ -30,25 +31,34 @@ export const executeOpenRouter = async (
   if (isGlm) {
     bodyPayload.provider = {
       order: [
-        "deepinfra/fp4",
-        "inference-net/fp4",
-        "novita/fp8",
+        "baseten/fp8",
+        "parasail/fp8",
+        "modal/nvfp4",
+        "crusoe/fp4"
       ],
       allow_fallbacks: true,
     };
   } else if (isDeepseek) {
     bodyPayload.provider = {
       order: [
+        "makora",
         "digitalocean",
         "deepinfra/fp8",
         "streamlake/fp8",
-        "makora",
       ],
       allow_fallbacks: true,
     };
   }
 
-  if (isMandatoryReasoningModel) {
+  if (isLing) {
+    if (includeReasoning === false) {
+      bodyPayload.include_reasoning = false;
+      bodyPayload.reasoning = { effort: "none" };
+    } else {
+      bodyPayload.include_reasoning = true;
+      bodyPayload.reasoning = { effort: "high" };
+    }
+  } else if (isMandatoryReasoningModel) {
     // These models strictly require reasoning or they deny the request
     bodyPayload.include_reasoning = true;
     // OpenRouter rejects reasoning.effort together with reasoning.max_tokens.
