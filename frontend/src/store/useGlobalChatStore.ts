@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import api from "@/lib/api";
+import { toast } from "sonner";
 import { parseIrisResponse } from "../utils/parseIrisResponse";
 import { prepareChatImage } from "@/utils/uploadImage";
 import { consumeAiChatStream } from "@/utils/consumeAiChatStream";
@@ -10,6 +11,7 @@ import type {
   IrisSegment,
   ToolCallRecord,
   ChatArtifact,
+  ChatAttachmentBundle,
   InteractiveQuestion,
 } from "@/components/ai/types";
 
@@ -55,6 +57,9 @@ type GlobalChatStore = {
   // Sidebar
   sessions: ChatSession[];
   sessionsLoading: boolean;
+  sessionsLoadingMore: boolean;
+  sessionsHasMore: boolean;
+  sessionsCursor: string | null;
 
   // Active chat
   activeSessionId: string | null;
@@ -65,6 +70,7 @@ type GlobalChatStore = {
   // Compose
   isSending: boolean;
   attachedImage: string | null;
+  attachedFolder: ChatAttachmentBundle | null;
   imageDisabled: boolean;
   useReasoning: boolean;
   useWebSearch: boolean;
@@ -76,12 +82,16 @@ type GlobalChatStore = {
 
   // Actions
   fetchSessions: (options?: { silent?: boolean }) => Promise<void>;
+  loadMoreSessions: () => Promise<void>;
+  deleteSession: (sessionId: string) => Promise<void>;
   loadSession: (sessionId: string, options?: { background?: boolean }) => Promise<void>;
   startNewChat: () => void;
-  sendMessage: (text: string, image?: string | null) => Promise<void>;
+  sendMessage: (text: string, image?: string | null, chatAttachmentId?: string | null) => Promise<void>;
   answerInteraction: (answer: string) => Promise<void>;
   stopGeneration: () => void;
   setAttachedImage: (img: string | null) => void;
+  setAttachedFolder: (folder: ChatAttachmentBundle | null) => void;
+  uploadFolder: (files: File[]) => Promise<void>;
   setUseReasoning: (val: boolean) => void;
   setUseWebSearch: (val: boolean) => void;
   setChatMode: (mode: "study" | "casual") => void;
@@ -91,12 +101,16 @@ type GlobalChatStore = {
 export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
   sessions: [],
   sessionsLoading: false,
+  sessionsLoadingMore: false,
+  sessionsHasMore: false,
+  sessionsCursor: null,
   activeSessionId: null,
   messages: [],
   messagesLoading: false,
   pendingInteraction: null,
   isSending: false,
   attachedImage: null,
+  attachedFolder: null,
   imageDisabled: false,
   useReasoning: false, 
   useWebSearch: false,
@@ -109,7 +123,7 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
       set({ sessionsLoading: true });
     }
     try {
-      const { data } = await api.get("/ai/sessions");
+      const { data } = await api.get("/ai/sessions", { params: { limit: 30 } });
       const currentSessions = get().sessions;
       const newSessions: ChatSession[] = data.data.sessions || [];
       const hasChanged =
@@ -124,12 +138,63 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
       if (hasChanged) {
         set({ sessions: newSessions });
       }
+      set({
+        sessionsHasMore: Boolean(data.data.hasMore),
+        sessionsCursor: data.data.nextCursor || null,
+      });
     } catch {
       // silently fail — sidebar just stays empty
     } finally {
       if (!options?.silent) {
         set({ sessionsLoading: false });
       }
+    }
+  },
+
+  loadMoreSessions: async () => {
+    const { sessionsLoadingMore, sessionsHasMore, sessionsCursor } = get();
+    if (sessionsLoadingMore || !sessionsHasMore || !sessionsCursor) return;
+
+    set({ sessionsLoadingMore: true });
+    try {
+      const { data } = await api.get("/ai/sessions", {
+        params: { limit: 30, cursor: sessionsCursor },
+      });
+      const incoming: ChatSession[] = data.data.sessions || [];
+      const existingIds = new Set(get().sessions.map((session) => session._id));
+      const appended = incoming.filter((session) => !existingIds.has(session._id));
+
+      set((state) => ({
+        sessions: [...state.sessions, ...appended],
+        sessionsHasMore: Boolean(data.data.hasMore),
+        sessionsCursor: data.data.nextCursor || null,
+      }));
+    } catch {
+      // Keep the already-loaded sessions visible.
+    } finally {
+      set({ sessionsLoadingMore: false });
+    }
+  },
+
+  deleteSession: async (sessionId: string) => {
+    try {
+      await api.delete(`/ai/sessions/${sessionId}`);
+      const wasActive = get().activeSessionId === sessionId;
+
+      set((state) => ({
+        sessions: state.sessions.filter((session) => session._id !== sessionId),
+        ...(wasActive
+          ? {
+              activeSessionId: null,
+              messages: [],
+              pendingInteraction: null,
+              attachedImage: null,
+              attachedFolder: null,
+            }
+          : {}),
+      }));
+    } catch {
+      toast.error("Could not delete this chat. Please try again.");
     }
   },
 
@@ -150,7 +215,10 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
     try {
       const { data } = await api.get(`/ai/chat/session/${sessionId}`);
 
-      set({ pendingInteraction: data.data.pendingInteraction || null });
+      set({
+        pendingInteraction: data.data.pendingInteraction || null,
+        attachedFolder: data.data.activeAttachmentBundle || null,
+      });
       
       // Inherit the chatMode from the loaded session if available
       if (data.data.chatMode === "study" || data.data.chatMode === "casual") {
@@ -192,6 +260,7 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
       messages: [],
       pendingInteraction: null,
       attachedImage: null,
+      attachedFolder: null,
     });
   },
 
@@ -353,10 +422,11 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
     }
   },
 
-  sendMessage: async (text: string, image?: string | null) => {
+  sendMessage: async (text: string, image?: string | null, chatAttachmentId?: string | null) => {
     const { activeSessionId, messages } = get();
     const requestSessionId = activeSessionId;
     const { imageForApi, imageUrl } = await prepareChatImage(image);
+    const attachmentId = chatAttachmentId || get().attachedFolder?.id || null;
 
     // 1. Optimistically add user message
     const userMsg: ChatMessage = {
@@ -392,6 +462,7 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
         text,
         sessionId: activeSessionId,
         imageForApi: imageForApi || undefined,
+        chatAttachmentId: attachmentId || undefined,
         activeArtifact: get().activeArtifact,
         messages,
         useReasoning: get().useReasoning,
@@ -536,18 +607,28 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
   },
 
   setAttachedImage: (img) => set({ attachedImage: img }),
+  setAttachedFolder: (folder) => set({ attachedFolder: folder }),
+  uploadFolder: async (files) => {
+    const { uploadChatAttachment } = await import("@/services/ai/uploadChatAttachment");
+    const folder = await uploadChatAttachment(files);
+    set({ attachedFolder: folder });
+  },
   setUseReasoning: (val) => set({ useReasoning: val }),
   setUseWebSearch: (val) => set({ useWebSearch: val }),
   setChatMode: (mode) => set({ chatMode: mode }),
   reset: () => set({
     sessions: [],
     sessionsLoading: false,
+    sessionsLoadingMore: false,
+    sessionsHasMore: false,
+    sessionsCursor: null,
     activeSessionId: null,
     messages: [],
     messagesLoading: false,
     pendingInteraction: null,
     isSending: false,
     attachedImage: null,
+    attachedFolder: null,
     imageDisabled: false,
   }),
 }));

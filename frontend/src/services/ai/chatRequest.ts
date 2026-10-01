@@ -65,6 +65,7 @@ export const startGlobalChatRequest = async ({
   text,
   sessionId,
   imageForApi,
+  chatAttachmentId,
   activeArtifact,
   messages,
   useReasoning,
@@ -75,6 +76,7 @@ export const startGlobalChatRequest = async ({
   text: string;
   sessionId: string | null;
   imageForApi?: string;
+  chatAttachmentId?: string;
   activeArtifact: ChatArtifact | null;
   messages: ChatMessage[];
   useReasoning: boolean;
@@ -96,6 +98,7 @@ export const startGlobalChatRequest = async ({
       message: text,
       sessionId,
       imageBase64: imageForApi || undefined,
+      chatAttachmentId: chatAttachmentId || undefined,
       stream: true,
       useReasoning,
       enableWeb,

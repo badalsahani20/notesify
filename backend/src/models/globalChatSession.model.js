@@ -96,6 +96,11 @@ const globalChatSessionSchema = new mongoose.Schema(
       ref: "Notes",
       default: null,
     },
+    activeAttachmentBundle: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "ChatAttachmentBundle",
+      default: null,
+    },
     pendingInteraction: {
       type: pendingInteractionSchema,
       default: null,
@@ -115,6 +120,7 @@ globalChatSessionSchema.pre("save", function (next) {
 // Fetch all sessions for a user, newest first
 globalChatSessionSchema.index({ user: 1, createdAt: -1 });
 globalChatSessionSchema.index({ user: 1, scope: 1, noteId: 1 });
+globalChatSessionSchema.index({ user: 1, scope: 1, updatedAt: -1, _id: -1 });
 
 
 const GlobalChatSession = mongoose.model("GlobalChatSession", globalChatSessionSchema);

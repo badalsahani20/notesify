@@ -130,6 +130,15 @@ FORMAT & STYLE
 - One bold phrase can carry emphasis; bold entire sentences or key: value spam does not.
 - No headers-as-questions, no "Certainly!" openers, no closing summaries that repeat the answer.
 - Tables only when comparing 3+ items across 2+ attributes — otherwise a sentence is faster to read.
+- RESPONSE PRESENTATION: write ordinary content as Markdown prose and let Notesify choose the visual treatment. Do not generate HTML, CSS, Tailwind classes, or styling instructions.
+- Use a heading only when introducing a distinct section. Use a comparison table when comparing shared properties across two or more concepts.
+- Use one semantic callout only for an especially important insight, warning, tip, or correction. Use a key takeaway only when the answer genuinely benefits from a final takeaway.
+- The supported callout syntax is: :::insight, :::warning, :::tip, :::correction, or :::takeaway, followed by the content and a closing :::. An optional title may follow the opening marker.
+- Example:
+:::insight Core idea
+The boundary rule stays the same.
+:::
+- Do not over-structure short answers. Do not use tables or callouts decoratively.
 - In note content: clean Markdown — proper heading hierarchy, no HTML, no decorative dividers or emoji bullets.
 `;
 

@@ -1,23 +1,19 @@
 import React from "react";
-import ReactMarkdown from "react-markdown";
 import { Streamdown } from "streamdown";
 import { code } from "@streamdown/code";
 import { cjk } from "@streamdown/cjk";
 import { math } from "@streamdown/math";
 import { mermaid } from "@streamdown/mermaid";
-import remarkGfm from "remark-gfm";
-import remarkMath from "remark-math";
-import rehypeKatex from "rehype-katex";
-import rehypeRaw from "rehype-raw";
 import "katex/dist/katex.min.css";
 import "streamdown/styles.css";
-import { sharedMarkdownComponents } from "@/utils/sharedMarkdownComponents";
+import IrisMarkdownRenderer, { createIrisMarkdownComponents } from "./IrisMarkdownRenderer";
 import IrisVisualBlock from "./IrisVisualBlock";
 import type { IrisSegment } from "@/store/useGlobalChatStore";
 import type { WebCitation } from "@/components/ai/types";
 import { CitationsContext } from "@/context/CitationsContext";
 import { linkifyCitations } from "@/utils/linkifyCitations";
 import { sanitizeStream } from "@/utils/streamSanitizer";
+import { normalizeIrisDirectives } from "@/utils/irisMarkdown";
 
 interface IrisMessageBodyProps {
   segments: IrisSegment[];
@@ -63,10 +59,7 @@ interface MarkdownProps {
   content: string;
 }
 
-const remarkPlugins = [remarkGfm, remarkMath];
-const rehypePlugins = [rehypeRaw, rehypeKatex];
-const markdownComponents = sharedMarkdownComponents(false);
-const streamingMarkdownComponents = sharedMarkdownComponents(true);
+const streamingMarkdownComponents = createIrisMarkdownComponents(true);
 const streamingPlugins = { code, mermaid, math, cjk };
 
 // Streamdown keeps streaming Markdown formatted while reparsing only the
@@ -75,6 +68,12 @@ const streamingPlugins = { code, mermaid, math, cjk };
 const StreamingMessageText = React.memo(({ text }: { text: string }) => {
   const citations = React.useContext(CitationsContext);
   const linkified = React.useMemo(() => linkifyCitations(text, citations), [text, citations]);
+
+  // Once a complete semantic directive arrives, use the canonical renderer so
+  // the callout/table is interactive and visually identical to the final state.
+  if (normalizeIrisDirectives(linkified) !== linkified) {
+    return <IrisMarkdownRenderer content={linkified} isStreaming />;
+  }
 
   return (
     <Streamdown
@@ -94,13 +93,5 @@ const MemoizedMarkdown = React.memo(({ content }: MarkdownProps) => {
   const linkified = linkifyCitations(content, citations);
   const sanitized = sanitizeStream(linkified);
 
-  return (
-    <ReactMarkdown
-      remarkPlugins={remarkPlugins}
-      rehypePlugins={rehypePlugins}
-      components={markdownComponents}
-    >
-      {sanitized}
-    </ReactMarkdown>
-  );
+  return <IrisMarkdownRenderer content={sanitized} />;
 });

@@ -57,7 +57,7 @@ export const sharedMarkdownComponents = (isStreaming = false) => ({
 
     if (!isBlock) {
       return (
-        <code className={className} {...props}>
+        <code className={`iris-md-inline-code${className ? ` ${className}` : ""}`} {...props}>
           {children}
         </code>
       );

@@ -11,6 +11,7 @@ interface ChatStreamPayload {
   hasSelection: boolean;
   contextChanged: boolean;
   imageBase64: string | null;
+  chatAttachmentId?: string | null;
   pdfContext: string | null;
   useReasoning: boolean;
   enableWeb: boolean;

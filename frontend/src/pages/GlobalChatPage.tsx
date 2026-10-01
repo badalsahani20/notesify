@@ -17,20 +17,27 @@ const GlobalChatPage = () => {
   const {
     sessions,
     sessionsLoading,
+    sessionsLoadingMore,
+    sessionsHasMore,
     activeSessionId,
     messages,
     messagesLoading,
     pendingInteraction,
     isSending,
     attachedImage,
+    attachedFolder,
     imageDisabled,
     fetchSessions,
     loadSession,
+    loadMoreSessions,
+    deleteSession,
     startNewChat,
     sendMessage,
     answerInteraction,
     stopGeneration,
     setAttachedImage,
+    setAttachedFolder,
+    uploadFolder,
     useReasoning,
     setUseReasoning,
     useWebSearch,
@@ -86,13 +93,13 @@ const GlobalChatPage = () => {
   }, [fetchSessions]);
 
   const handleSend = () => {
-    if (!input.trim() && !attachedImage) return;
+    if (!input.trim() && !attachedImage && !attachedFolder) return;
     const toSend = input;
     setInput("");
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
-    sendMessage(toSend, attachedImage);
+    sendMessage(toSend, attachedImage, attachedFolder?.id);
   };
 
   const lastAssistantMsg = messages.length > 0 ? messages[messages.length - 1] : null;
@@ -178,8 +185,12 @@ const GlobalChatPage = () => {
         setSidebarOpen={setSidebarOpen}
         sessions={sessions}
         sessionsLoading={sessionsLoading}
+        sessionsLoadingMore={sessionsLoadingMore}
+        sessionsHasMore={sessionsHasMore}
         activeSessionId={activeSessionId}
         loadSession={loadSession}
+        loadMoreSessions={() => void loadMoreSessions()}
+        deleteSession={deleteSession}
         startNewChat={startNewChat}
       />
 
@@ -233,6 +244,9 @@ const GlobalChatPage = () => {
                 setInput={setInput}
                 attachedImage={attachedImage}
                 setAttachedImage={setAttachedImage}
+                attachedFolder={attachedFolder}
+                onFolderUpload={uploadFolder}
+                onClearFolder={() => setAttachedFolder(null)}
                 isSending={isSending}
                 imageDisabled={imageDisabled}
                 handleSend={handleSend}

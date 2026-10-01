@@ -6,6 +6,7 @@ import {
   PanelLeft,
   X,
   MoreHorizontal,
+  Trash2,
 } from "lucide-react";
 
 interface GlobalChatSidebarProps {
@@ -14,8 +15,12 @@ interface GlobalChatSidebarProps {
   setSidebarOpen: (open: boolean) => void;
   sessions: any[];
   sessionsLoading: boolean;
+  sessionsLoadingMore: boolean;
+  sessionsHasMore: boolean;
   activeSessionId: string | null;
   loadSession: (id: string) => void;
+  loadMoreSessions: () => void;
+  deleteSession: (id: string) => Promise<void>;
   startNewChat: () => void;
 }
 
@@ -25,12 +30,18 @@ export const GlobalChatSidebar = memo(({
   setSidebarOpen,
   sessions,
   sessionsLoading,
+  sessionsLoadingMore,
+  sessionsHasMore,
   activeSessionId,
   loadSession,
+  loadMoreSessions,
+  deleteSession,
   startNewChat,
 }: GlobalChatSidebarProps) => {
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
 
   const filteredSessions = useMemo(() => {
     if (!searchQuery.trim()) return sessions;
@@ -151,7 +162,8 @@ export const GlobalChatSidebar = memo(({
                 {searchQuery ? "No matching chats" : "No conversations yet"}
               </p>
             ) : (
-              filteredSessions.map((session) => {
+              <>
+                {filteredSessions.map((session) => {
                 const isActive = activeSessionId === session._id;
                 const cleanTitle = session.title
                   ? session.title
@@ -159,35 +171,80 @@ export const GlobalChatSidebar = memo(({
                       .trim() || "Untitled chat"
                   : "Untitled chat";
 
-                return (
-                  <button
-                    key={session._id}
-                    onClick={() => {
-                      loadSession(session._id);
-                      if (isMobile) setSidebarOpen(false);
-                    }}
-                    className={cn(
-                      "w-full text-left flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-[13.5px] font-normal transition-colors cursor-pointer group relative",
-                      isActive
-                        ? "bg-[#212121] text-white"
-                        : "text-zinc-200/90 hover:text-white hover:bg-white/[0.05]"
-                    )}
-                    title={cleanTitle}
-                  >
-                    <span className="truncate leading-normal flex-1">
-                      {cleanTitle}
-                    </span>
-                    <span
-                      className={cn(
-                        "opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-white/10 text-zinc-400 hover:text-white shrink-0",
-                        isActive && "opacity-60 hover:opacity-100"
+                  return (
+                    <div key={session._id} className="relative group">
+                      <button
+                        onClick={() => {
+                          setOpenMenuId(null);
+                          loadSession(session._id);
+                          if (isMobile) setSidebarOpen(false);
+                        }}
+                        className={cn(
+                          "w-full text-left flex items-center justify-between gap-2 px-3 py-2 pr-10 rounded-lg text-[13.5px] font-normal transition-colors cursor-pointer group relative",
+                          isActive
+                            ? "bg-[#212121] text-white"
+                            : "text-zinc-200/90 hover:text-white hover:bg-white/[0.05]"
+                        )}
+                        title={cleanTitle}
+                      >
+                        <span className="truncate leading-normal flex-1">
+                          {cleanTitle}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`Actions for ${cleanTitle}`}
+                        aria-expanded={openMenuId === session._id}
+                        disabled={deletingSessionId === session._id}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setOpenMenuId((current) => current === session._id ? null : session._id);
+                        }}
+                        className={cn(
+                          "gc-session-actions absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-white/10 text-zinc-400 hover:text-white transition-opacity cursor-pointer",
+                          openMenuId === session._id || isActive
+                            ? "opacity-100"
+                            : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
+                        )}
+                      >
+                        <MoreHorizontal size={14} />
+                      </button>
+                      {openMenuId === session._id && (
+                        <div className="absolute right-2 top-[calc(100%-0.2rem)] z-20 min-w-32 rounded-lg border border-white/10 bg-[#242424] p-1 shadow-xl">
+                          <button
+                            type="button"
+                            disabled={deletingSessionId === session._id}
+                            onClick={async (event) => {
+                              event.stopPropagation();
+                              const confirmed = window.confirm(`Delete “${cleanTitle}”?`);
+                              if (!confirmed) return;
+
+                              setDeletingSessionId(session._id);
+                              await deleteSession(session._id);
+                              setDeletingSessionId(null);
+                              setOpenMenuId(null);
+                            }}
+                            className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs text-red-300 hover:bg-red-500/10 hover:text-red-200 disabled:opacity-60"
+                          >
+                            <Trash2 size={13} />
+                            {deletingSessionId === session._id ? "Deleting…" : "Delete chat"}
+                          </button>
+                        </div>
                       )}
-                    >
-                      <MoreHorizontal size={14} />
-                    </span>
+                    </div>
+                  );
+                })}
+                {sessionsHasMore && (
+                  <button
+                    type="button"
+                    onClick={loadMoreSessions}
+                    disabled={sessionsLoadingMore}
+                    className="w-full px-3 py-2.5 mt-1 text-xs text-zinc-400 hover:text-white hover:bg-white/[0.05] rounded-lg transition-colors disabled:opacity-60"
+                  >
+                    {sessionsLoadingMore ? "Loading older chats…" : "Load older chats"}
                   </button>
-                );
-              })
+                )}
+              </>
             )}
           </div>
         </div>

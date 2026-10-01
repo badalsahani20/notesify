@@ -47,6 +47,22 @@ export interface WebCitation {
   content?: string;
 }
 
+export interface ChatAttachmentBundle {
+  id: string;
+  name: string;
+  kind: "folder" | "file";
+  totalBytes: number;
+  extractedCharacters: number;
+  files: Array<{
+    originalName: string;
+    relativePath: string;
+    mimeType: string;
+    bytes: number;
+    cloudinaryUrl?: string;
+    extractedCharacters: number;
+  }>;
+}
+
 export interface InteractiveQuestion {
   id: string;
   question: string;

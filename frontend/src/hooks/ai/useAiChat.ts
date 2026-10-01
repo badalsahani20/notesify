@@ -3,13 +3,14 @@ import type { Editor } from "@tiptap/react";
 import type { AxiosError } from "axios";
 import { toast } from "sonner";
 import { stripHtml } from "@/utils/stripHtml";
-import type { Message, ChatHistoryMessage } from "@/components/ai/types";
+import type { Message, ChatHistoryMessage, ChatAttachmentBundle } from "@/components/ai/types";
 import { useNoteContext } from "./useNoteContext";
 import { useAiSuggestion } from "./useAiSuggestion";
 import { useAiActions } from "./useAiActions";
 import { useAiChatSession } from "./useAiChatSession";
 import { useAiChatStreaming } from "./useAiChatStreaming";
 import { postAiChatStream } from "@/services/ai/aiChatApi";
+import { uploadChatAttachment } from "@/services/ai/uploadChatAttachment";
 
 import { useGlobalChatStore } from "@/store/useGlobalChatStore";
 
@@ -27,6 +28,7 @@ export const useAiChat = (noteId: string, noteContent: string, editor: Editor | 
   const [chatHistory, setChatHistory] = useState<ChatHistoryMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [attachedImage, setAttachedImage] = useState<string | null>(null);
+  const [attachedFolder, setAttachedFolder] = useState<ChatAttachmentBundle | null>(null);
   const [isSendingChat, setIsSendingChat] = useState(false);
 
   // ── AI Settings State ───────────────────────────────────────────────────────
@@ -143,7 +145,7 @@ export const useAiChat = (noteId: string, noteContent: string, editor: Editor | 
     if (isSendingChat) return;
     const textToProcess = overrideText !== undefined ? overrideText : chatInput;
     const trimmed = textToProcess.trim();
-    if (!trimmed && !attachedImage) return;
+    if (!trimmed && !attachedImage && !attachedFolder) return;
 
     const textToSend = trimmed || "Describe this image context.";
     const sentImage = attachedImage;
@@ -177,6 +179,7 @@ export const useAiChat = (noteId: string, noteContent: string, editor: Editor | 
         hasSelection,
         contextChanged,
         imageBase64: sentImage,
+        chatAttachmentId: attachedFolder?.id || null,
         pdfContext: pdfInjected ? null : pdfContext,
         useReasoning,
         enableWeb: useWebSearch,
@@ -250,6 +253,11 @@ export const useAiChat = (noteId: string, noteContent: string, editor: Editor | 
     setChatInput,
     attachedImage,
     setAttachedImage,
+    attachedFolder,
+    setAttachedFolder,
+    uploadFolder: async (files: File[]) => {
+      setAttachedFolder(await uploadChatAttachment(files));
+    },
     loadingAction: actions.loadingAction,
     isSendingChat,
     sendChatMessage,

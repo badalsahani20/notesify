@@ -1,12 +1,13 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import type { ReactNode, RefObject } from "react";
-import { X, FileText, Lightbulb, Globe, Search, BrainCircuit, GraduationCap } from "lucide-react";
+import { X, FileText, FolderUp, Lightbulb, Globe, Search, BrainCircuit, GraduationCap } from "lucide-react";
 import { toast } from "sonner";
 import { AnimatedAIChat } from "@/components/ui/animated-ai-chat";
 import { motion } from "framer-motion";
 import { useGlobalChatStore } from "@/store/useGlobalChatStore";
 import { VoiceDictationButton } from "./VoiceDictationButton";
+import type { ChatAttachmentBundle } from "@/components/ai/types";
 
 const DEFAULT_CHAT_COMMANDS = [
   { 
@@ -34,6 +35,9 @@ interface GlobalChatComposeProps {
   setInput: (value: string) => void;
   attachedImage: string | null;
   setAttachedImage: (image: string | null) => void;
+  attachedFolder?: ChatAttachmentBundle | null;
+  onFolderUpload?: (files: File[]) => Promise<void>;
+  onClearFolder?: () => void;
   isSending: boolean;
   imageDisabled: boolean;
   handleSend: () => void;
@@ -53,6 +57,9 @@ export const GlobalChatCompose = ({
   setInput,
   attachedImage,
   setAttachedImage,
+  attachedFolder = null,
+  onFolderUpload,
+  onClearFolder,
   isSending,
   imageDisabled,
   handleSend,
@@ -69,6 +76,8 @@ export const GlobalChatCompose = ({
   const { chatMode, setChatMode } = useGlobalChatStore();
   const [fileAccept, setFileAccept] = useState("image/*,.pdf");
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [isUploadingFolder, setIsUploadingFolder] = useState(false);
+  const folderFileRef = useRef<HTMLInputElement>(null);
 
   // Handle paste image from clipboard
   useEffect(() => {
@@ -125,17 +134,57 @@ export const GlobalChatCompose = ({
     return () => window.removeEventListener("keydown", onKey);
   }, [lightboxOpen]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 15 * 1024 * 1024) {
       toast.error("File must be less than 15 MB");
       return;
     }
+    if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
+      if (!onFolderUpload) {
+        toast.error("PDF upload is not available in this chat");
+        return;
+      }
+      setIsUploadingFolder(true);
+      try {
+        await onFolderUpload([file]);
+        toast.success("PDF uploaded and ready for Iris");
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Unable to upload PDF");
+      } finally {
+        setIsUploadingFolder(false);
+      }
+      if (fileRef.current) fileRef.current.value = "";
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = (ev) => setAttachedImage(ev.target?.result as string);
     reader.readAsDataURL(file);
     if (fileRef.current) fileRef.current.value = "";
+  };
+
+  const handleFolderChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length || !onFolderUpload) return;
+
+    const pdfFiles = files.filter((file) => file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf"));
+    if (!pdfFiles.length) {
+      toast.error("Choose a folder containing PDF files");
+      return;
+    }
+
+    setIsUploadingFolder(true);
+    try {
+      await onFolderUpload(pdfFiles);
+      toast.success(`${pdfFiles.length} PDF${pdfFiles.length === 1 ? "" : "s"} uploaded and ready for Iris`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to upload folder");
+    } finally {
+      setIsUploadingFolder(false);
+      if (folderFileRef.current) folderFileRef.current.value = "";
+    }
   };
 
   const handleImageClick = () => {
@@ -154,7 +203,7 @@ export const GlobalChatCompose = ({
   const isPdf = attachedImage?.startsWith("data:application/pdf");
 
   const attachments = useMemo(() => {
-    if (!attachedImage) return null;
+    if (!attachedImage && !attachedFolder) return null;
     
     return (
       <motion.div 
@@ -162,7 +211,7 @@ export const GlobalChatCompose = ({
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
       >
-        <div className="relative group inline-flex items-center gap-2 text-xs bg-white/[0.05] border border-white/10 py-1.5 px-3 rounded-lg text-white/90">
+        {attachedImage && <div className="relative group inline-flex items-center gap-2 text-xs bg-white/[0.05] border border-white/10 py-1.5 px-3 rounded-lg text-white/90">
           {isPdf ? (
             <FileText size={14} className="text-white/60" />
           ) : (
@@ -180,14 +229,37 @@ export const GlobalChatCompose = ({
           >
             <X size={12} />
           </button>
-        </div>
+        </div>}
+        {attachedFolder && <div className="relative group inline-flex items-center gap-2 text-xs bg-white/[0.05] border border-white/10 py-1.5 px-3 rounded-lg text-white/90">
+          <FolderUp size={14} className="text-indigo-300" />
+          <span>{attachedFolder.name} · {attachedFolder.files.length} PDF{attachedFolder.files.length === 1 ? "" : "s"}</span>
+          {onClearFolder && <button
+            onClick={onClearFolder}
+            className="ml-1 text-white/40 hover:text-white transition-colors"
+            title="Remove PDF folder context"
+          >
+            <X size={12} />
+          </button>}
+        </div>}
       </motion.div>
     );
-  }, [attachedImage, isPdf, setAttachedImage]);
+  }, [attachedFolder, attachedImage, isPdf, onClearFolder, setAttachedImage]);
 
   const extraActionButtons = useMemo(() => {
     return (
       <>
+        {onFolderUpload && (
+          <button
+            type="button"
+            onClick={() => folderFileRef.current?.click()}
+            disabled={isUploadingFolder || isSending}
+            className="p-1.5 sm:px-2.5 sm:py-1 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer text-xs font-medium shrink-0 touch-manipulation active:scale-95 text-white/40 hover:text-white/90 hover:bg-white/5 disabled:opacity-40"
+            title="Attach a folder of PDFs"
+          >
+            <FolderUp className="w-3.5 h-3.5 shrink-0" />
+            <span className="hidden sm:inline">Folder</span>
+          </button>
+        )}
         <button
           type="button"
           onClick={() => {
@@ -227,7 +299,7 @@ export const GlobalChatCompose = ({
         )}
       </>
     );
-  }, [chatMode, setChatMode, useWebSearch, setUseWebSearch, useReasoning, setUseReasoning]);
+  }, [chatMode, folderFileRef, isSending, isUploadingFolder, onFolderUpload, setChatMode, useWebSearch, setUseWebSearch, useReasoning, setUseReasoning]);
 
   return (
     <div className="absolute bottom-0 left-0 w-full z-20 bg-gradient-to-t from-background via-background/95 to-transparent pt-6 pb-2 px-2 sm:px-4 flex flex-col justify-end pointer-events-none">
@@ -241,6 +313,17 @@ export const GlobalChatCompose = ({
         className="hidden"
         onChange={handleFileChange}
       />
+      {onFolderUpload && (
+        <input
+          type="file"
+          ref={folderFileRef}
+          accept=".pdf,application/pdf"
+          multiple
+          {...({ webkitdirectory: "", directory: "" } as React.InputHTMLAttributes<HTMLInputElement>)}
+          className="hidden"
+          onChange={handleFolderChange}
+        />
+      )}
 
       <AnimatedAIChat 
         value={input}

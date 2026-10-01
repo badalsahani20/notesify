@@ -4,14 +4,9 @@ import { Button } from "@/components/ui/button";
 import type { AssistResult } from "@/components/ai/types";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import remarkMath from "remark-math";
-import rehypeKatex from "rehype-katex";
-import rehypeRaw from "rehype-raw";
 import "katex/dist/katex.min.css";
 import { sanitizeStream } from "@/utils/streamSanitizer";
-import { sharedMarkdownComponents } from "@/utils/sharedMarkdownComponents";
+import IrisMarkdownRenderer from "@/components/chat/IrisMarkdownRenderer";
 
 
 
@@ -96,13 +91,7 @@ const AiResultDialog = ({ result, onApply, onClose }: AiResultDialogProps) => {
 
           <div className="p-8 max-h-[60vh] overflow-y-auto custom-scrollbar bg-[var(--panel-bg)] selection:bg-[var(--accent-strong)]/30">
             <div className="gc-markdown text-[var(--text-strong)] max-w-full">
-               <ReactMarkdown
-                remarkPlugins={[remarkGfm, remarkMath]}
-                rehypePlugins={[rehypeRaw, rehypeKatex]}
-                components={sharedMarkdownComponents()}
-               >
-                 {sanitizeStream(result.suggestion)}
-               </ReactMarkdown>
+               <IrisMarkdownRenderer content={sanitizeStream(result.suggestion)} />
                {result.isStreaming && (
                  <span className="gc-cursor" aria-hidden="true" />
                )}

@@ -29,7 +29,11 @@ const safeParse = (raw: string): ComparisonData | null => {
     if (!obj || typeof obj !== "object") return null;
 
     // Be extremely forgiving during live streaming of data
-    const headers = Array.isArray(obj.headers) ? obj.headers.map(String) : [];
+    const headers = Array.isArray(obj.headers)
+      ? obj.headers.map(String)
+      : Array.isArray(obj.columns)
+        ? obj.columns.map(String)
+        : [];
     const rows = Array.isArray(obj.rows)
       ? obj.rows
           .filter((r: any) => Array.isArray(r))
@@ -53,6 +57,7 @@ const renderCellContent = (content: string) => {
     return "";
   }
   const normalized = String(content).trim().toLowerCase();
+  const inlineCode = String(content).trim().match(/^`([^`]+)`$/);
   
   // Success/Positive indicator matches
   if (
@@ -103,6 +108,10 @@ const renderCellContent = (content: string) => {
         {content}
       </span>
     );
+  }
+
+  if (inlineCode) {
+    return <code className="iris-comparison-inline-code">{inlineCode[1]}</code>;
   }
 
   return <span className="iris-cell-text">{content}</span>;

@@ -32,6 +32,9 @@ const ContextualAiPanel = ({
     setChatInput,
     attachedImage,
     setAttachedImage,
+    attachedFolder,
+    setAttachedFolder,
+    uploadFolder,
     isSendingChat,
     sendChatMessage,
     stopRequest,
@@ -83,13 +86,16 @@ const ContextualAiPanel = ({
       transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
       className={`assistant-rail relative overflow-hidden ${mobileMode ? "assistant-rail-mobile" : "flex"}`}
     >
-      {/* Dim moving purplish gradient background */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-        <div className="absolute top-[10%] left-[10%] w-[200px] h-[200px] rounded-full bg-violet-600/10 blur-[60px] animate-blob-drift" style={{ animationDuration: '8s' }} />
-        <div className="absolute top-[40%] right-[10%] w-[180px] h-[180px] rounded-full bg-fuchsia-600/10 blur-[60px] animate-blob-drift" style={{ animationDuration: '10s', animationDelay: '1s' }} />
-        <div className="absolute bottom-[10%] left-[30%] w-[220px] h-[220px] rounded-full bg-indigo-600/10 blur-[60px] animate-blob-drift" style={{ animationDuration: '12s', animationDelay: '2s' }} />
-      </div>
-      <div className="relative z-10 flex items-center justify-between px-4 py-2 border-b border-white/5 shrink-0 bg-background/80 backdrop-blur-md">
+      {/* Decorative blur layers are intentionally desktop-only. They are expensive
+          to composite while a full-screen mobile sheet is opening. */}
+      {!mobileMode && (
+        <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+          <div className="absolute top-[10%] left-[10%] w-[200px] h-[200px] rounded-full bg-violet-600/10 blur-[60px]" />
+          <div className="absolute top-[40%] right-[10%] w-[180px] h-[180px] rounded-full bg-fuchsia-600/10 blur-[60px]" />
+          <div className="absolute bottom-[10%] left-[30%] w-[220px] h-[220px] rounded-full bg-indigo-600/10 blur-[60px]" />
+        </div>
+      )}
+      <div className={`relative z-10 flex items-center justify-between px-4 py-2 border-b border-white/5 shrink-0 ${mobileMode ? "bg-background/95" : "bg-background/80 backdrop-blur-md"}`}>
         <div className="flex items-center gap-2 overflow-hidden">
           {isNewNote ? (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] uppercase tracking-wider font-semibold bg-amber-500/10 text-amber-500 border border-amber-500/20 whitespace-nowrap">
@@ -113,7 +119,10 @@ const ContextualAiPanel = ({
           <button
             type="button"
             className="assistant-header-action"
-            onClick={() => void startNewChat()}
+            onClick={() => {
+              setAttachedFolder(null);
+              void startNewChat();
+            }}
             title="Start fresh chat"
           >
             <RefreshCcw size={14} />
@@ -165,6 +174,9 @@ const ContextualAiPanel = ({
           setInput={setChatInput}
           attachedImage={attachedImage}
           setAttachedImage={setAttachedImage}
+          attachedFolder={attachedFolder}
+          onFolderUpload={uploadFolder}
+          onClearFolder={() => setAttachedFolder(null)}
           isSending={isSendingChat}
           imageDisabled={false}
           handleSend={() => void sendChatMessage()}

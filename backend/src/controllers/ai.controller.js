@@ -20,6 +20,11 @@ import { SseStreamParser } from "../utils/sseParser.js";
 import agentRunService from "../services/ai/agent/agentRunService.js";
 import {cleanSessionTitle, hashText} from "../utils/hashText.js"
 import { uploadImageToCloudinary } from "../services/imageUpload.service.js";
+import {
+  buildChatAttachmentContext,
+  createChatAttachmentBundle,
+  getChatAttachmentBundleForUser,
+} from "../services/chatAttachment.service.js";
 
 
 export const checkGrammarController = catchAsync(async (req, res) => {
@@ -267,6 +272,7 @@ const resolveSession = async (req) => {
   let session = null;
   let history = [];
   let summary = "";
+  let activeAttachmentBundle = null;
 
   if (isGlobalChat) {
     if (sessionId) {
@@ -282,6 +288,7 @@ const resolveSession = async (req) => {
         toolCalls: m.toolCalls,
       }));
       summary = session.summary || "";
+      activeAttachmentBundle = session.activeAttachmentBundle || null;
     }
   } else {
     history = Array.isArray(req.body.history) ? req.body.history : [];
@@ -320,6 +327,7 @@ const resolveSession = async (req) => {
 
     activeSessionId = session._id;
     activeSession = session;
+    activeAttachmentBundle = session.activeAttachmentBundle || null;
   } else if (activeSession && req.body.chatMode && activeSession.chatMode !== req.body.chatMode) {
     activeSession.chatMode = req.body.chatMode;
     await activeSession.save();
@@ -333,6 +341,7 @@ const resolveSession = async (req) => {
     summary: summary || "",
     activeSessionId,
     activeSession,
+    activeAttachmentBundle,
   };
 };
 
@@ -381,6 +390,7 @@ const persistToDb = async (
   activeSession,
   summary = "",
   toolCalls = [],
+  attachmentBundleId = null,
 ) => {
   const isImageUrl =
     typeof imageBase64 === "string" && /^https?:\/\//i.test(imageBase64);
@@ -404,6 +414,7 @@ const persistToDb = async (
     { role: "assistant", content: finalReply, toolCalls },
   );
   if (summary) sessionToUpdate.summary = summary;
+  if (attachmentBundleId) sessionToUpdate.activeAttachmentBundle = attachmentBundleId;
   await sessionToUpdate.save();
 
   const userTurnCount = sessionToUpdate.messages.filter((msg) => msg.role === "user").length;
@@ -429,13 +440,33 @@ const persistToDb = async (
   }
 };
 
+export const uploadChatAttachmentController = catchAsync(async (req, res) => {
+  const files = Array.isArray(req.files) ? req.files : [];
+  const bundle = await createChatAttachmentBundle({
+    files,
+    userId: req.user._id,
+    name: req.body.folderName || files[0]?.originalname || "Uploaded documents",
+  });
+
+  res.status(201).json({ success: true, data: { bundle } });
+});
+
 //  Main chat controller
 
 export const chatWithAiController = catchAsync(async (req, res) => {
-  const { message, imageBase64, pdfContext, stream, useReasoning, enableWeb, chatMode } =
+  const {
+    message,
+    imageBase64,
+    pdfContext,
+    chatAttachmentId,
+    stream,
+    useReasoning,
+    enableWeb,
+    chatMode,
+  } =
     req.body;
 
-  if ((!message || !message.trim()) && !imageBase64) {
+  if ((!message || !message.trim()) && !imageBase64 && !chatAttachmentId) {
     return res
       .status(400)
       .json({ success: false, message: "Message or Image is required" });
@@ -449,6 +480,16 @@ export const chatWithAiController = catchAsync(async (req, res) => {
     activeSessionId,
     activeSession,
   } = sessionData;
+
+  const activeAttachmentBundleId =
+    chatAttachmentId || sessionData.activeAttachmentBundle || null;
+  const attachmentContext = activeAttachmentBundleId
+    ? await buildChatAttachmentContext({
+        bundleId: activeAttachmentBundleId,
+        userId: req.user._id,
+      })
+    : "";
+  const modelPdfContext = [pdfContext, attachmentContext].filter(Boolean).join("\n\n");
 
   if (isGlobalChat && req.body.sessionId && !sessionData.session) {
     return res
@@ -529,7 +570,7 @@ export const chatWithAiController = catchAsync(async (req, res) => {
           noteFetched,
           isNoteScoped,
           tools,
-          pdfContext: pdfContext || "",
+          pdfContext: modelPdfContext,
         },
       });
 
@@ -585,7 +626,7 @@ export const chatWithAiController = catchAsync(async (req, res) => {
       noteContext,
       noteFetched,
       systemPrompt: finalSystemPrompt,
-      pdfContext: pdfContext || "",
+      pdfContext: modelPdfContext,
       imageBase64,
       stream: isStreaming,
       useReasoning: effectiveReasoning,
@@ -679,7 +720,9 @@ export const chatWithAiController = catchAsync(async (req, res) => {
 
     finalReply = agentResult.finalReply;
     toolCalls = agentResult.toolCalls;
-    pdfContextToEmit = agentResult.pdfContext;
+    // Do not send the extracted folder text back over SSE. The browser keeps
+    // only the bundle id; the server resolves it again for future turns.
+    pdfContextToEmit = pdfContext || "";
 
     // Resolve Cloudinary URL if uploaded in background
     let persistedImageUrl = imageBase64;
@@ -705,6 +748,7 @@ export const chatWithAiController = catchAsync(async (req, res) => {
         activeSession,
         sessionSummary,
         toolCalls,
+        activeAttachmentBundleId,
       );
     }
   } catch (err) {
@@ -767,6 +811,11 @@ export const getChatSessionController = catchAsync(async (req, res) => {
       .json({ success: false, message: "Session not found" });
   }
 
+  const activeAttachmentBundle = await getChatAttachmentBundleForUser({
+    bundleId: session.activeAttachmentBundle,
+    userId: req.user._id,
+  });
+
   res.status(200).json({
     success: true,
     data: {
@@ -780,27 +829,87 @@ export const getChatSessionController = catchAsync(async (req, res) => {
       title: cleanSessionTitle(session.title),
       chatMode: session.chatMode,
       pendingInteraction: session.pendingInteraction || null,
+      activeAttachmentBundle,
     },
   });
 });
 
-// GET /api/ai/sessions — sidebar: list all sessions (no messages, just metadata)
-export const getAllSessionsController = catchAsync(async (req, res) => {
-  const sessions = await GlobalChatSession.find({
+// DELETE /api/ai/sessions/:sessionId — delete one global chat session
+export const deleteChatSessionController = catchAsync(async (req, res) => {
+  const session = await GlobalChatSession.findOneAndDelete({
+    _id: req.params.sessionId,
     user: req.user._id,
     $or: [{ scope: "global" }, { scope: { $exists: false } }],
-  })
+  });
+
+  if (!session) {
+    return res
+      .status(404)
+      .json({ success: false, message: "Chat session not found" });
+  }
+
+  res.status(200).json({
+    success: true,
+    data: { sessionId: String(session._id) },
+  });
+});
+
+// GET /api/ai/sessions — sidebar: paginated session metadata (no messages)
+export const getAllSessionsController = catchAsync(async (req, res) => {
+  const requestedLimit = Number.parseInt(req.query.limit, 10);
+  const limit = Math.min(Math.max(Number.isFinite(requestedLimit) ? requestedLimit : 30, 1), 50);
+  const filter = {
+    user: req.user._id,
+    $or: [{ scope: "global" }, { scope: { $exists: false } }],
+  };
+
+  if (req.query.cursor) {
+    try {
+      const cursor = JSON.parse(
+        Buffer.from(String(req.query.cursor), "base64url").toString("utf8"),
+      );
+      const cursorDate = new Date(cursor.updatedAt);
+
+      if (cursor.id && mongoose.isValidObjectId(cursor.id) && !Number.isNaN(cursorDate.getTime())) {
+        filter.$and = [
+          {
+            $or: [
+              { updatedAt: { $lt: cursorDate } },
+              { updatedAt: cursorDate, _id: { $lt: cursor.id } },
+            ],
+          },
+        ];
+      }
+    } catch {
+      // Ignore an invalid cursor and return the first page.
+    }
+  }
+
+  const sessions = await GlobalChatSession.find(filter)
     .select("title updatedAt") // only what the sidebar needs
-    .sort({ updatedAt: -1 }) // newest first
+    .sort({ updatedAt: -1, _id: -1 }) // newest first
+    .limit(limit + 1)
     .lean();
+
+  const hasMore = sessions.length > limit;
+  const page = hasMore ? sessions.slice(0, limit) : sessions;
+  const lastSession = page[page.length - 1];
+  const nextCursor = hasMore && lastSession
+    ? Buffer.from(JSON.stringify({
+        id: String(lastSession._id),
+        updatedAt: lastSession.updatedAt,
+      })).toString("base64url")
+    : null;
 
   res.status(200).json({
     success: true,
     data: {
-      sessions: sessions.map((session) => ({
+      sessions: page.map((session) => ({
         ...session,
         title: cleanSessionTitle(session.title),
       })),
+      hasMore,
+      nextCursor,
     },
   });
 });

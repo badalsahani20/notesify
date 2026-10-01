@@ -657,9 +657,11 @@ export const GlobalChatMessages = memo(({
 
       {/* Reader-Aware Message Scroller Viewport */}
       <MessageScroller
-        followOutput={true}
+        // Do not animate from the top to the bottom when an existing session
+        // is hydrated. The loaded transcript should land at its latest message.
+        followOutput={!messagesLoading}
         followThreshold={64}
-        smooth={!isStreaming}
+        smooth={false}
         busy={isStreaming}
         navigation={fullWidthAssistant ? undefined : "rail"}
         navigationLabel="Chat navigation"

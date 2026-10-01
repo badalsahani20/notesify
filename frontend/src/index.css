@@ -1295,6 +1295,9 @@
   box-shadow: 0 -24px 54px rgba(0, 0, 0, 0.15);
   overflow: hidden;
   padding-bottom: env(safe-area-inset-bottom);
+  contain: layout paint;
+  isolation: isolate;
+  will-change: transform;
 }
 
 .assistant-mobile-overlay {
@@ -1306,7 +1309,10 @@
   justify-content: stretch;
   padding: max(0.75rem, env(safe-area-inset-top)) 0 0;
   background: color-mix(in srgb, #000 48%, transparent);
-  backdrop-filter: blur(10px);
+  /* A viewport-sized backdrop blur forces the editor underneath to repaint on
+     every frame of the sheet transition. Keep the dimming, skip the blur. */
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .mobile-ai-fab-stack {
@@ -7456,6 +7462,187 @@ html:not(.dark) .dock-btn-active {
   }
   to {
     background-position: -200% 0;
+  }
+}
+
+/* ── Iris semantic Markdown layer ──────────────────────────────────────── */
+.gc-msg-assistant .iris-message-body {
+  width: min(100%, 720px);
+  max-width: 720px;
+}
+
+.iris-message-body {
+  color: var(--text-strong, rgba(255, 255, 255, 0.88));
+  font-size: 0.9375rem;
+  line-height: 1.8;
+  letter-spacing: -0.006em;
+  -webkit-font-smoothing: antialiased;
+}
+
+.iris-message-body > :first-child,
+.iris-message-body > *:first-child {
+  margin-top: 0;
+}
+
+.iris-md-paragraph {
+  color: inherit;
+}
+
+.iris-md-heading {
+  color: var(--text-strong, rgba(255, 255, 255, 0.96));
+  letter-spacing: -0.018em;
+}
+
+.iris-md-h1 {
+  font-size: 1.25rem;
+}
+
+.iris-md-list {
+  padding-left: 1.35rem;
+}
+
+.iris-md-list-item {
+  padding-left: 0.15rem;
+  margin-bottom: 0.35rem;
+}
+
+.iris-md-list-item::marker {
+  color: color-mix(in srgb, var(--accent-strong, #818cf8) 70%, transparent);
+}
+
+.iris-md-blockquote {
+  margin: 1.25rem 0;
+  padding: 0.75rem 1rem;
+  border-left: 2px solid color-mix(in srgb, var(--accent-strong, #818cf8) 65%, transparent);
+  border-radius: 0 0.7rem 0.7rem 0;
+  color: var(--muted-text, rgba(255, 255, 255, 0.68));
+  background: color-mix(in srgb, var(--accent-strong, #818cf8) 5%, transparent);
+}
+
+.iris-md-inline-code {
+  padding: 0.12em 0.38em;
+  border: 1px solid color-mix(in srgb, var(--text-strong, #fff) 10%, transparent);
+  border-radius: 0.35rem;
+  background: color-mix(in srgb, var(--text-strong, #fff) 7%, transparent);
+  color: color-mix(in srgb, var(--text-strong, #fff) 92%, var(--accent-strong, #818cf8));
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  font-size: 0.9em;
+  font-weight: 400;
+}
+
+.iris-md-table-wrapper {
+  width: 100%;
+  margin: 1.25rem 0;
+  overflow-x: auto;
+  border: 1px solid color-mix(in srgb, var(--text-strong, #fff) 10%, transparent);
+  border-radius: 0.8rem;
+  background: color-mix(in srgb, var(--text-strong, #fff) 3%, transparent);
+}
+
+.iris-md-table {
+  width: 100% !important;
+  min-width: 34rem;
+  margin: 0 !important;
+  border-collapse: collapse;
+}
+
+.iris-md-table th,
+.iris-md-table td {
+  min-width: 0 !important;
+  padding: 0.7rem 0.9rem !important;
+  border-right: 1px solid color-mix(in srgb, var(--text-strong, #fff) 7%, transparent) !important;
+  border-bottom: 1px solid color-mix(in srgb, var(--text-strong, #fff) 8%, transparent) !important;
+  text-align: left;
+  vertical-align: top;
+}
+
+.iris-md-table th {
+  background: color-mix(in srgb, var(--text-strong, #fff) 5%, transparent) !important;
+  color: var(--text-strong, rgba(255, 255, 255, 0.96));
+  font-size: 0.8rem;
+  letter-spacing: 0.01em;
+}
+
+.iris-md-table tr:last-child td {
+  border-bottom: 0 !important;
+}
+
+.iris-md-table th:last-child,
+.iris-md-table td:last-child {
+  border-right: 0 !important;
+}
+
+.iris-callout,
+.iris-key-takeaway {
+  margin: 1.25rem 0;
+  padding: 0.9rem 1rem 0.95rem;
+  border: 1px solid color-mix(in srgb, var(--callout-color, #818cf8) 22%, transparent);
+  border-left: 3px solid var(--callout-color, #818cf8);
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--callout-color, #818cf8) 7%, transparent);
+}
+
+.iris-callout-heading,
+.iris-key-takeaway-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 0.35rem;
+  color: color-mix(in srgb, var(--callout-color, #a5b4fc) 90%, white);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+}
+
+.iris-callout-body,
+.iris-key-takeaway-body {
+  color: var(--text-strong, rgba(255, 255, 255, 0.87));
+  line-height: 1.7;
+}
+
+.iris-callout-body > :last-child,
+.iris-key-takeaway-body > :last-child {
+  margin-bottom: 0;
+}
+
+.iris-callout-icon {
+  display: inline-flex;
+}
+
+.iris-callout-insight { --callout-color: #818cf8; }
+.iris-callout-warning { --callout-color: #f59e0b; }
+.iris-callout-tip { --callout-color: #34d399; }
+.iris-callout-correction { --callout-color: #f472b6; }
+.iris-key-takeaway { --callout-color: #22d3ee; }
+
+.iris-semantic-comparison {
+  margin: 1.25rem 0;
+}
+
+.iris-comparison-inline-code {
+  border-radius: 0.35rem;
+  padding: 0.12em 0.35em;
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.9);
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  font-size: 0.9em;
+}
+
+@media (max-width: 720px) {
+  .gc-msg-assistant .iris-message-body {
+    max-width: 100%;
+  }
+
+  .iris-md-table {
+    min-width: 30rem;
+  }
+}
+
+/* Touch devices have no hover state, so keep session actions reachable. */
+@media (max-width: 960px) {
+  .gc-sidebar-mobile .gc-session-actions {
+    opacity: 0.72;
   }
 }
 
