@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { GlobalChatMessages } from "@/components/chat/GlobalChatMessages";
 import { GlobalChatCompose } from "@/components/chat/GlobalChatCompose";
 import { InteractivePromptDialog } from "@/components/chat/InteractivePromptDialog";
+import { SelectionToolbar } from "@/components/chat/SelectionToolbar";
 import type { useAiChat } from "@/hooks/ai/useAiChat";
 import type { Message, InteractiveQuestion } from "../ai/types";
 
@@ -79,6 +80,16 @@ const ContextualAiPanel = ({
     [sendChatMessage]
   );
 
+  const handleAskIris = useCallback((quotedText: string) => {
+    const formattedQuote = `> ${quotedText.replace(/\n/g, "\n> ")}\n\n`;
+    setChatInput((prev) => (prev ? `${prev.trim()}\n\n${formattedQuote}` : formattedQuote));
+    setTimeout(() => {
+      textareaRef.current?.focus();
+      const len = textareaRef.current?.value.length ?? 0;
+      textareaRef.current?.setSelectionRange(len, len);
+    }, 50);
+  }, [setChatInput]);
+
   return (
     <motion.aside
       initial={mobileMode ? { x: "100%" } : { opacity: 0 }}
@@ -86,6 +97,7 @@ const ContextualAiPanel = ({
       transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
       className={`assistant-rail relative overflow-hidden ${mobileMode ? "assistant-rail-mobile" : "flex"}`}
     >
+      <SelectionToolbar onAskIris={handleAskIris} />
       {/* Decorative blur layers are intentionally desktop-only. They are expensive
           to composite while a full-screen mobile sheet is opening. */}
       {!mobileMode && (

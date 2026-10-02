@@ -12,6 +12,7 @@ import { GlobalChatMessages } from "@/components/chat/GlobalChatMessages";
 import { GlobalChatCompose } from "@/components/chat/GlobalChatCompose";
 import { ChatArtifactViewer } from "@/components/chat/ChatArtifactViewer";
 import { InteractivePromptDialog } from "@/components/chat/InteractivePromptDialog";
+import { SelectionToolbar } from "@/components/chat/SelectionToolbar";
 import type { InteractiveQuestion } from "@/components/ai/types";
 
 const GlobalChatPage = () => {
@@ -229,8 +230,19 @@ const GlobalChatPage = () => {
     window.addEventListener("mouseup", handleMouseUp);
   };
 
+  const handleAskIris = useCallback((quotedText: string) => {
+    const formattedQuote = `> ${quotedText.replace(/\n/g, "\n> ")}\n\n`;
+    setInput((prev) => (prev ? `${prev.trim()}\n\n${formattedQuote}` : formattedQuote));
+    setTimeout(() => {
+      textareaRef.current?.focus();
+      const len = textareaRef.current?.value.length ?? 0;
+      textareaRef.current?.setSelectionRange(len, len);
+    }, 50);
+  }, []);
+
   return (
     <div className="gc-shell">
+      <SelectionToolbar onAskIris={handleAskIris} />
       <GlobalChatSidebar
         isMobile={isMobile}
         sidebarOpen={sidebarOpen}

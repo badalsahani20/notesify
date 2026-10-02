@@ -3699,6 +3699,11 @@ span[data-ai-ghost] {
   letter-spacing: -0.006em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  -webkit-touch-callout: none;
+}
+
+[data-slot="message"] {
+  -webkit-touch-callout: none;
 }
 
 .gc-markdown :where(p, li, ul, ol, em) {
