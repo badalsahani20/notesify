@@ -9,16 +9,36 @@ import { executeOpenRouter } from "./openRouterClient.js";
 export const executeGroq = async (
   messages,
   stream = false,
-  modelId = "openai/gpt-oss-120b"
+  modelId = "openai/gpt-oss-120b",
+  tools = null
 ) => {
   if (groqNativeClient?.chat?.completions) {
     try {
-      const response = await groqNativeClient.chat.completions.create({
+      // Only keep standard function tools (exclude provider-specific tools like openrouter:web_search)
+      const validTools = Array.isArray(tools)
+        ? tools.filter((t) => t.type === "function" || !t.type)
+        : null;
+
+      const payload = {
         model: modelId,
         messages,
         stream,
-      });
-      if (stream) return response;
+        ...(validTools && validTools.length > 0 ? { tools: validTools } : {}),
+      };
+
+      const response = await groqNativeClient.chat.completions.create(payload);
+
+      if (stream) {
+        async function* toSseStream() {
+          const encoder = new TextEncoder();
+          for await (const chunk of response) {
+            yield encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`);
+          }
+          yield encoder.encode(`data: [DONE]\n\n`);
+        }
+        return toSseStream();
+      }
+
       return response.choices?.[0]?.message?.content || "";
     } catch (groqErr) {
       console.warn(
@@ -27,5 +47,6 @@ export const executeGroq = async (
       );
     }
   }
-  return await executeOpenRouter(modelId, messages, stream);
+
+  return await executeOpenRouter(modelId, messages, stream, false, 5000, tools);
 };

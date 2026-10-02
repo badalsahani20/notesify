@@ -70,7 +70,7 @@ type GlobalChatStore = {
   // Compose
   isSending: boolean;
   attachedImage: string | null;
-  attachedFolder: ChatAttachmentBundle | null;
+  attachedDoc: ChatAttachmentBundle | null;
   imageDisabled: boolean;
   useReasoning: boolean;
   useWebSearch: boolean;
@@ -90,8 +90,8 @@ type GlobalChatStore = {
   answerInteraction: (answer: string) => Promise<void>;
   stopGeneration: () => void;
   setAttachedImage: (img: string | null) => void;
-  setAttachedFolder: (folder: ChatAttachmentBundle | null) => void;
-  uploadFolder: (files: File[]) => Promise<void>;
+  setAttachedDoc: (folder: ChatAttachmentBundle | null) => void;
+  uploadDoc: (files: File[]) => Promise<void>;
   setUseReasoning: (val: boolean) => void;
   setUseWebSearch: (val: boolean) => void;
   setChatMode: (mode: "study" | "casual") => void;
@@ -110,7 +110,7 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
   pendingInteraction: null,
   isSending: false,
   attachedImage: null,
-  attachedFolder: null,
+  attachedDoc: null,
   imageDisabled: false,
   useReasoning: false, 
   useWebSearch: false,
@@ -189,7 +189,7 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
               messages: [],
               pendingInteraction: null,
               attachedImage: null,
-              attachedFolder: null,
+              attachedDoc: null,
             }
           : {}),
       }));
@@ -217,7 +217,7 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
 
       set({
         pendingInteraction: data.data.pendingInteraction || null,
-        attachedFolder: data.data.activeAttachmentBundle || null,
+        attachedDoc: null,
       });
       
       // Inherit the chatMode from the loaded session if available
@@ -260,7 +260,7 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
       messages: [],
       pendingInteraction: null,
       attachedImage: null,
-      attachedFolder: null,
+      attachedDoc: null,
     });
   },
 
@@ -426,7 +426,7 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
     const { activeSessionId, messages } = get();
     const requestSessionId = activeSessionId;
     const { imageForApi, imageUrl } = await prepareChatImage(image);
-    const attachmentId = chatAttachmentId || get().attachedFolder?.id || null;
+    const attachmentId = chatAttachmentId || get().attachedDoc?.id || null;
 
     // 1. Optimistically add user message
     const userMsg: ChatMessage = {
@@ -450,7 +450,8 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
     set({ 
       messages: [...messages, userMsg, aiMsg], 
       isSending: true, 
-      attachedImage: null 
+      attachedImage: null,
+      attachedDoc: null,
     });
 
     const abortController = new AbortController();
@@ -607,11 +608,11 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
   },
 
   setAttachedImage: (img) => set({ attachedImage: img }),
-  setAttachedFolder: (folder) => set({ attachedFolder: folder }),
-  uploadFolder: async (files) => {
+  setAttachedDoc: (doc) => set({ attachedDoc: doc }),
+  uploadDoc: async (files) => {
     const { uploadChatAttachment } = await import("@/services/ai/uploadChatAttachment");
-    const folder = await uploadChatAttachment(files);
-    set({ attachedFolder: folder });
+    const doc = await uploadChatAttachment(files);
+    set({ attachedDoc: doc });
   },
   setUseReasoning: (val) => set({ useReasoning: val }),
   setUseWebSearch: (val) => set({ useWebSearch: val }),
@@ -628,7 +629,7 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
     pendingInteraction: null,
     isSending: false,
     attachedImage: null,
-    attachedFolder: null,
+    attachedDoc: null,
     imageDisabled: false,
   }),
 }));

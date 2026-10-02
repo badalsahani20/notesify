@@ -2,7 +2,7 @@ import {
   PRIMARY_MODEL,
   TEACHING_MODELS,
   DEFAULT_CHAT_MODEL,
-  VISUALIZATION_MODEL,
+  COMPLEX_ANALYSIS_MODEL,
 } from "../config/aiModels.js";
 
 export const classifyChatIntent = (
@@ -18,7 +18,7 @@ export const classifyChatIntent = (
 
   // 1. VISUAL CONVO
   const hasAttachedImage = !!imageBase64;
-  if (hasAttachedImage) return VISUALIZATION_MODEL;
+  if (hasAttachedImage) return DEFAULT_CHAT_MODEL || COMPLEX_ANALYSIS_MODEL;
 
   // Calculate total context size
   const historyText = history
@@ -37,7 +37,7 @@ export const classifyChatIntent = (
     console.log(
       `📦 Large context detected (${totalContextLength} characters). Overriding routing to use ${PRIMARY_MODEL} (DeepSeek).`,
     );
-    return PRIMARY_MODEL;
+    return PRIMARY_MODEL || DEFAULT_CHAT_MODEL || COMPLEX_ANALYSIS_MODEL;
   }
 
   // 4. STUDY MODE

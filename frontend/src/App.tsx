@@ -67,6 +67,7 @@ function App() {
               <Route path="/search" element={<SearchPage />} />
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/chat" element={<GlobalChatPage />} />
+              <Route path="/chat/:sessionId" element={<GlobalChatPage />} />
               <Route path="/folders" element={<FolderWorkspace />} />
               <Route path="/favorites" element={<EmptyState />} />
               <Route path="/favorites/note/:noteId" element={<NoteEditor />} />

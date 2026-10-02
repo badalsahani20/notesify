@@ -44,8 +44,7 @@ function useAutoResizeTextarea({
                 return;
             }
 
-            // Using 'auto' instead of '0px' prevents scroll jumps, caret loss, and violent layout collapse
-            textarea.style.height = "auto";
+            textarea.style.height = `${minHeight}px`;
             const scrollHeight = textarea.scrollHeight;
             const limit = maxHeight ?? 200;
             const nextHeight = Math.max(minHeight, Math.min(scrollHeight, limit));
@@ -255,7 +254,7 @@ export function AnimatedAIChat({
         if (e.key === "Enter" && !e.shiftKey) {
             if (e.nativeEvent.isComposing) return;
             e.preventDefault();
-            if (value.trim()) {
+            if (value.trim() || attachments) {
                 onSubmit();
                 adjustHeight(true);
             }
@@ -263,7 +262,7 @@ export function AnimatedAIChat({
     };
 
     const handleSendMessage = () => {
-        if (value.trim()) {
+        if (value.trim() || attachments) {
             onSubmit();
             adjustHeight(true);
         }

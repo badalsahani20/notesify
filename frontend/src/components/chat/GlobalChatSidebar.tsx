@@ -147,7 +147,7 @@ export const GlobalChatSidebar = memo(({
           </div>
 
           {/* Chat History List */}
-          <div className="flex-1 overflow-y-auto px-2 pb-3 space-y-0.5 custom-scrollbar">
+          <div className="flex-1 overflow-y-auto px-2 pb-3 space-y-0.5 no-scrollbar">
             {sessionsLoading && sessions.length === 0 ? (
               <div className="space-y-1.5 px-1 py-1">
                 {[...Array(6)].map((_, i) => (

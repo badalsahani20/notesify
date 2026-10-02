@@ -32,9 +32,9 @@ const ContextualAiPanel = ({
     setChatInput,
     attachedImage,
     setAttachedImage,
-    attachedFolder,
-    setAttachedFolder,
-    uploadFolder,
+    attachedDoc,
+    setAttachedDoc,
+    uploadDoc,
     isSendingChat,
     sendChatMessage,
     stopRequest,
@@ -120,7 +120,7 @@ const ContextualAiPanel = ({
             type="button"
             className="assistant-header-action"
             onClick={() => {
-              setAttachedFolder(null);
+              setAttachedDoc(null);
               void startNewChat();
             }}
             title="Start fresh chat"
@@ -174,9 +174,9 @@ const ContextualAiPanel = ({
           setInput={setChatInput}
           attachedImage={attachedImage}
           setAttachedImage={setAttachedImage}
-          attachedFolder={attachedFolder}
-          onFolderUpload={uploadFolder}
-          onClearFolder={() => setAttachedFolder(null)}
+          attachedDoc={attachedDoc}
+          onDocUpload={uploadDoc}
+          onClearDoc={() => setAttachedDoc(null)}
           isSending={isSendingChat}
           imageDisabled={false}
           handleSend={() => void sendChatMessage()}

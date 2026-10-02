@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import { useGlobalChatStore } from "@/store/useGlobalChatStore";
 import { useMediaQuery } from "@/hooks/ui/useMediaQuery";
 import type { Message } from "@/components/ai/types";
@@ -25,7 +26,7 @@ const GlobalChatPage = () => {
     pendingInteraction,
     isSending,
     attachedImage,
-    attachedFolder,
+    attachedDoc,
     imageDisabled,
     fetchSessions,
     loadSession,
@@ -36,8 +37,8 @@ const GlobalChatPage = () => {
     answerInteraction,
     stopGeneration,
     setAttachedImage,
-    setAttachedFolder,
-    uploadFolder,
+    setAttachedDoc,
+    uploadDoc,
     useReasoning,
     setUseReasoning,
     useWebSearch,
@@ -74,6 +75,9 @@ const GlobalChatPage = () => {
   const fileRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  const { sessionId } = useParams<{ sessionId?: string }>();
+  const navigate = useNavigate();
+
   useEffect(() => {
     fetchSessions();
     // Fetch dynamic prompts
@@ -92,14 +96,62 @@ const GlobalChatPage = () => {
     });
   }, [fetchSessions]);
 
+  // ── Sync URL param -> activeSessionId (handles page refresh & direct links) ──
+  useEffect(() => {
+    if (sessionId) {
+      if (sessionId !== activeSessionId) {
+        loadSession(sessionId);
+      }
+      sessionStorage.setItem("notesify_last_chat_session", sessionId);
+    } else {
+      // User refreshed or loaded bare "/chat"
+      const savedSessionId = sessionStorage.getItem("notesify_last_chat_session");
+      if (savedSessionId) {
+        navigate(`/chat/${savedSessionId}`, { replace: true });
+      }
+    }
+  }, [sessionId]);
+
+  // ── Sync activeSessionId -> URL param & sessionStorage (handles new session creation) ──
+  useEffect(() => {
+    if (activeSessionId) {
+      sessionStorage.setItem("notesify_last_chat_session", activeSessionId);
+      if (sessionId !== activeSessionId) {
+        navigate(`/chat/${activeSessionId}`, { replace: true });
+      }
+    } else if (sessionId) {
+      sessionStorage.removeItem("notesify_last_chat_session");
+      navigate("/chat", { replace: true });
+    }
+  }, [activeSessionId, sessionId, navigate]);
+
+  const handleStartNewChat = useCallback(() => {
+    sessionStorage.removeItem("notesify_last_chat_session");
+    startNewChat();
+    navigate("/chat");
+  }, [startNewChat, navigate]);
+
+  const handleLoadSession = useCallback(
+    (id: string) => {
+      sessionStorage.setItem("notesify_last_chat_session", id);
+      loadSession(id);
+      navigate(`/chat/${id}`);
+    },
+    [loadSession, navigate],
+  );
+
   const handleSend = () => {
-    if (!input.trim() && !attachedImage && !attachedFolder) return;
+    if (!input.trim() && !attachedImage && !attachedDoc) return;
     const toSend = input;
+    const imageToSend = attachedImage;
+    const docId = attachedDoc?.id;
     setInput("");
+    setAttachedImage(null);
+    setAttachedDoc(null);
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
-    sendMessage(toSend, attachedImage, attachedFolder?.id);
+    sendMessage(toSend, imageToSend, docId);
   };
 
   const lastAssistantMsg = messages.length > 0 ? messages[messages.length - 1] : null;
@@ -188,10 +240,10 @@ const GlobalChatPage = () => {
         sessionsLoadingMore={sessionsLoadingMore}
         sessionsHasMore={sessionsHasMore}
         activeSessionId={activeSessionId}
-        loadSession={loadSession}
+        loadSession={handleLoadSession}
         loadMoreSessions={() => void loadMoreSessions()}
         deleteSession={deleteSession}
-        startNewChat={startNewChat}
+        startNewChat={handleStartNewChat}
       />
 
       {/* ── Main chat area ── */}
@@ -244,9 +296,9 @@ const GlobalChatPage = () => {
                 setInput={setInput}
                 attachedImage={attachedImage}
                 setAttachedImage={setAttachedImage}
-                attachedFolder={attachedFolder}
-                onFolderUpload={uploadFolder}
-                onClearFolder={() => setAttachedFolder(null)}
+                attachedDoc={attachedDoc}
+                onDocUpload={uploadDoc}
+                onClearDoc={() => setAttachedDoc(null)}
                 isSending={isSending}
                 imageDisabled={imageDisabled}
                 handleSend={handleSend}

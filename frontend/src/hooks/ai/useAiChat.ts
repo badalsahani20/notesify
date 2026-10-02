@@ -28,7 +28,7 @@ export const useAiChat = (noteId: string, noteContent: string, editor: Editor | 
   const [chatHistory, setChatHistory] = useState<ChatHistoryMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [attachedImage, setAttachedImage] = useState<string | null>(null);
-  const [attachedFolder, setAttachedFolder] = useState<ChatAttachmentBundle | null>(null);
+  const [attachedDoc, setAttachedDoc] = useState<ChatAttachmentBundle | null>(null);
   const [isSendingChat, setIsSendingChat] = useState(false);
 
   // ── AI Settings State ───────────────────────────────────────────────────────
@@ -145,11 +145,13 @@ export const useAiChat = (noteId: string, noteContent: string, editor: Editor | 
     if (isSendingChat) return;
     const textToProcess = overrideText !== undefined ? overrideText : chatInput;
     const trimmed = textToProcess.trim();
-    if (!trimmed && !attachedImage && !attachedFolder) return;
+    if (!trimmed && !attachedImage && !attachedDoc) return;
 
     const textToSend = trimmed || "Describe this image context.";
     const sentImage = attachedImage;
+    const sentDocId = attachedDoc?.id || null;
     setAttachedImage(null);
+    setAttachedDoc(null);
 
     const userMessage: Message = {
       id: crypto.randomUUID(),
@@ -179,7 +181,7 @@ export const useAiChat = (noteId: string, noteContent: string, editor: Editor | 
         hasSelection,
         contextChanged,
         imageBase64: sentImage,
-        chatAttachmentId: attachedFolder?.id || null,
+        chatAttachmentId: sentDocId,
         pdfContext: pdfInjected ? null : pdfContext,
         useReasoning,
         enableWeb: useWebSearch,
@@ -253,10 +255,10 @@ export const useAiChat = (noteId: string, noteContent: string, editor: Editor | 
     setChatInput,
     attachedImage,
     setAttachedImage,
-    attachedFolder,
-    setAttachedFolder,
-    uploadFolder: async (files: File[]) => {
-      setAttachedFolder(await uploadChatAttachment(files));
+    attachedDoc,
+    setAttachedDoc,
+    uploadDoc: async (files: File[]) => {
+      setAttachedDoc(await uploadChatAttachment(files));
     },
     loadingAction: actions.loadingAction,
     isSendingChat,
