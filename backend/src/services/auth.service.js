@@ -189,11 +189,11 @@ export const refreshAccessToken = async (refreshTokenFromCookie) => {
   const tokenExists = user.refreshToken.some((t) => t.token === hashedToken);
 
   if (!tokenExists) {
-    //Likely a stale/replayed token. Clear server-side sessions defensively.
-    await User.updateOne({ _id: user._id }, { $set: { refreshToken: [] } });
-
-    const error = new Error("Refresh token reuse detected");
-    error.statusCode = 403;
+    // The token was already rotated — likely a race condition between tabs or
+    // devices, not necessarily a theft.  Reject this single request without
+    // wiping every other device's session.
+    const error = new Error("Refresh token expired or already used");
+    error.statusCode = 401;
     throw error;
   }
   const newAccessToken = user.generateAccessToken();
