@@ -1,7 +1,7 @@
 import React from "react";
 import type { Editor } from "@tiptap/react";
 import { Archive, Star, BookOpen, ChevronLeft, Share2, MoreHorizontal, Loader2, ChevronDown, Check, FileText, Search, X } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import type { AiAction } from "@/components/ai/types";
 import { EditorStats } from "./EditorStats";
 import { ShareModal } from "./ShareModal";
@@ -128,12 +128,17 @@ const EditorHeader = ({
     }
   };
 
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const focus = searchParams.get("focus");
+  const isFocusMode = focus === "1" || focus === "2";
   const isDesktop = isDesktopApp();
+  const needsDesktopTitlebarPadding = isDesktop && isFocusMode;
 
   return (
     <div 
-      className={`desktop-editor-header ${isDesktop && !isAiOpen ? "is-desktop-app" : ""}`}
-      style={isDesktop && !isAiOpen ? { paddingRight: "clamp(140px, 9.5rem, 160px)" } : undefined}
+      className={`desktop-editor-header ${needsDesktopTitlebarPadding && !isAiOpen ? "is-desktop-app" : ""}`}
+      style={needsDesktopTitlebarPadding && !isAiOpen ? { paddingRight: "clamp(140px, 9.5rem, 160px)" } : undefined}
     >
       <div className="editor-title-row">
         <div className="flex flex-1 items-center min-w-0 gap-1 group/title-switcher">

@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useCallback } from "react";
+import { useLocation } from "react-router-dom";
 import { FileText, Type, X, RefreshCcw, Pencil } from "lucide-react";
 import { motion } from "framer-motion";
 import { GlobalChatMessages } from "@/components/chat/GlobalChatMessages";
@@ -92,7 +93,12 @@ const ContextualAiPanel = ({
     }, 50);
   }, [setChatInput]);
 
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const focus = searchParams.get("focus");
+  const isFocusMode = focus === "1" || focus === "2";
   const isDesktop = isDesktopApp();
+  const needsDesktopTitlebarPadding = isDesktop && isFocusMode && !mobileMode;
 
   return (
     <motion.aside
@@ -113,7 +119,7 @@ const ContextualAiPanel = ({
       )}
       <div 
         className={`relative z-10 flex items-center justify-between px-4 py-2 border-b border-white/5 shrink-0 ${mobileMode ? "bg-background/95" : "bg-background/80 backdrop-blur-md"}`}
-        style={isDesktop && !mobileMode ? { paddingRight: "clamp(140px, 9.5rem, 160px)" } : undefined}
+        style={needsDesktopTitlebarPadding ? { paddingRight: "clamp(140px, 9.5rem, 160px)" } : undefined}
       >
         <div className="flex items-center gap-2 overflow-hidden">
           {isNewNote ? (
