@@ -132,6 +132,52 @@ export function normalizeGitHubRelease(raw: any): NormalizedRelease {
 // Built-in fallback snapshot if offline or GitHub API is unavailable
 export const FALLBACK_RELEASES: NormalizedRelease[] = [
   {
+    id: 393000000,
+    version: 'v1.2.3',
+    tagName: 'v1.2.3',
+    name: '🧠 Notesify v1.2.3 — Agentic Learning Tasks, Native Protocol & Queue UI',
+    publishedAt: '2026-10-04T16:00:00Z',
+    publishedDateFormatted: 'Oct 4, 2026',
+    htmlUrl: 'https://github.com/badalsahani20/notesify/releases/tag/v1.2.3',
+    body: `## 🧠 Notesify v1.2.3 — Agentic Learning Tasks, Native Protocol & Queue UI\n\nThis release introduces autonomous learning milestones and practice queues for Iris, a permanent archive lifecycle for mastery tracking, native tool execution protocols, and composer streamlining.\n\n### ✨ What's New\n\n- **Agentic Learning Tasks Queue** — Iris can now create, track, and update concrete practice milestones that dock right above the chat composer with smooth spring animations.\n- **Permanent Archive Lifecycle** — Learning tasks transition smoothly from Pending → In Progress → Completed → Archived. No TTL deletions, retaining your full learning graph for future analytics.\n- **Native Function Calling Protocol** — Strict native assistant tool_calls and tool-result message schemas, eliminating text hallucinations.\n- **Streamlined Composer Bar** — Cleaner input footer with direct access to Study, Web, and Thinking modes while keeping keyboard slash-commands instant and responsive.`,
+    highlights: [
+      {
+        title: 'Docked Learning Tasks Queue',
+        tag: 'Agentic Tools',
+        description: 'Interactive milestone queue floating directly above the chat composer for active practice tracking.',
+      },
+      {
+        title: 'Permanent Learning Archive',
+        tag: 'Learning Graph',
+        description: 'Completed tasks graduate into a permanent archive for long-term mastery analytics without context bloat.',
+      },
+      {
+        title: 'Native Tool Calling Protocol',
+        tag: 'Iris AI',
+        description: 'Native role: "tool" execution eliminating simulated text tags and improving model reliability.',
+      },
+      {
+        title: 'Streamlined Composer Footer',
+        tag: 'UI / UX',
+        description: 'Cleaned-up composer footer with quick slash-commands preserved and dedicated mode toggles.',
+      },
+    ],
+    technicalNotes: [
+      'New LearningTask model with compound user indexes and decoupled active/history queries.',
+      'Docked Queue UI built with native custom scrollbar and Framer Motion spring physics.',
+      'Native tool execution in chatService.js with role: "tool" schemas.',
+      'Cleaned up Tools button from composer bar while preserving / command palette.',
+    ],
+    assets: [
+      {
+        name: 'Notesify.Setup.1.2.3.exe',
+        size: 100873011,
+        sizeFormatted: '96.2 MB',
+        downloadUrl: 'https://github.com/badalsahani20/notesify/releases/download/v1.2.3/Notesify.Setup.1.2.3.exe',
+      },
+    ],
+  },
+  {
     id: 392500000,
     version: 'v1.2.2',
     tagName: 'v1.2.2',

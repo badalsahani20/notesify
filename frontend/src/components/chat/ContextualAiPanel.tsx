@@ -6,6 +6,7 @@ import { GlobalChatCompose } from "@/components/chat/GlobalChatCompose";
 import { InteractivePromptDialog } from "@/components/chat/InteractivePromptDialog";
 import { LearningTasksQueue } from "@/components/chat/LearningTasksQueue";
 import { SelectionToolbar } from "@/components/chat/SelectionToolbar";
+import { isDesktopApp } from "@/lib/desktop";
 import type { useAiChat } from "@/hooks/ai/useAiChat";
 import type { Message, InteractiveQuestion } from "../ai/types";
 
@@ -91,6 +92,8 @@ const ContextualAiPanel = ({
     }, 50);
   }, [setChatInput]);
 
+  const isDesktop = isDesktopApp();
+
   return (
     <motion.aside
       initial={mobileMode ? { x: "100%" } : { opacity: 0 }}
@@ -108,7 +111,10 @@ const ContextualAiPanel = ({
           <div className="absolute bottom-[10%] left-[30%] w-[220px] h-[220px] rounded-full bg-indigo-600/10 blur-[60px]" />
         </div>
       )}
-      <div className={`relative z-10 flex items-center justify-between px-4 py-2 border-b border-white/5 shrink-0 ${mobileMode ? "bg-background/95" : "bg-background/80 backdrop-blur-md"}`}>
+      <div 
+        className={`relative z-10 flex items-center justify-between px-4 py-2 border-b border-white/5 shrink-0 ${mobileMode ? "bg-background/95" : "bg-background/80 backdrop-blur-md"}`}
+        style={isDesktop && !mobileMode ? { paddingRight: "clamp(140px, 9.5rem, 160px)" } : undefined}
+      >
         <div className="flex items-center gap-2 overflow-hidden">
           {isNewNote ? (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] uppercase tracking-wider font-semibold bg-amber-500/10 text-amber-500 border border-amber-500/20 whitespace-nowrap">
@@ -128,7 +134,7 @@ const ContextualAiPanel = ({
           )}
           {!isNewNote && noteTitle ? <span className="text-xs font-medium text-white/80 truncate">{noteTitle}</span> : null}
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 shrink-0" style={{ WebkitAppRegion: "no-drag" } as any}>
           <button
             type="button"
             className="assistant-header-action"

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import type { PanelImperativeHandle } from "react-resizable-panels";
 import { useDefaultLayout } from "react-resizable-panels";
+import { useLocation, useNavigate } from "react-router-dom";
 import { usePanelStore } from "@/store/usePanelStore";
 
 import MobileCreateButton from "./header/MobileCreateButton";
@@ -45,7 +46,31 @@ const AppLayout = ({
   const [isTransitioning, setIsTransitioning] = useState(false);
   const closeFolderPanel = usePanelStore((state) => state.closeFolderPanel);
 
+  const location = useLocation();
+  const navigate = useNavigate();
+
   const { defaultLayout, onLayoutChanged } = useDefaultLayout({ id: "notesify-layout-v6" });
+
+  const handleLayoutChanged = (layout: any) => {
+    onLayoutChanged?.(layout);
+    if (isMobile) return;
+
+    const notesSize = typeof layout?.notes === "number" ? layout.notes : (Array.isArray(layout) ? layout[0] : 0);
+    const params = new URLSearchParams(location.search);
+    const currentFocus = params.get("focus");
+
+    if (notesSize > 5) {
+      if (currentFocus === "2") {
+        params.set("focus", "1");
+        navigate(`${location.pathname}?${params.toString()}`, { replace: true });
+      }
+    } else if (notesSize <= 1) {
+      if (currentFocus === "1") {
+        params.set("focus", "2");
+        navigate(`${location.pathname}?${params.toString()}`, { replace: true });
+      }
+    }
+  };
 
   // Handle smooth transition when toggling panels
   useEffect(() => {
@@ -203,7 +228,7 @@ const AppLayout = ({
             /* ── DESKTOP — resizable panels ── */
             <ResizablePanelGroup
               defaultLayout={defaultLayout}
-              onLayoutChanged={onLayoutChanged}
+              onLayoutChanged={handleLayoutChanged}
               orientation="horizontal"
               className="flex-1 overflow-hidden"
             >
@@ -218,15 +243,12 @@ const AppLayout = ({
                 panelRef={notesPanelRef}
                 className={isTransitioning ? "panel-transition" : ""}
               >
-                <div 
-                  className="desktop-notes-column w-full h-full overflow-hidden"
-                  style={{ opacity: showNotesPanel ? 1 : 0 }}
-                >
+                <div className="desktop-notes-column w-full h-full overflow-hidden">
                   {middlePanel}
                 </div>
               </ResizablePanel>
 
-              {showNotesPanel && <ResizableHandle />}
+              <ResizableHandle />
 
               {/* Editor: fills remaining space. initial={false} prevents 8px shift on mount */}
               <ResizablePanel id="main" minSize="20%">

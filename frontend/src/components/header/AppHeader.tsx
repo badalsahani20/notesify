@@ -41,7 +41,7 @@ const AppHeader = ({ theme, onToggleTheme, onMenuOpen }: AppHeaderProps) => {
   };
 
   return (
-    <header 
+    <header
       className={`desktop-header ${isDesktop ? "is-desktop-app" : ""}`}
       style={isDesktop ? { paddingRight: "clamp(140px, 9.5rem, 160px)" } : undefined}
     >
@@ -59,12 +59,12 @@ const AppHeader = ({ theme, onToggleTheme, onMenuOpen }: AppHeaderProps) => {
         <div className="relative shrink-0">
           <div className="absolute inset-0 bg-white/5 blur-md" />
           <div className="relative w-8 h-8 rounded-lg overflow-hidden bg-zinc-900 border border-white/10 shadow-[0_0_15px_rgba(255,255,255,0.05)] flex items-center justify-center">
-            <img 
-              src={notesifyLogo} 
-              alt="Notesify" 
-              width={26} 
-              height={26} 
-              className="w-6.5 h-6.5 object-contain" 
+            <img
+              src={notesifyLogo}
+              alt="Notesify"
+              width={26}
+              height={26}
+              className="w-6.5 h-6.5 object-contain"
             />
           </div>
         </div>
@@ -78,10 +78,10 @@ const AppHeader = ({ theme, onToggleTheme, onMenuOpen }: AppHeaderProps) => {
       </div>
 
       <div className="desktop-header-actions">
-        <button 
-          type="button" 
-          onClick={(e) => onToggleTheme(e)} 
-          className="nav-action-btn" 
+        <button
+          type="button"
+          onClick={(e) => onToggleTheme(e)}
+          className="nav-action-btn"
           style={{ '--highlight-color': '#94a3b8' } as any}
           aria-label="Toggle theme"
         >
@@ -89,9 +89,9 @@ const AppHeader = ({ theme, onToggleTheme, onMenuOpen }: AppHeaderProps) => {
         </button>
         <NotificationsMenu />
         <div className="hidden lg:flex items-center gap-2">
-          <button 
-            type="button" 
-            onClick={() => setIsNewNotebookOpen(true)} 
+          <button
+            type="button"
+            onClick={() => setIsNewNotebookOpen(true)}
             className="ignite-button bg-[#2563eb] border-[#2563eb]/20 hover:bg-[#1d4ed8] text-white transition-colors shadow-sm"
           >
             <Plus size={18} />
@@ -101,11 +101,11 @@ const AppHeader = ({ theme, onToggleTheme, onMenuOpen }: AppHeaderProps) => {
         <UserMenu />
       </div>
 
-      <FolderFormDialog 
-        open={isNewNotebookOpen} 
+      <FolderFormDialog
+        open={isNewNotebookOpen}
         mode="create"
         isSaving={isSaving}
-        onClose={() => setIsNewNotebookOpen(false)} 
+        onClose={() => setIsNewNotebookOpen(false)}
         onSubmit={handleCreateFolder}
       />
     </header>

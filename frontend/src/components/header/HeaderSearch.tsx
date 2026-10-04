@@ -32,7 +32,7 @@ const HeaderSearch = () => {
           <Search size={16} className="text-[var(--muted-text)] group-hover:text-[var(--accent-strong)] transition-colors" />
           <span className="text-sm font-medium">Search notes, folders...</span>
         </div>
-        
+
         <div className="flex items-center gap-1 text-[10px] font-bold opacity-60 bg-[var(--surface-ghost)] px-1.5 py-0.5 rounded border border-[var(--divider)]">
           <span className="text-[12px] leading-none mb-0.5">⌘</span>K
         </div>

@@ -19,6 +19,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { isDesktopApp } from "@/lib/desktop";
 
 type EditorHeaderProps = {
   note: Note;
@@ -127,8 +128,13 @@ const EditorHeader = ({
     }
   };
 
+  const isDesktop = isDesktopApp();
+
   return (
-    <div className="desktop-editor-header">
+    <div 
+      className={`desktop-editor-header ${isDesktop && !isAiOpen ? "is-desktop-app" : ""}`}
+      style={isDesktop && !isAiOpen ? { paddingRight: "clamp(140px, 9.5rem, 160px)" } : undefined}
+    >
       <div className="editor-title-row">
         <div className="flex flex-1 items-center min-w-0 gap-1 group/title-switcher">
           <button

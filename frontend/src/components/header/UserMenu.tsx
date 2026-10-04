@@ -50,7 +50,7 @@ const UserMenu = () => {
           </Avatar>
         </button>
       </DropdownMenuTrigger>
-      
+
       <DropdownMenuContent className="w-56" align="end">
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
@@ -59,7 +59,7 @@ const UserMenu = () => {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        
+
         <DropdownMenuItem className="cursor-pointer" onClick={() => navigate("/profile")}>
           <UserIcon className="mr-2 h-4 w-4" />
           <span>Profile</span>
@@ -72,7 +72,7 @@ const UserMenu = () => {
           <CreditCard className="mr-2 h-4 w-4" />
           <span>Subscriptions</span>
         </DropdownMenuItem>
-        
+
         <DropdownMenuSeparator />
         <DropdownMenuItem className="cursor-pointer text-red-500 focus:text-red-500" onClick={handleLogout}>
           <LogOut className="mr-2 h-4 w-4" />

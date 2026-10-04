@@ -12,7 +12,7 @@ export const AboutTab = () => (
       </div>
       <div className="flex items-center gap-2 mt-2">
         <span className="px-2.5 py-1 rounded-full bg-indigo-500/10 text-indigo-400 text-xs font-semibold border border-indigo-500/20">
-          Version 1.2.2
+          Version 1.2.3
         </span>
         <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-semibold border border-emerald-500/20">
           Release
