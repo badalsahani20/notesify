@@ -13,6 +13,7 @@ import studyRoute from "./src/routes/study.route.js";
 import userRoute from "./src/routes/user.route.js";
 import sttRoute from "./src/routes/stt.route.js";
 import workflowRoute from "./src/routes/workflow.route.js";
+import tasksRoute from "./src/routes/learningTask.route.js";
 
 import errorMiddleware from "./src/middleware/error.middleware.js";
 
@@ -54,6 +55,7 @@ app.use("/api/study", studyRoute);
 app.use("/api/user", userRoute);
 app.use("/api/stt", sttRoute);
 app.use("/api/workflows", workflowRoute);
+app.use("/api/tasks", tasksRoute);
 
 app.get("/api/keep-alive", (req, res) => {
     res.status(200).json({ status: "alive" });

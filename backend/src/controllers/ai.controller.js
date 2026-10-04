@@ -411,7 +411,7 @@ const persistToDb = async (
 
   sessionToUpdate.messages.push(
     { role: "user", content: safeUserContent },
-    { role: "assistant", content: finalReply, toolCalls },
+    { role: "assistant", content: finalReply || "", toolCalls },
   );
   if (summary) sessionToUpdate.summary = summary;
   if (attachmentBundleId) sessionToUpdate.activeAttachmentBundle = attachmentBundleId;

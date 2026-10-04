@@ -4,6 +4,7 @@ import { stripHtml } from "../../utils/stripHtml.js";
 import { summarizeHistory } from "../../utils/summarizeHistory.js";
 import { formatStructuredNoteContext } from "./chatService.js";
 import { getChatTools } from "./tools/chatTools.js";
+import { getActiveTasks } from "../learningTask.service.js";
 
 /**
  * Fetch note context when the message is plausibly about the note.
@@ -192,8 +193,21 @@ export class ChatContextResolver {
       activeNoteContext = `\n\n[ACTIVE NOTE]\nid: ${activeNoteId}\ntitle: "${activeNoteTitle || "Untitled"}"\n[/ACTIVE NOTE]`;
     }
 
+    // Retrieve Active Learning Tasks / Practice Goals (Non-stale, max 5)
+    let taskContext = "";
+    if (user?._id) {
+      try {
+        const activeTasks = await getActiveTasks(user._id, 5);
+        if (activeTasks?.length > 0) {
+          taskContext = `\n--- ACTIVE LEARNING TASKS ---\nActive learning queue for this user:\n${activeTasks
+            .map((t, idx) => `- Task ${idx + 1} [${t.status}]: ${t.title}${t.description ? ` (${t.description})` : ""}`)
+            .join("\n")}\n--- END ACTIVE LEARNING TASKS ---\n`;
+        }
+      } catch (_) {}
+    }
+
     const userName = user?.name ? `User: ${user.name}` : "";
-    const finalSystemPrompt = [userName, memoryContext, activeNoteContext].filter(Boolean).join("\n");
+    const finalSystemPrompt = [userName, memoryContext, taskContext, activeNoteContext].filter(Boolean).join("\n");
 
     const currentMode = activeSession?.chatMode || chatMode || "casual";
     // A global chat may reference the currently open note without becoming a

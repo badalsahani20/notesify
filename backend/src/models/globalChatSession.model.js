@@ -12,7 +12,7 @@ const chatMessageSchema = new mongoose.Schema(
     },
     content: {
       type: String,
-      required: true,
+      default: "",
     },
     toolCalls: {
       type: [mongoose.Schema.Types.Mixed],

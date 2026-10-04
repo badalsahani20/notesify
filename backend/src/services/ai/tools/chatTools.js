@@ -379,6 +379,83 @@ export const updateNoteTool = {
   },
 };
 
+export const createLearningTasksTool = {
+  type: "function",
+  function: {
+    name: "create_learning_tasks",
+    description: `Assign or suggest structured learning tasks, practice questions, or action items for the user to retain and apply what they just learned.
+Use this tool when:
+- Concluding a teaching session or explaining a complex topic and giving the user practice exercises.
+- The user asks for practice questions, homework, action items, or what to work on next.
+- Breaking down a study roadmap into concrete bite-sized milestones.
+
+Do NOT call this on every casual chat. Only call it when actionable tasks or practice questions are genuinely helpful.`,
+    parameters: {
+      type: "object",
+      properties: {
+        tasks: {
+          type: "array",
+          description: "List of learning tasks or practice questions to assign.",
+          minItems: 1,
+          maxItems: 8,
+          items: {
+            type: "object",
+            properties: {
+              title: {
+                type: "string",
+                description: "Concise actionable title or question (e.g., 'Implement Two Sum in Python')",
+              },
+              description: {
+                type: "string",
+                description: "Optional details, test cases, or hints",
+              },
+              type: {
+                type: "string",
+                enum: ["practice_question", "concept_review", "coding_task", "quiz", "todo"],
+                default: "practice_question",
+              },
+              difficulty: {
+                type: "string",
+                enum: ["easy", "medium", "hard"],
+                default: "medium",
+              },
+              topic: {
+                type: "string",
+                description: "Topic or subject tag (e.g., 'React', 'DSA', 'Calculus')",
+              },
+            },
+            required: ["title"],
+          },
+        },
+      },
+      required: ["tasks"],
+    },
+  },
+};
+
+export const updateTaskStatusTool = {
+  type: "function",
+  function: {
+    name: "update_task_status",
+    description: "Update the status of an existing learning task in the user's queue.",
+    parameters: {
+      type: "object",
+      properties: {
+        taskId: {
+          type: "string",
+          description: "The task number (e.g. '1'), task title, or ID.",
+        },
+        status: {
+          type: "string",
+          enum: ["in_progress", "completed", "pending", "skipped"],
+          description: "The updated status of the task.",
+        },
+      },
+      required: ["taskId", "status"],
+    },
+  },
+};
+
 /**
  * Returns available tools for the current chat mode.
  * @param {string} chatMode - "casual" | "study"
@@ -395,6 +472,8 @@ export const getChatTools = (chatMode = "casual", options = {}) => {
         getNoteContentTool,
         updateNoteTool,
         askQuestionTool,
+        createLearningTasksTool,
+        updateTaskStatusTool,
       ]
     : [
         saveMemoryTool,
@@ -402,6 +481,8 @@ export const getChatTools = (chatMode = "casual", options = {}) => {
         createNoteTool,
         updateNoteTool,
         askQuestionTool,
+        createLearningTasksTool,
+        updateTaskStatusTool,
       ];
 
   if (chatMode === "study") {

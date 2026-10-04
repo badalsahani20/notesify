@@ -129,6 +129,8 @@ const ChatMessageRow = memo(({
       url?: string;
       citations?: any[];
       quizData?: any[];
+      tasks?: any[];
+      task?: any;
       status?: "pending" | "executing" | "success" | "error";
       data?: any;
       args?: any;
@@ -144,8 +146,9 @@ const ChatMessageRow = memo(({
     const askQuestionActivity = (toolCalls ?? []).find(
       (tc) => tc.tool === "ask_question" || tc.tool === "render_quiz" || tc.tool === "generate_quiz"
     );
+    const tasksActivity = (toolCalls ?? []).find((tc) => tc.tool === "create_learning_tasks");
     const hasAgenticTask = Boolean(
-      noteReadActivity || searchActivity || crawlActivity || memoryActivity || askQuestionActivity
+      noteReadActivity || searchActivity || crawlActivity || memoryActivity || askQuestionActivity || tasksActivity
     );
 
     return (
@@ -172,6 +175,9 @@ const ChatMessageRow = memo(({
               )}
               {askQuestionActivity && (
                 <TextShimmer duration={2.5}>Generating questions...</TextShimmer>
+              )}
+              {tasksActivity && (
+                <TextShimmer duration={2.5}>Assigning learning tasks...</TextShimmer>
               )}
             </div>
           )}
@@ -247,7 +253,9 @@ const ChatMessageRow = memo(({
               tc.tool === "get_note_content" ||
               tc.tool === "ask_question" ||
               tc.tool === "render_quiz" ||
-              tc.tool === "generate_quiz"
+              tc.tool === "generate_quiz" ||
+              tc.tool === "create_learning_tasks" ||
+              tc.tool === "update_task_status"
             ) {
               return null;
             }

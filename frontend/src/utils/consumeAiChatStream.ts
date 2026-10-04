@@ -23,6 +23,8 @@ export type ToolCallEvent = {
   query?: string;
   url?: string;
   citations?: WebCitation[];
+  tasks?: any[];
+  task?: any;
 };
 
 type MetadataEvent = {
@@ -147,6 +149,8 @@ export const consumeAiChatStream = async (
             query: (data as any).query,
             url: (data as any).url,
             citations: (data as any).citations,
+            tasks: (data as any).tasks,
+            task: (data as any).task,
           });
           continue;
         }

@@ -2,6 +2,7 @@ import type { ChatArtifact, ChatMessage, PendingInteraction } from "@/store/useG
 import type { InteractiveQuestion, ToolCallRecord } from "@/components/ai/types";
 import { executeClientTool } from "@/services/ai/clientToolExecutor";
 import type { ToolCallEvent } from "@/utils/consumeAiChatStream";
+import { queryClient } from "@/lib/queryClient";
 
 type UpdateAssistantMessage = (updater: (message: ChatMessage) => ChatMessage) => void;
 
@@ -30,6 +31,8 @@ const buildToolCallRecord = (event: ToolCallEvent): ToolCallRecord => ({
   query: event.query,
   url: event.url,
   citations: event.citations,
+  tasks: event.tasks,
+  task: event.task,
 });
 
 const updateExistingToolCall = (existing: ToolCallRecord[], event: ToolCallEvent): ToolCallRecord[] | null => {
@@ -64,6 +67,8 @@ const updateExistingToolCall = (existing: ToolCallRecord[], event: ToolCallEvent
     purpose: event.purpose ?? updated[correlatedIndex].purpose,
     status: event.status ?? updated[correlatedIndex].status,
     data: event.data ?? updated[correlatedIndex].data,
+    tasks: event.tasks ?? updated[correlatedIndex].tasks,
+    task: event.task ?? updated[correlatedIndex].task,
     error: event.error ?? updated[correlatedIndex].error,
   };
   return updated;
@@ -91,6 +96,10 @@ export const createChatToolHandler = ({
     title,
     citations,
   } = event;
+
+  if (tool === "create_learning_tasks" || tool === "update_task_status") {
+    void queryClient.invalidateQueries({ queryKey: ["learning-tasks"] });
+  }
 
   if (tool === "ask_question" && interactionId && checkpointId) {
     const questionList = (questions ?? quizData) as InteractiveQuestion[] | undefined;

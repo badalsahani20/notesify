@@ -1,6 +1,6 @@
 import { chatWithAi } from "../chatService.js";
 
-const DEFAULT_MAX_TOOL_ROUNDS = 3;
+const DEFAULT_MAX_TOOL_ROUNDS = 6;
 
 export class IrisAgent {
   constructor({ maxToolRounds = DEFAULT_MAX_TOOL_ROUNDS } = {}) {
@@ -127,6 +127,9 @@ export class IrisAgent {
           serverToolsToRun.length > 0 &&
           currentRound < this.maxToolRounds
         ) {
+          const roundAssistantToolCalls = [];
+          const roundToolResponses = [];
+
           for (const st of serverToolsToRun) {
             const toolExecResult = await executeServerTool(
               st.tool,
@@ -154,29 +157,31 @@ export class IrisAgent {
               data: toolExecResult,
             });
 
-            extraMessages.push(
-              {
-                role: "assistant",
-                content: responseObj.finalReply || null,
-                tool_calls: [
-                  {
-                    id: st.id,
-                    type: "function",
-                    function: {
-                      name: st.tool,
-                      arguments: JSON.stringify(st.args),
-                    },
-                  },
-                ],
-              },
-              {
-                role: "tool",
-                tool_call_id: st.id,
+            roundAssistantToolCalls.push({
+              id: st.id,
+              type: "function",
+              function: {
                 name: st.tool,
-                content: JSON.stringify(toolExecResult),
+                arguments: typeof st.args === "string" ? st.args : JSON.stringify(st.args || {}),
               },
-            );
+            });
+
+            roundToolResponses.push({
+              role: "tool",
+              tool_call_id: st.id,
+              name: st.tool,
+              content: typeof toolExecResult === "string" ? toolExecResult : JSON.stringify(toolExecResult),
+            });
           }
+
+          extraMessages.push(
+            {
+              role: "assistant",
+              content: responseObj.finalReply || null,
+              tool_calls: roundAssistantToolCalls,
+            },
+            ...roundToolResponses
+          );
 
           // Continue the agentic loop with the server tool result.
           continue;
@@ -195,9 +200,18 @@ export class IrisAgent {
       }
     }
 
+    if (!finalReply?.trim() && toolCalls.length > 0) {
+      const hasTaskTool = toolCalls.some(
+        (tc) => tc.tool === "update_task_status" || tc.tool === "create_learning_tasks"
+      );
+      if (hasTaskTool) {
+        finalReply = "I've updated your learning tasks in the queue above.";
+      }
+    }
+
     return {
       status: "completed",
-      finalReply,
+      finalReply: finalReply || "",
       toolCalls,
       pdfContext: pdfContextToEmit,
     };

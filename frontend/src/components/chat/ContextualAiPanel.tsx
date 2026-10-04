@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { GlobalChatMessages } from "@/components/chat/GlobalChatMessages";
 import { GlobalChatCompose } from "@/components/chat/GlobalChatCompose";
 import { InteractivePromptDialog } from "@/components/chat/InteractivePromptDialog";
+import { LearningTasksQueue } from "@/components/chat/LearningTasksQueue";
 import { SelectionToolbar } from "@/components/chat/SelectionToolbar";
 import type { useAiChat } from "@/hooks/ai/useAiChat";
 import type { Message, InteractiveQuestion } from "../ai/types";
@@ -213,7 +214,9 @@ const ContextualAiPanel = ({
                   if (lastAssistantMsg) setDismissedPromptId(lastAssistantMsg.id);
                 }}
               />
-            ) : undefined
+            ) : (
+              <LearningTasksQueue className="mb-2" defaultOpen={true} />
+            )
           }
         />
       </div>

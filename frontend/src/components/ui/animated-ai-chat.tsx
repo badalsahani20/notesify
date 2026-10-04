@@ -2,7 +2,6 @@ import React, { useRef, useEffect, useLayoutEffect, useCallback, useState } from
 import { 
     ArrowUpIcon, 
     Paperclip, 
-    Command, 
     Square,
     LoaderIcon,
     FileText,
@@ -202,8 +201,7 @@ export function AnimatedAIChat({
         const handleClickOutside = (event: MouseEvent) => {
             if (
                 commandPaletteRef.current && 
-                !commandPaletteRef.current.contains(event.target as Node) &&
-                !(event.target as HTMLElement).closest('[data-command-button]')
+                !commandPaletteRef.current.contains(event.target as Node)
             ) {
                 setShowCommandPalette(false);
                 setUserDismissedCommands(true);
@@ -399,36 +397,20 @@ export function AnimatedAIChat({
                         <div className="pt-1.5 border-t border-white/[0.06] flex items-center justify-between gap-2">
                             <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto no-scrollbar py-0.5 min-w-0 flex-1">
                                 {onAttachClick && (
-                                    <motion.button
-                                        type="button"
-                                        onClick={onAttachClick}
-                                        whileTap={{ scale: 0.94 }}
-                                        className="p-1.5 sm:px-2.5 sm:py-1 text-white/50 hover:text-white hover:bg-white/10 active:bg-white/15 rounded-md transition-colors flex items-center gap-1 sm:gap-1.5 text-xs font-medium cursor-pointer relative group shrink-0 touch-manipulation"
-                                        title="Attach file (image or PDF)"
-                                    >
-                                        <Paperclip className="w-3.5 h-3.5 shrink-0" />
-                                        <span className="hidden sm:inline">Attach</span>
-                                    </motion.button>
+                                    <>
+                                        <motion.button
+                                            type="button"
+                                            onClick={onAttachClick}
+                                            whileTap={{ scale: 0.94 }}
+                                            className="p-1.5 sm:px-2.5 sm:py-1 text-white/50 hover:text-white hover:bg-white/10 active:bg-white/15 rounded-md transition-colors flex items-center gap-1 sm:gap-1.5 text-xs font-medium cursor-pointer relative group shrink-0 touch-manipulation"
+                                            title="Attach file (image or PDF)"
+                                        >
+                                            <Paperclip className="w-3.5 h-3.5 shrink-0" />
+                                            <span className="hidden sm:inline">Attach</span>
+                                        </motion.button>
+                                        <div className="h-3.5 w-px bg-white/10 mx-0.5 shrink-0"></div>
+                                    </>
                                 )}
-                                <motion.button
-                                    type="button"
-                                    data-command-button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setShowCommandPalette(prev => !prev);
-                                    }}
-                                    whileTap={{ scale: 0.94 }}
-                                    className={cn(
-                                        "p-1.5 sm:px-2.5 sm:py-1 text-white/50 hover:text-white hover:bg-white/10 active:bg-white/15 rounded-md transition-colors flex items-center gap-1 sm:gap-1.5 text-xs font-medium cursor-pointer relative group shrink-0 touch-manipulation",
-                                        showCommandPalette && "bg-white/10 text-white/90"
-                                    )}
-                                    title="Quick AI Commands"
-                                >
-                                    <Command className="w-3.5 h-3.5 shrink-0" />
-                                    <span className="hidden sm:inline">Tools</span>
-                                </motion.button>
-
-                                <div className="h-3.5 w-px bg-white/10 mx-0.5 shrink-0"></div>
                                 {extraActionButtons}
                             </div>
                             

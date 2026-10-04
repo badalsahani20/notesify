@@ -12,6 +12,7 @@ import { GlobalChatMessages } from "@/components/chat/GlobalChatMessages";
 import { GlobalChatCompose } from "@/components/chat/GlobalChatCompose";
 import { ChatArtifactViewer } from "@/components/chat/ChatArtifactViewer";
 import { InteractivePromptDialog } from "@/components/chat/InteractivePromptDialog";
+import { LearningTasksQueue } from "@/components/chat/LearningTasksQueue";
 import { SelectionToolbar } from "@/components/chat/SelectionToolbar";
 import type { InteractiveQuestion } from "@/components/ai/types";
 
@@ -329,7 +330,9 @@ const GlobalChatPage = () => {
                       onSubmit={handlePromptSubmit}
                       onDismiss={handlePromptDismiss}
                     />
-                  ) : undefined
+                  ) : (
+                    <LearningTasksQueue className="mb-2" defaultOpen={true} />
+                  )
                 }
               />
             </>

@@ -87,6 +87,8 @@ export type ToolCallRecord = {
   citations?: WebCitation[];
   category?: string;
   content?: string;
+  tasks?: any[];
+  task?: any;
   error?: string;
 };
 
