@@ -17,6 +17,8 @@ export interface Note {
   shareSlug?: string;
   shareExpiresAt?: string | null;
   shareViews?: number;
+  isConflicted?: boolean;
+  conflictId?: number;
   chatHistory?: { id: string; role: 'user' | 'assistant'; content: string; segments?: IrisSegment[] }[];
 }
 

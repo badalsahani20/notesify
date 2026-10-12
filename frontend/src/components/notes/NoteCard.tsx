@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useCallback, useEffect } from "react";
-import { Archive, RotateCcw, Star, Trash2, X, MoreVertical } from "lucide-react";
+import { Archive, RotateCcw, Star, Trash2, X, MoreVertical, AlertTriangle } from "lucide-react";
 import { stripHtml } from "@/utils/stripHtml";
 import { useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
@@ -125,7 +125,14 @@ const NoteCard = ({
 
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-3">
-            <h3 className="truncate text-sm font-semibold text-[var(--text-strong)]">{note.title || "Untitled note"}</h3>
+            <div className="flex items-center gap-1.5 min-w-0 truncate">
+              <h3 className="truncate text-sm font-semibold text-[var(--text-strong)]">{note.title || "Untitled note"}</h3>
+              {note.isConflicted && (
+                <span className="shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center gap-1">
+                  <AlertTriangle size={10} /> Conflict
+                </span>
+              )}
+            </div>
             <span className="shrink-0 text-xs text-[var(--muted-text)]">{getRelativeUpdatedLabel(note.updatedAt, stableNow)}</span>
           </div>
 

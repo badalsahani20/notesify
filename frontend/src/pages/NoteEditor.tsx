@@ -26,6 +26,7 @@ import { useKeyboardOffset } from "@/hooks/ui/useKeyboardOffset";
 import { useNoteSync } from "@/hooks/notes/useNoteSync";
 import { FloatingScrollButtons } from "@/components/editor/FloatingScrollButtons";
 import { MobileAiActions } from "@/components/editor/MobileAiActions";
+import { NoteConflictBanner } from "@/components/notes/NoteConflictBanner";
 
 
 const NoteEditor = () => {
@@ -232,6 +233,10 @@ const NoteEditor = () => {
           onOpenGenerateNotes={() => setIsGenerateNotesOpen(true)}
           onClose={handleCloseNote}
         />
+
+        {note?._id && note._id !== "new" && (
+          <NoteConflictBanner noteId={note._id} />
+        )}
 
         <div 
           ref={editorScrollRef}

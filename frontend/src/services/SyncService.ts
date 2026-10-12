@@ -24,6 +24,31 @@ class SyncEngine {
         return this._remoteFolders;
     }
 
+    private conflictChannel: BroadcastChannel | null =
+        typeof window !== "undefined" && "BroadcastChannel" in window
+            ? new BroadcastChannel("notesify_conflicts")
+            : null;
+
+    private broadcastConflict(detail: {
+        entity: string;
+        entityId: string;
+        conflictId?: number;
+        serverState?: any;
+    }) {
+        try {
+            if (typeof window !== "undefined") {
+                window.dispatchEvent(new CustomEvent("notesify:conflict", { detail }));
+                this.conflictChannel?.postMessage({
+                    type: "CONFLICT_DETECTED",
+                    ...detail,
+                    timestamp: Date.now(),
+                });
+            }
+        } catch (err) {
+            console.warn("[SyncService] Failed to broadcast conflict:", err);
+        }
+    }
+
     async processQueue(): Promise<void> {
         // Single-flight guard: don't run if already running or offline
         if (this.isProcessing || !navigator.onLine) {
@@ -35,11 +60,20 @@ class SyncEngine {
         try {
             // Continuous draining loop
             while (true) {
-                // Fetch the oldest operation
-                const operation = await db.syncQueue.orderBy('timestamp').first();
+                // Fetch active unresolved conflicts to quarantine dependent operations on the same entity
+                const unresolvedConflicts = await db.conflictLog.where("status").equals("UNRESOLVED").toArray();
+                const quarantinedEntityIds = new Set(unresolvedConflicts.map((c) => c.entityId));
 
-                if (!operation) {
+                // Inspect oldest operations and select the first one not blocked by a conflict
+                const batch = await db.syncQueue.orderBy("timestamp").limit(50).toArray();
+                if (batch.length === 0) {
                     break; // Queue is empty!
+                }
+
+                const operation = batch.find((op) => !quarantinedEntityIds.has(op.entityId));
+                if (!operation) {
+                    // All remaining operations in the queue are quarantined waiting for conflict resolution
+                    break;
                 }
 
                 const success = await this.processOperation(operation);
@@ -113,6 +147,18 @@ class SyncEngine {
                 pendingOperations.filter(op => op.entity === "folder").map(op => op.entityId),
             );
 
+            // Also shield entities that have an active UNRESOLVED conflict from being overwritten
+            const unresolvedConflicts = await db.conflictLog.where("status").equals("UNRESOLVED").toArray();
+            const conflictedNoteIds = new Set(
+                unresolvedConflicts.filter(c => c.entity === "note").map(c => c.entityId),
+            );
+            const conflictedFolderIds = new Set(
+                unresolvedConflicts.filter(c => c.entity === "folder").map(c => c.entityId),
+            );
+
+            const protectedNoteIds = new Set([...pendingNoteIds, ...conflictedNoteIds]);
+            const protectedFolderIds = new Set([...pendingFolderIds, ...conflictedFolderIds]);
+
             const remoteNotesApi = await this.getRemoteNotes();
             const remoteNotes = await remoteNotesApi.getNotes();
             const archivedNotes = await remoteNotesApi.getArchivedNotes();
@@ -126,7 +172,7 @@ class SyncEngine {
                 const remoteNoteIds = new Set(allRemoteNotes.map(note => note._id));
 
                 for(const remoteNote of allRemoteNotes) {
-                    if(!remoteNote?._id || pendingNoteIds.has(remoteNote._id)) continue;
+                    if(!remoteNote?._id || protectedNoteIds.has(remoteNote._id)) continue;
 
                     const localNote = await db.notes.get(remoteNote._id);
                     if(!localNote || (remoteNote.version && remoteNote.version > (localNote.version || 0))) {
@@ -137,7 +183,7 @@ class SyncEngine {
 
                 const allLocalNotes = await db.notes.toArray();
                 for(const localNote of allLocalNotes) {
-                    if (!remoteNoteIds.has(localNote._id) && !pendingNoteIds.has(localNote._id)) {
+                    if (!remoteNoteIds.has(localNote._id) && !protectedNoteIds.has(localNote._id)) {
                         await db.notes.delete(localNote._id);
                         hasChanges = true;
                     }
@@ -150,7 +196,7 @@ class SyncEngine {
                 const remoteFolderIds = new Set(remoteFolders.map(folder => folder._id));
 
                 for(const remoteFolder of remoteFolders) {
-                    if(!remoteFolder?._id || pendingFolderIds.has(remoteFolder._id)) continue;
+                    if(!remoteFolder?._id || protectedFolderIds.has(remoteFolder._id)) continue;
 
                     const localFolder = await db.folders.get(remoteFolder._id);
                     if(!localFolder || (remoteFolder.version && remoteFolder.version > (localFolder.version || 0))) {
@@ -161,7 +207,7 @@ class SyncEngine {
 
                 const allLocalFolders = await db.folders.toArray();
                 for(const localFolder of allLocalFolders) {
-                    if (!remoteFolderIds.has(localFolder._id) && !pendingFolderIds.has(localFolder._id)) {
+                    if (!remoteFolderIds.has(localFolder._id) && !protectedFolderIds.has(localFolder._id)) {
                         await db.folders.delete(localFolder._id);
                         hasChanges = true;
                     }
@@ -201,26 +247,46 @@ class SyncEngine {
         if (axios.isAxiosError(error)) {
             const status = error.response?.status;
 
-            // 1. Conflict (409) -> Move to Dead-Letter Queue and CONTINUE
+            // 1. Conflict (409) -> Atomically record conflict, preserve local draft, mark note, & quarantine
             if (status === 409) {
-                console.warn("[SyncService] 409 Conflict detected. Moving to Dead-Letter Queue.", operation.entityId);
-                const data = error.response?.data;
+                console.warn("[SyncService] 409 Conflict detected. Quarantining entity:", operation.entityId);
+                const data = error.response?.data as any;
+                const localNote = operation.entity === "note" ? await db.notes.get(operation.entityId) : null;
                 
-                await db.transaction('rw', [db.syncQueue, db.conflictLog], async () => {
-                    await db.conflictLog.add({
+                let conflictId: number | undefined;
+                await db.transaction('rw', [db.syncQueue, db.conflictLog, db.notes], async () => {
+                    conflictId = await db.conflictLog.add({
                         entity: operation.entity,
                         entityId: operation.entityId,
                         action: operation.action,
                         operation: operation,
                         reason: "VERSION_CONFLICT",
-                        localVersion: (operation.payload as any).version || 0,
-                        serverVersion: data?.serverVersion,
+                        status: "UNRESOLVED",
+                        localVersion: (operation.payload as any)?.version ?? localNote?.version ?? 0,
+                        serverVersion: data?.serverVersion ?? data?.serverState?.version,
+                        localDraft: localNote ? { ...localNote } : ((operation.payload as any)?.updates ?? {}),
                         serverState: data?.serverState,
-                        timestamp: Date.now()
+                        timestamp: Date.now(),
                     });
+
+                    if (operation.entity === "note" && localNote) {
+                        await db.notes.update(operation.entityId, {
+                            isConflicted: true,
+                            conflictId,
+                        });
+                    }
+
                     if (operation.id) await db.syncQueue.delete(operation.id);
                 });
-                return true; // Return true to CONTINUTE the queue processing
+
+                this.broadcastConflict({
+                    entity: operation.entity,
+                    entityId: operation.entityId,
+                    conflictId,
+                    serverState: data?.serverState,
+                });
+
+                return true; // Return true to CONTINUE queue processing for OTHER notes
             }
 
             // 2. Permanent Failure (400, 403, 422) -> Move to Dead-Letter Queue and CONTINUE
@@ -233,6 +299,7 @@ class SyncEngine {
                         action: operation.action,
                         operation: operation,
                         reason: "PERMANENT_FAILURE",
+                        status: "UNRESOLVED",
                         localVersion: (operation.payload as any).version || 0,
                         timestamp: Date.now()
                     });
@@ -261,6 +328,7 @@ class SyncEngine {
                             action: operation.action,
                             operation: operation,
                             reason: "PERMANENT_FAILURE",
+                            status: "UNRESOLVED",
                             localVersion: (operation.payload as any).version || 0,
                             timestamp: Date.now()
                         });

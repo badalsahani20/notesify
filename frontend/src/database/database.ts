@@ -1,8 +1,7 @@
 import Dexie from "dexie";
-import { dbSchema } from "./tables";
+import { dbSchemaV1, dbSchemaV2 } from "./tables";
 import type { Note } from "@/store/useNoteStore";
 import type { Folder } from "@/store/useFolderStore";
-
 
 export interface SyncOperation {
     id?: number;
@@ -20,8 +19,10 @@ export interface ConflictRecord {
     action: "CREATE" | "UPDATE" | "DELETE" | "HARD_DELETE_NOTE";
     operation: SyncOperation; // The exact failed operation
     reason: "VERSION_CONFLICT" | "PERMANENT_FAILURE";
+    status: "UNRESOLVED" | "RESOLVED";
     localVersion: number;
     serverVersion?: number;
+    localDraft?: Partial<Note>;
     serverState?: any;
     timestamp: number;
 }
@@ -34,7 +35,8 @@ export class NotesDatabase extends Dexie {
 
     constructor() {
         super("NotesifyDB");
-        this.version(1).stores(dbSchema);
+        this.version(1).stores(dbSchemaV1);
+        this.version(2).stores(dbSchemaV2);
     }
 }
 
