@@ -193,23 +193,26 @@ export class ChatContextResolver {
       activeNoteContext = `\n\n[ACTIVE NOTE]\nid: ${activeNoteId}\ntitle: "${activeNoteTitle || "Untitled"}"\n[/ACTIVE NOTE]`;
     }
 
-    // Retrieve Active Learning Tasks / Practice Goals (Non-stale, max 5)
+    // Retrieve Active Learning Tasks / Practice Goals (Non-stale, max 10)
     let taskContext = "";
     if (user?._id) {
       try {
-        const activeTasks = await getActiveTasks(user._id, 5);
+        const activeTasks = await getActiveTasks(user._id, 10);
         if (activeTasks?.length > 0) {
-          taskContext = `\n--- ACTIVE LEARNING TASKS ---\nActive learning queue for this user:\n${activeTasks
-            .map((t, idx) => `- Task ${idx + 1} [${t.status}]: ${t.title}${t.description ? ` (${t.description})` : ""}`)
-            .join("\n")}\n--- END ACTIVE LEARNING TASKS ---\n`;
+          taskContext = `Active learning queue for this user (inspect before calling create_learning_tasks or update_task_status):\n${activeTasks
+            .map(
+              (t, idx) =>
+                `- Task ${idx + 1} [ID: "${t._id}", Type: "${t.type || "practice_question"}", Topic: "${t.topic || "General"}", Status: "${t.status}"]: ${t.title}${t.description ? ` (Criteria/Details: ${t.description})` : ""}`,
+            )
+            .join("\n")}`;
         }
       } catch (_) {}
     }
 
     const userName = user?.name ? `User: ${user.name}` : "";
-    const finalSystemPrompt = [userName, memoryContext, taskContext, activeNoteContext].filter(Boolean).join("\n");
+    const finalSystemPrompt = [userName, memoryContext, activeNoteContext].filter(Boolean).join("\n");
 
-    const currentMode = activeSession?.chatMode || chatMode || "casual";
+    const currentMode = chatMode || activeSession?.chatMode || "casual";
     // A global chat may reference the currently open note without becoming a
     // note-scoped conversation. Note-scoped chats are the contextual drawer.
     const isNoteScoped = !isGlobalChat;
@@ -223,6 +226,7 @@ export class ChatContextResolver {
       noteContext,
       noteFetched,
       finalSystemPrompt,
+      taskContext,
       currentMode,
       isNoteScoped,
       activeNoteId,

@@ -32,6 +32,8 @@ export const LearningTasksQueue: React.FC<LearningTasksQueueProps> = ({
   defaultOpen = true,
 }) => {
   const [isDismissed, setIsDismissed] = useState(false);
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+  const prevCountRef = React.useRef(0);
 
   const { tasks: queryTasks, deleteTask, archiveTasks } = useTasks(
     propTasks ? undefined : { limit: 30 }
@@ -46,11 +48,15 @@ export const LearningTasksQueue: React.FC<LearningTasksQueueProps> = ({
     (t) => t.status === "completed" || t.status === "skipped"
   );
 
-  // Automatically reset dismissed state whenever new active tasks arrive
+  // Automatically reset dismissed state and expand whenever new active tasks arrive
   useEffect(() => {
     if (activeTasks.length > 0) {
       setIsDismissed(false);
+      if (activeTasks.length > prevCountRef.current) {
+        setIsOpen(true);
+      }
     }
+    prevCountRef.current = activeTasks.length;
   }, [activeTasks.length]);
 
   if (
@@ -70,7 +76,7 @@ export const LearningTasksQueue: React.FC<LearningTasksQueueProps> = ({
     <Queue className={cn("w-full transition-all", className)}>
       {/* Active Tasks Section (pending & in_progress) */}
       {activeTasks.length > 0 && (
-        <QueueSection defaultOpen={defaultOpen}>
+        <QueueSection open={isOpen} onOpenChange={setIsOpen}>
           <QueueSectionTrigger>
             <QueueSectionLabel count={activeTasks.length} label={title} />
           </QueueSectionTrigger>

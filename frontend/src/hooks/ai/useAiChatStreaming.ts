@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { Message } from "@/components/ai/types";
 import { consumeAiChatStream } from "@/utils/consumeAiChatStream";
 import { parseIrisResponse } from "@/utils/parseIrisResponse";
+import { queryClient } from "@/lib/queryClient";
 
 interface UseAiChatStreamingOptions {
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
@@ -25,7 +26,11 @@ export const useAiChatStreaming = ({
 
     const { fullText, fullThought, thinkingTime: finalThinkingTime } =
       await consumeAiChatStream(responseBody, {
-        onToolCall: ({ id, tool, args, execution, purpose, status, data, error, quizData, questions, title, query, url, citations }) => {
+        onToolCall: ({ id, tool, args, execution, purpose, status, data, error, quizData, questions, title, query, url, citations, tasks, task }) => {
+          if (tool === "create_learning_tasks" || tool === "update_task_status") {
+            void queryClient.invalidateQueries({ queryKey: ["learning-tasks"] });
+          }
+
           if ((execution === "client" || execution === "local") && args) {
             import("@/services/ai/clientToolExecutor").then(({ executeClientTool }) => {
               executeClientTool(tool, args).then((result) => {
@@ -84,6 +89,8 @@ export const useAiChatStreaming = ({
                     purpose: purpose ?? updated[correlatedIdx].purpose,
                     status: status ?? updated[correlatedIdx].status,
                     data: data ?? updated[correlatedIdx].data,
+                    tasks: tasks ?? updated[correlatedIdx].tasks,
+                    task: task ?? updated[correlatedIdx].task,
                     error: error ?? updated[correlatedIdx].error,
                   };
                 return { ...m, toolCalls: updated };
@@ -98,6 +105,8 @@ export const useAiChatStreaming = ({
                   purpose,
                   status: status ?? "pending",
                   data,
+                  tasks,
+                  task,
                   error,
                   quizData,
                   questions: questions ?? quizData,
@@ -138,6 +147,8 @@ export const useAiChatStreaming = ({
                 purpose: purpose ?? updated[correlatedIdx].purpose,
                 status: status ?? updated[correlatedIdx].status,
                 data: data ?? updated[correlatedIdx].data,
+                tasks: tasks ?? updated[correlatedIdx].tasks,
+                task: task ?? updated[correlatedIdx].task,
                 error: error ?? updated[correlatedIdx].error,
               };
               return { ...m, toolCalls: updated };
@@ -147,7 +158,7 @@ export const useAiChatStreaming = ({
               toolCalls: [...existingCalls, {
                 id, tool, args, execution, purpose,
                 status: status ?? "pending",
-                data, error, quizData,
+                data, tasks, task, error, quizData,
                 questions: questions ?? quizData,
                 title, query, url, citations,
               }],

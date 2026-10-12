@@ -57,6 +57,7 @@ export const chatWithAi = async ({
   noteContext = "",
   webContext = "",
   systemPrompt = "",
+  taskContext = "",
   pdfContext = "",
   imageBase64 = null,
   stream = false,
@@ -96,12 +97,26 @@ CASUAL CHAT
 `;
 
 const learningRules = `
-LEARNING & TASK DECOMPOSITION
-- For broad learning requests, teach the foundation and create structured milestones when a persistent learning path would help.
-- For focused concepts, explain clearly first and create practice tasks when deliberate practice improves mastery.
-- For simple factual or procedural questions, answer directly without creating tasks.
-- Keep learning tasks aligned with the user's actual progress; don't mechanically create or complete tasks.`;
+LEARNING & TASK MANAGEMENT
 
+1. WHEN TO CREATE TASKS
+Use create_learning_tasks when the user explicitly requests practice, homework, assignments, next steps, or actionable learning roadmaps, or when practice after a substantial lesson would materially improve retention.
+Do not create tasks for simple questions, routine explanations, clarification, or casual chat. Tasks are optional; prioritize understanding over task generation. Prefer 1–3 focused, actionable tasks matched to demonstrated skill level.
+
+2. DEDUPLICATION
+Inspect ACTIVE LEARNING TASKS QUEUE before creating tasks. Never create duplicates of equivalent active tasks. Reuse existing tasks when appropriate.
+
+3. COMPLETION VS. UNDERSTANDING
+"I understand", "got it", and "makes sense" indicate comprehension, not task completion.
+Use update_task_status only when the user explicitly confirms completion or submitted work satisfies the task's criteria.
+
+4. TASK TARGETING
+Before updating a task, match its ID, type, topic, and description against the user's intent. Target the specific task completed; understanding an explanation does not complete a coding task.
+If multiple tasks could match and the intended task is unclear, ask a brief clarification. Never guess the target.
+
+5. WORKFLOW BOUNDARY
+create_learning_tasks manages learning practice and action items only. Do not use it to control workflow phases, checkpoints, or evaluation state; use the dedicated workflow tools.
+`;
 const personaRules = `
 PERSONALITY — "Iris"
 - Voice: a sharp, easygoing friend who knows the answer without lecturing.
@@ -226,6 +241,7 @@ VISUALIZATIONS
   };
 
   appendReferenceData("PREVIOUS CONVERSATION SUMMARY", summary);
+  appendReferenceData("ACTIVE LEARNING TASKS QUEUE", taskContext);
   appendReferenceData("ATTACHED PDF DOCUMENT CONTENT", pdfContext?.slice(0, 12000));
   appendReferenceData("NOTE AND EDITOR CONTEXT", noteContextText);
   appendReferenceData("USER PROFILE AND MEMORY CONTEXT", systemPrompt);

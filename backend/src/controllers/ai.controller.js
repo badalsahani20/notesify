@@ -321,14 +321,16 @@ const resolveSession = async (req) => {
         noteId,
         title: "Note Chat",
         messages: [],
-        chatMode: req.body.chatMode || "study",
+        chatMode: req.body.chatMode || "casual",
       });
     }
 
     activeSessionId = session._id;
     activeSession = session;
     activeAttachmentBundle = session.activeAttachmentBundle || null;
-  } else if (activeSession && req.body.chatMode && activeSession.chatMode !== req.body.chatMode) {
+  }
+
+  if (activeSession && req.body.chatMode && activeSession.chatMode !== req.body.chatMode) {
     activeSession.chatMode = req.body.chatMode;
     await activeSession.save();
   }
@@ -536,6 +538,7 @@ export const chatWithAiController = catchAsync(async (req, res) => {
     noteContext,
     noteFetched,
     finalSystemPrompt,
+    taskContext,
     currentMode,
     isNoteScoped,
     activeNoteId,
@@ -626,6 +629,7 @@ export const chatWithAiController = catchAsync(async (req, res) => {
       noteContext,
       noteFetched,
       systemPrompt: finalSystemPrompt,
+      taskContext,
       pdfContext: modelPdfContext,
       imageBase64,
       stream: isStreaming,

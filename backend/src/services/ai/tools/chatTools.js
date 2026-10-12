@@ -383,21 +383,39 @@ export const createLearningTasksTool = {
   type: "function",
   function: {
     name: "create_learning_tasks",
-    description: `Assign or suggest structured learning tasks, practice questions, or action items for the user to retain and apply what they just learned.
-Use this tool when:
-- Concluding a teaching session or explaining a complex topic and giving the user practice exercises.
-- The user asks for practice questions, homework, action items, or what to work on next.
-- Breaking down a study roadmap into concrete bite-sized milestones.
+    description: `Assign concrete practice questions, exercises, or action items for the user to retain and apply what they just learned.
 
-Do NOT call this on every casual chat. Only call it when actionable tasks or practice questions are genuinely helpful.`,
+Learning tasks are optional, not mandatory. Prioritize understanding over task generation. Create tasks only at natural practice points.
+
+WHEN TO USE:
+- The user explicitly asks for practice questions, exercises, homework, assignments, or tasks.
+- You have just taught a substantial concept and practice would meaningfully improve retention.
+- The user asks what they should work on next or how to prepare for an interview/exam.
+- The user asks for a learning roadmap and needs actionable milestones.
+
+WHEN NOT TO USE:
+- Simple factual or procedural questions.
+- After every explanation or answer.
+- When the user only wants clarification or is having casual conversation.
+- When practice adds unnecessary friction.
+- When the user says they completed or finished tasks (use update_task_status instead).
+- Never create duplicate tasks that already exist in ACTIVE LEARNING TASKS.
+
+TEST BEFORE CALLING:
+"Would giving this user a concrete task right now materially improve their ability to retain or apply what they just learned?" If no, do not call this tool.
+
+QUALITY RULES:
+- Prefer 1–3 focused, high-yield tasks over a large list.
+- Concrete and independently actionable without requiring another explanation.
+- Match difficulty (easy/medium/hard) to demonstrated understanding, not merely the topic.`,
     parameters: {
       type: "object",
       properties: {
         tasks: {
           type: "array",
-          description: "List of learning tasks or practice questions to assign.",
+          description: "List of 1–3 (max 5) focused learning tasks or practice questions to assign.",
           minItems: 1,
-          maxItems: 8,
+          maxItems: 5,
           items: {
             type: "object",
             properties: {
@@ -437,13 +455,19 @@ export const updateTaskStatusTool = {
   type: "function",
   function: {
     name: "update_task_status",
-    description: "Update the status of an existing learning task in the user's queue.",
+    description: `Update the status of an existing learning task in the user's queue (e.g. mark 'completed', 'in_progress', 'skipped').
+
+RULES FOR CALLING:
+- Completion criteria: Call only when the user explicitly indicates completion (e.g. "I finished task 1", "done with the coding question") or provides work that satisfies the task's criteria. A user saying "I understand now" or "makes sense" indicates comprehension, NOT task completion. Do not mark practice tasks completed for expressions of understanding.
+- Target the exact task: Target only the specific task the user actually finished. For example, if the user completed an explanation/review, target the concept_review task, NOT a separate coding_task.
+- Disambiguation: If multiple tasks exist on the same topic and the target is ambiguous, ask the user a brief clarification ("Did you complete the coding implementation or the concept review?") rather than guessing and updating the wrong task.
+- Pass the exact taskId (preferred, from [ID: "..."] in ACTIVE LEARNING TASKS), task number (e.g. '1'), or title.`,
     parameters: {
       type: "object",
       properties: {
         taskId: {
           type: "string",
-          description: "The task number (e.g. '1'), task title, or ID.",
+          description: "The exact taskId (from [ID: '...'] in ACTIVE LEARNING TASKS), task number (e.g. '1'), or title.",
         },
         status: {
           type: "string",
