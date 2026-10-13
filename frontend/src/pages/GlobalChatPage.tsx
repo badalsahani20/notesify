@@ -112,7 +112,6 @@ const GlobalChatPage = () => {
     }
   }, [sessionId, activeSessionId, loadSession, startNewChat]);
 
-  // ── When a new session is created during chat, sync URL ──
   useEffect(() => {
     if (!sessionId && activeSessionId && isSending) {
       sessionStorage.setItem("notesify_last_chat_session", activeSessionId);
