@@ -2,6 +2,7 @@ import express from "express";
 import multer from "multer";
 import authMiddleware from "../middleware/auth.middleware.js";
 import verifiedMiddleware from "../middleware/verified.middleware.js";
+import { aiConcurrencyLimiter, aiBurstLimiter } from "../middleware/aiRateLimit.middleware.js";
 import {
   aiAssistController,
   chatWithAiController,
@@ -26,9 +27,9 @@ router.use(authMiddleware);
 router.use(verifiedMiddleware);
 
 router.post("/check-note/:noteId", checkGrammarController);
-router.post("/assist", aiAssistController);
+router.post("/assist", aiConcurrencyLimiter, aiBurstLimiter, aiAssistController);
 router.post("/chat/attachments", upload.array("files", 40), uploadChatAttachmentController);
-router.post("/chat", chatWithAiController);
+router.post("/chat", aiConcurrencyLimiter, aiBurstLimiter, chatWithAiController);
 router.post("/interactions/:interactionId/answer", answerInteractionController);
 router.post("/chat/tool-result", reportToolResultController);
 router.get("/sessions", getAllSessionsController);

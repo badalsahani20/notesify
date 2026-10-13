@@ -22,6 +22,7 @@
   "registries": {
     "@react-bits": "https://reactbits.dev/r/{name}.json",
     "@ai-elements": "https://ai-sdk.dev/elements/api/registry/{name}.json",
-    "@beui": "https://beui.dev/r/{name}.json"
+    "@beui": "https://beui.dev/r/{name}.json",
+    "@assistant-ui": "https://r.assistant-ui.com/{name}.json"
   }
 }

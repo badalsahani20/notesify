@@ -184,15 +184,9 @@ export const generateConversationTitle = async (messages = []) => {
     : "New Conversation";
 
   const systemPrompt =
-    "You are a concise session title generator for an AI note-taking app. " +
-    "Generate a specific, natural, 3 to 6 word title summarizing the central topic or task of this conversation. " +
-    "STRICT RULES:\n" +
-    "- Return ONLY the title string.\n" +
-    "- No quotes, no markdown, no punctuation at the end.\n" +
-    "- Do NOT include transcript labels like 'User:', 'Assistant:', or message numbers.\n" +
-    "- Do NOT include conversational filler like 'Hey', 'Can you', 'Yo', 'I want', etc.\n" +
-    "- Do NOT include names of users or AI assistants.\n" +
-    "- Never return 'New Chat' or 'Conversation'.";
+    "Generate a specific, natural title of 3–6 words describing the conversation's central topic. " +
+    "Return only the title, without quotes, punctuation, labels, filler, user names, or assistant names. " +
+    "Never return 'New Chat' or 'Conversation'.";
 
   const titleMessages = [
     { role: "system", content: systemPrompt },

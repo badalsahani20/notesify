@@ -98,7 +98,7 @@ const GlobalChatPage = () => {
     });
   }, [fetchSessions]);
 
-  // ── Sync URL param -> activeSessionId (handles page refresh & direct links) ──
+  // ── Sync URL param and activeSessionId cleanly without double-navigation ──
   useEffect(() => {
     if (sessionId) {
       if (sessionId !== activeSessionId) {
@@ -106,26 +106,12 @@ const GlobalChatPage = () => {
       }
       sessionStorage.setItem("notesify_last_chat_session", sessionId);
     } else {
-      // User refreshed or loaded bare "/chat"
-      const savedSessionId = sessionStorage.getItem("notesify_last_chat_session");
-      if (savedSessionId) {
-        navigate(`/chat/${savedSessionId}`, { replace: true });
+      const targetSession = activeSessionId || sessionStorage.getItem("notesify_last_chat_session");
+      if (targetSession) {
+        navigate(`/chat/${targetSession}`, { replace: true });
       }
     }
-  }, [sessionId]);
-
-  // ── Sync activeSessionId -> URL param & sessionStorage (handles new session creation) ──
-  useEffect(() => {
-    if (activeSessionId) {
-      sessionStorage.setItem("notesify_last_chat_session", activeSessionId);
-      if (sessionId !== activeSessionId) {
-        navigate(`/chat/${activeSessionId}`, { replace: true });
-      }
-    } else if (sessionId) {
-      sessionStorage.removeItem("notesify_last_chat_session");
-      navigate("/chat", { replace: true });
-    }
-  }, [activeSessionId, sessionId, navigate]);
+  }, [sessionId, activeSessionId, loadSession, navigate]);
 
   const handleStartNewChat = useCallback(() => {
     sessionStorage.removeItem("notesify_last_chat_session");
@@ -327,6 +313,7 @@ const GlobalChatPage = () => {
                     <InteractivePromptDialog
                       questions={activeQuestions}
                       title={activePromptToolCall?.title ?? pendingInteraction?.title ?? undefined}
+                      purpose={activePromptToolCall?.purpose ?? pendingInteraction?.purpose ?? undefined}
                       onSubmit={handlePromptSubmit}
                       onDismiss={handlePromptDismiss}
                     />

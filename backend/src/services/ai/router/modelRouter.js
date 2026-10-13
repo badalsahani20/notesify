@@ -3,6 +3,7 @@ import {
   TEACHING_MODELS,
   DEFAULT_CHAT_MODEL,
   COMPLEX_ANALYSIS_MODEL,
+  QUICK_MODEL,
 } from "../config/aiModels.js";
 
 export const classifyChatIntent = (
@@ -64,7 +65,7 @@ export const classifyChatIntent = (
   }
 
   // 7. Default chat model
-  return DEFAULT_CHAT_MODEL;
+  return QUICK_MODEL || DEFAULT_CHAT_MODEL;
 };
 
 export const selectOptimalModel = classifyChatIntent;

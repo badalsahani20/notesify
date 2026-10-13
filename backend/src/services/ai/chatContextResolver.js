@@ -92,12 +92,11 @@ export class ChatContextResolver {
       clientToolResults,
     } = body || {};
 
-    // Context-aware history management (Large Context Window Strategy)
-    // Retain full conversational fidelity for long sessions.
-    // Modern models have 128k - 1M context windows, and modelRouter.js overrides
-    // to large-context models if totalContextLength exceeds 150k characters.
-    const RECENT_MESSAGE_COUNT = 80;
-    const SUMMARY_TRIGGER_COUNT = 100;
+    // Context-aware history management (15-20 message sliding window with summarization)
+    // Keep the most recent 16 messages (~8 back-and-forth turns) verbatim for immediate conversational fidelity.
+    // When history reaches 20 messages, older messages are summarized in the background and injected as concise reference context.
+    const RECENT_MESSAGE_COUNT = 16;
+    const SUMMARY_TRIGGER_COUNT = 20;
 
     let effectiveHistory = history;
     let sessionSummary = summary;
@@ -164,7 +163,7 @@ export class ChatContextResolver {
       try {
         const memories = await Memory.find({ user: user._id })
           .sort({ lastAccessedAt: -1 })
-          .limit(8)
+          .limit(4)
           .lean();
         if (memories?.length > 0) {
           memoryContext = `\n--- USER MEMORIES ---\nFacts previously noted about the user:\n${memories
@@ -193,7 +192,7 @@ export class ChatContextResolver {
       activeNoteContext = `\n\n[ACTIVE NOTE]\nid: ${activeNoteId}\ntitle: "${activeNoteTitle || "Untitled"}"\n[/ACTIVE NOTE]`;
     }
 
-    // Retrieve Active Learning Tasks / Practice Goals (Non-stale, max 10)
+    // Retrieve Active Learning Tasks / Practice Goals (Non-stale, max 3)
     let taskContext = "";
     if (user?._id) {
       try {

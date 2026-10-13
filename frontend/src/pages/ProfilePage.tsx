@@ -26,6 +26,19 @@ function getUsageLabel(used: number, limit: number): string {
   return "Looks good";
 }
 
+function formatTokens(num: number): string {
+  if (!num || num === 0) return "0";
+  if (num >= 1_000_000) {
+    const val = num / 1_000_000;
+    return `${val % 1 === 0 ? val : val.toFixed(1)}M`;
+  }
+  if (num >= 1_000) {
+    const val = num / 1_000;
+    return `${val % 1 === 0 ? val : val.toFixed(1)}k`;
+  }
+  return num.toLocaleString();
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 const ProfilePage = () => {
@@ -34,8 +47,10 @@ const ProfilePage = () => {
   const { data: stats, isLoading } = useUserStats();
 
   const provider = stats?.provider ?? user?.provider;
-  const aiUsed    = stats?.aiCount ?? 0;
-  const aiLimit   = stats?.limit   ?? 10;
+  const tier = (stats?.tier || "free").toLowerCase();
+  const hasTokenStats = typeof stats?.tokensUsed === "number";
+  const aiUsed    = hasTokenStats ? (stats?.tokensUsed ?? 0) : (stats?.aiCount ?? 0);
+  const aiLimit   = hasTokenStats ? (stats?.tokensLimit ?? 100000) : (stats?.limit ?? 100000);
   const usagePct  = Math.min((aiUsed / aiLimit) * 100, 100);
   const usageColor = getUsageColor(aiUsed, aiLimit);
 
@@ -92,16 +107,28 @@ const ProfilePage = () => {
             className="rounded-2xl p-4 flex flex-col gap-0.5"
             style={{ background: "var(--window-bg)", border: "1px solid var(--divider)" }}
           >
-            <div className="flex items-center gap-1.5 mb-1">
-              <Sparkles size={13} style={{ color: "var(--accent-strong)" }} />
-              <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--muted-text)" }}>
-                AI Today
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-1.5">
+                <Sparkles size={13} style={{ color: "var(--accent-strong)" }} />
+                <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--muted-text)" }}>
+                  AI Today
+                </span>
+              </div>
+              <span
+                className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded capitalize"
+                style={{
+                  background: tier === "enterprise" ? "rgba(168, 85, 247, 0.15)" : tier === "pro" ? "rgba(245, 158, 11, 0.15)" : "rgba(99, 102, 241, 0.12)",
+                  color: tier === "enterprise" ? "#c084fc" : tier === "pro" ? "#fbbf24" : "#818cf8",
+                  border: `1px solid ${tier === "enterprise" ? "rgba(168, 85, 247, 0.25)" : tier === "pro" ? "rgba(245, 158, 11, 0.25)" : "rgba(99, 102, 241, 0.2)"}`
+                }}
+              >
+                {tier}
               </span>
             </div>
             <span className="text-2xl font-bold" style={{ color: "var(--text-strong)" }}>
-              {isLoading ? "—" : `${aiUsed}/${aiLimit}`}
+              {isLoading ? "—" : `${formatTokens(aiUsed)} / ${formatTokens(aiLimit)}`}
             </span>
-            <span className="text-xs" style={{ color: "var(--muted-text)" }}>requests used</span>
+            <span className="text-xs" style={{ color: "var(--muted-text)" }}>tokens used</span>
           </div>
         </div>
 
@@ -114,7 +141,17 @@ const ProfilePage = () => {
             <div className="flex items-center gap-2">
               <TrendingUp size={14} style={{ color: "var(--accent-strong)" }} />
               <span className="text-sm font-semibold" style={{ color: "var(--text-strong)" }}>
-                AI Requests Today
+                AI Tokens Today
+              </span>
+              <span
+                className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded capitalize"
+                style={{
+                  background: tier === "enterprise" ? "rgba(168, 85, 247, 0.15)" : tier === "pro" ? "rgba(245, 158, 11, 0.15)" : "rgba(99, 102, 241, 0.12)",
+                  color: tier === "enterprise" ? "#c084fc" : tier === "pro" ? "#fbbf24" : "#818cf8",
+                  border: `1px solid ${tier === "enterprise" ? "rgba(168, 85, 247, 0.25)" : tier === "pro" ? "rgba(245, 158, 11, 0.25)" : "rgba(99, 102, 241, 0.2)"}`
+                }}
+              >
+                {tier} Tier
               </span>
             </div>
             {!isLoading && (
@@ -144,10 +181,12 @@ const ProfilePage = () => {
 
           <div className="flex items-center justify-between">
             <span className="text-xs" style={{ color: "var(--muted-text)" }}>
-              {isLoading ? "Loading…" : `${aiUsed} of ${aiLimit} requests used`}
+              {isLoading
+                ? "Loading…"
+                : `${aiUsed.toLocaleString()} of ${aiLimit.toLocaleString()} tokens used`}
             </span>
             <span className="text-xs" style={{ color: "var(--muted-text)" }}>
-              Resets at midnight
+              Resets at 00:00 UTC
             </span>
           </div>
         </div>

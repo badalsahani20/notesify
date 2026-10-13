@@ -53,7 +53,7 @@ const AppLayout = ({
 
   const handleLayoutChanged = (layout: any) => {
     onLayoutChanged?.(layout);
-    if (isMobile) return;
+    if (isMobile || !isNoteEditor) return;
 
     const notesSize = typeof layout?.notes === "number" ? layout.notes : (Array.isArray(layout) ? layout[0] : 0);
     const params = new URLSearchParams(location.search);
@@ -243,12 +243,15 @@ const AppLayout = ({
                 panelRef={notesPanelRef}
                 className={isTransitioning ? "panel-transition" : ""}
               >
-                <div className="desktop-notes-column w-full h-full overflow-hidden">
+                <div
+                  className="desktop-notes-column w-full h-full overflow-hidden"
+                  style={{ opacity: showNotesPanel ? 1 : 0 }}
+                >
                   {middlePanel}
                 </div>
               </ResizablePanel>
 
-              <ResizableHandle />
+              {showNotesPanel && <ResizableHandle />}
 
               {/* Editor: fills remaining space. initial={false} prevents 8px shift on mount */}
               <ResizablePanel id="main" minSize="20%">

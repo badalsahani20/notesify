@@ -42,6 +42,7 @@ export class IrisStreamHandler {
     let updateTaskToolArgs = "";
     let updateTaskToolIndex = -1;
     let interaction = null;
+    let capturedUsage = null;
 
     // Server tools & citations tracking
     const toolCallsByIndex = new Map(); // index -> { id, name, rawArgs: "", emitted: false, parsedQuery: "", parsedUrl: "" }
@@ -62,6 +63,15 @@ export class IrisStreamHandler {
       const events = parser.processChunk(chunk);
 
       for (const data of events) {
+
+        if(data?.usage) {
+          capturedUsage = {
+            promptTokens: data.usage.prompt_tokens || 0,
+            completionTokens: data.usage.completion_tokens || 0,
+            totalTokens: data.usage.total_tokens || 0,
+          };
+        }
+
         const choice = data.choices?.[0];
 
         // 1. Intercept choice annotations (citations returned by OpenRouter server tools)
@@ -588,7 +598,14 @@ export class IrisStreamHandler {
       }
     }
 
-    return { finalReply, toolCalls, serverToolCalls, interaction };
+    const tokenUsage = capturedUsage || {
+        promptTokens: Math.ceil(500 / 3.8),
+        completionTokens: Math.ceil(finalReply.length / 3.8),
+        totalTokens: Math.ceil((500 + finalReply.length) / 3.8),
+        estimated: true,
+      };
+
+    return { finalReply, toolCalls, serverToolCalls, interaction, tokenUsage };
   }
 }
 

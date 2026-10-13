@@ -58,10 +58,36 @@ const userSchema = new mongoose.Schema({
         editorFontSize: { type: Number, default: 18, min: 12, max: 28 },
         focusMode: { type: Boolean, default: false },
     },
+    plan: {
+    tier: { 
+        type: String, 
+        enum: ["free", "pro", "enterprise"], 
+        default: "free" 
+    },
+    status: { 
+        type: String, 
+        enum: ["active", "trialing", "past_due", "canceled"], 
+        default: "active" 
+    },
+    currentPeriodEnd: { type: Date, default: null },
+    customTokenLimit: { type: Number, default: null },
+},
     aiUsage: {
         dailyCount: { type: Number, default: 0},
-        lastResetAt: { type: Date, default: Date.now }
-    }
+        dailyTokens: { type: Number, default: 0 },
+        dailyInputTokens: { type: Number, default: 0 },
+        dailyOutputTokens: { type: Number, default: 0 },
+        lastResetAt: { type: Date, default: Date.now },
+        modelBreakdown: {
+        type: Map,
+        of: {
+            promptTokens: { type: Number, default: 0 },
+            completionTokens: { type: Number, default: 0 },
+            totalTokens: { type: Number, default: 0 },
+        },
+        default: {},
+    },
+}
 } , {timestamps: true});
 
 userSchema.index(

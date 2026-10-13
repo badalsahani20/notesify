@@ -123,6 +123,7 @@ export interface AnimatedAIChatProps {
   showHeading?: boolean;
   commands?: CommandSuggestion[];
   minHeight?: number;
+  disabled?: boolean;
 }
 
 export function AnimatedAIChat({
@@ -140,6 +141,7 @@ export function AnimatedAIChat({
   showHeading = false,
   commands,
   minHeight = 36,
+  disabled = false,
 }: AnimatedAIChatProps) {
     const [activeSuggestion, setActiveSuggestion] = useState<number>(-1);
     const [showCommandPalette, setShowCommandPalette] = useState(false);
@@ -250,7 +252,7 @@ export function AnimatedAIChat({
         }
 
         if (e.key === "Enter" && !e.shiftKey) {
-            if (e.nativeEvent.isComposing) return;
+            if (e.nativeEvent.isComposing || disabled || isTyping) return;
             e.preventDefault();
             if (value.trim() || attachments) {
                 onSubmit();
@@ -260,6 +262,7 @@ export function AnimatedAIChat({
     };
 
     const handleSendMessage = () => {
+        if (disabled || isTyping) return;
         if (value.trim() || attachments) {
             onSubmit();
             adjustHeight(true);
@@ -431,16 +434,18 @@ export function AnimatedAIChat({
                                     <motion.button
                                         type="button"
                                         onClick={handleSendMessage}
-                                        whileHover={{ scale: 1.02 }}
-                                        whileTap={{ scale: 0.95 }}
-                                        disabled={isTyping || (!value.trim() && !attachments)}
+                                        whileHover={!disabled ? { scale: 1.02 } : undefined}
+                                        whileTap={!disabled ? { scale: 0.95 } : undefined}
+                                        disabled={disabled || isTyping || (!value.trim() && !attachments)}
                                         className={cn(
-                                            "w-8 h-8 rounded-lg transition-all flex items-center justify-center cursor-pointer shrink-0 touch-manipulation",
-                                            value.trim() || attachments
-                                                ? "bg-white text-black shadow-md hover:bg-white/90 active:scale-95"
+                                            "w-8 h-8 rounded-lg transition-all flex items-center justify-center shrink-0 touch-manipulation",
+                                            disabled
+                                                ? "bg-white/5 text-rose-400/50 border border-rose-500/20 cursor-not-allowed opacity-60"
+                                                : value.trim() || attachments
+                                                ? "bg-white text-black shadow-md hover:bg-white/90 active:scale-95 cursor-pointer"
                                                 : "bg-white/5 text-white/30 cursor-not-allowed"
                                         )}
-                                        title="Send message"
+                                        title={disabled ? "Daily AI token limit reached (Resets at 00:00 UTC)" : "Send message"}
                                     >
                                         {isTyping ? (
                                             <LoaderIcon className="w-4 h-4 animate-[spin_2s_linear_infinite]" />

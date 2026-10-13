@@ -112,15 +112,15 @@ export type ChatHistoryMessage = {
 
 export type ChatArtifact =
   | {
-      type: "note";
-      id?: string;
-      title?: string;
-      content?: string;
-    }
+    type: "note";
+    id?: string;
+    title?: string;
+    content?: string;
+  }
   | {
-      type: "pdf";
-      id?: string;
-      title?: string;
-      url?: string;
-      rawText?: string;
-    };
+    type: "pdf";
+    id?: string;
+    title?: string;
+    url?: string;
+    rawText?: string;
+  };

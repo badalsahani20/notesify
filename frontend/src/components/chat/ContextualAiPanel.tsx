@@ -8,6 +8,7 @@ import { InteractivePromptDialog } from "@/components/chat/InteractivePromptDial
 import { LearningTasksQueue } from "@/components/chat/LearningTasksQueue";
 import { SelectionToolbar } from "@/components/chat/SelectionToolbar";
 import { isDesktopApp } from "@/lib/desktop";
+import { AiUsageContextIndicator } from "@/components/chat/AiUsageContextIndicator";
 import type { useAiChat } from "@/hooks/ai/useAiChat";
 import type { Message, InteractiveQuestion } from "../ai/types";
 
@@ -141,6 +142,7 @@ const ContextualAiPanel = ({
           {!isNewNote && noteTitle ? <span className="text-xs font-medium text-white/80 truncate">{noteTitle}</span> : null}
         </div>
         <div className="flex items-center gap-1 shrink-0" style={{ WebkitAppRegion: "no-drag" } as any}>
+          <AiUsageContextIndicator variant="badge" className="mr-0.5" />
           <button
             type="button"
             className="assistant-header-action"
@@ -218,6 +220,7 @@ const ContextualAiPanel = ({
               <InteractivePromptDialog
                 questions={activeQuestions}
                 title={activePromptToolCall?.title}
+                purpose={activePromptToolCall?.purpose}
                 onSubmit={(formatted) => {
                   if (lastAssistantMsg) setDismissedPromptId(lastAssistantMsg.id);
                   void sendChatMessage(formatted);

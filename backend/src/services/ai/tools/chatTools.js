@@ -31,40 +31,23 @@ export const askQuestionTool = {
   type: "function",
   function: {
     name: "ask_question",
-    description: `Present one or more questions to the user as an interactive dialog.
-Use this tool whenever you want to:
-- Quiz the user or test their knowledge
-- Clarify ambiguous requirements or ask the user for direction
-- Collect user preferences, choices, or design decisions
-- Ask the user to rank or prioritize alternatives
-
-Supported question types:
-- "single_select": the user picks exactly one option.
-- "multi_select": the user picks one or more options.
-- "rank_priority": the user orders the options from highest to lowest priority.
-
-Match each question's type to the overall purpose: purpose="ranking" means every question uses rank_priority. purpose="quiz", "clarification", or "preference" means every question uses single_select or multi_select, never rank_priority.
-
-CRITICAL: Respond to the user normally first, engaging with what they actually said. Then call this tool to ask your questions — do not repeat them as markdown text after calling it.
-
-Use this tool only when the user explicitly requests a quiz, survey, ranking, or multiple-choice interaction, or when several structured choices are genuinely better than a normal conversational question. For one simple clarification, ask naturally in the response instead. Do not use it for greetings or ordinary conversation. For quizzes, do not include the correct answer or an explanation in the tool call.`,
+    description:
+      "Present an interactive question, quiz, or ranking dialog to the user when testing knowledge or collecting structured choices/priorities.",
     parameters: {
       type: "object",
       properties: {
         purpose: {
           type: "string",
           enum: ["quiz", "clarification", "preference", "ranking"],
-          description:
-            "Use 'quiz' only to test knowledge. Use 'ranking' only when every question is rank_priority. Use 'clarification' or 'preference' for everything else.",
+          description: "Purpose of the question set.",
         },
         title: {
           type: "string",
-          description:
-            "Short label for this set of questions, 2-4 words.",
+          description: "Short label for this question set (2-4 words).",
         },
         questions: {
           type: "array",
-          description: "The list of questions to ask the user.",
+          description: "List of questions to ask the user.",
           minItems: 1,
           maxItems: 15,
           items: {
@@ -72,28 +55,26 @@ Use this tool only when the user explicitly requests a quiz, survey, ranking, or
             properties: {
               id: {
                 type: "string",
-                description: "Unique identifier for this question (e.g. 'q1')",
+                description: "Unique identifier for this question (e.g. 'q1').",
               },
               question: {
                 type: "string",
-                description: "The question or instruction prompt. Keep it to one or two sentences.",
+                description: "The question or instruction prompt.",
               },
               type: {
                 type: "string",
                 enum: ["single_select", "multi_select", "rank_priority"],
-                description:
-                  "Must match the call's purpose: rank_priority only when purpose='ranking'; single_select or multi_select for quiz, clarification, and preference.",
+                description: "Interaction type (single_select, multi_select, or rank_priority).",
               },
               allowOther: {
                 type: "boolean",
-                description: "Whether the user may provide an option outside the listed choices.",
+                description: "Whether the user may write in a custom option.",
                 default: true,
               },
               options: {
                 type: "array",
                 items: { type: "string" },
-                description:
-                  "List of options (typically 2 to 5). Keep each option under 5 words. No parenthetical explanations. For rank_priority, list only the items being ranked — never add an 'all', 'none', or 'other' option.",
+                description: "List of 2 to 5 selectable options.",
               },
             },
             required: ["id", "question", "type", "options"],
@@ -109,13 +90,8 @@ export const createWorkflowTool = {
   type: "function",
   function: {
     name: "create_workflow",
-    description: `Create a persistent structured learning workflow for the user.
-
-Use this when the user explicitly asks to learn, study, practice, or be taught a topic as a structured multi-step program.
-
-Do not create a workflow for ordinary explanations or casual questions.
-
-The workflow should contain a sensible progression of phases and tasks. Each task must represent one concrete learning objective.`,
+    description:
+      "Create a structured multi-phase learning workflow when the user explicitly requests a guided learning roadmap or study program.",
     parameters: {
       type: "object",
       properties: {
@@ -157,7 +133,7 @@ The workflow should contain a sensible progression of phases and tasks. Each tas
                     },
                     concept: {
                       type: "string",
-                      description: "The specific concept or learning objective.",
+                      description: "Specific concept or learning objective.",
                     },
                     order: {
                       type: "integer",
@@ -190,7 +166,7 @@ export const listWorkflowsTool = {
   function: {
     name: "list_workflows",
     description:
-      "List the user's existing learning workflows. Use this when the user wants to resume, continue, inspect, or choose between existing learning workflows.",
+      "List the user's existing learning workflows to inspect, resume, or continue them.",
     parameters: {
       type: "object",
       properties: {
@@ -210,7 +186,7 @@ export const getWorkflowTool = {
   function: {
     name: "get_workflow",
     description:
-      "Retrieve the complete current state of a specific learning workflow. Use this before continuing or transitioning a workflow when its latest state/version is not already available in context.",
+      "Retrieve the complete current state of a specific learning workflow by workflowId.",
     parameters: {
       type: "object",
       properties: {
@@ -229,15 +205,8 @@ export const transitionWorkflowTool = {
   type: "function",
   function: {
     name: "transition_workflow",
-    description: `Apply one deterministic command to a learning workflow.
-
-The workflow engine, not Iris, decides whether the transition is valid.
-
-IMPORTANT:
-- Never invent expectedVersion.
-- Use the version from the latest workflow state you received.
-- After a successful transition, use the returned workflow version for the next transition.
-- Use this tool for starting, pausing, resuming, retrying, activating tasks, presenting checkpoints, submitting answers, evaluating checkpoints, and abandoning tasks.`,
+    description:
+      "Apply a deterministic command to advance, pause, resume, or evaluate a learning workflow using expectedVersion from latest state.",
     parameters: {
       type: "object",
       properties: {
@@ -262,15 +231,13 @@ IMPORTANT:
         },
         payload: {
           type: "object",
-          description:
-            "Command-specific parameters. For example taskId, checkpointId, question, answer, verdict, or confidence.",
+          description: "Command parameters (e.g. taskId, checkpointId, answer).",
           additionalProperties: true,
         },
         expectedVersion: {
           type: "integer",
           minimum: 0,
-          description:
-            "The workflow version currently known by Iris. Must come from the latest workflow state.",
+          description: "Current workflow version known from latest state.",
         },
       },
       required: ["workflowId", "command", "expectedVersion"],
@@ -283,21 +250,20 @@ export const deleteWorkflowTool = {
   type: "function",
   function: {
     name: "delete_workflow",
-    description: `Delete a learning workflow permanently.
-Use this only when the user explicitly asks to delete, remove, or discard a workflow.
-Do not use this to pause, abandon, or complete a workflow.`,
+    description:
+      "Permanently delete a learning workflow when the user explicitly asks to remove it.",
     parameters: {
       type: "object",
       properties: {
         workflowId: {
           type: "string",
-          description: "The workflow's stable ID."
-        }
+          description: "The workflow's stable ID.",
+        },
       },
       required: ["workflowId"],
-      additionalProperties: false
-    }
-  }
+      additionalProperties: false,
+    },
+  },
 };
 
 export const createNoteTool = {
@@ -305,17 +271,17 @@ export const createNoteTool = {
   function: {
     name: "create_note",
     description:
-      "Create a new note in Notesify. Call this when the user wants a new note created and is not asking to modify an existing note (e.g. 'Create a note about Docker', 'Turn this explanation into a note').",
+      "Create a new note in Notesify with title and Markdown content when explicitly requested.",
     parameters: {
       type: "object",
       properties: {
         title: {
           type: "string",
-          description: "The title of the note",
+          description: "The title of the note.",
         },
         content: {
           type: "string",
-          description: "The body content in rich Markdown (headings, bullet lists, code blocks).",
+          description: "The body content in rich Markdown.",
         },
       },
       required: ["title", "content"],
@@ -329,13 +295,13 @@ export const getNoteContentTool = {
   function: {
     name: "get_note_content",
     description:
-      "Retrieve the complete current title, version, and content of the active note when the local editor context or selection is not sufficient. Pass the noteId from [ACTIVE NOTE].",
+      "Retrieve the complete current content of an active note by noteId.",
     parameters: {
       type: "object",
       properties: {
         noteId: {
           type: "string",
-          description: "The unique ID of the active note to retrieve (from [ACTIVE NOTE]). Required.",
+          description: "The unique ID of the active note to retrieve.",
         },
       },
       required: ["noteId"],
@@ -349,28 +315,26 @@ export const updateNoteTool = {
   function: {
     name: "update_note",
     description:
-      "Modify an existing note in Notesify. Use mode='append' to add new material. Use mode='replace' only when the user explicitly requests a complete rewrite or overwrite.",
+      "Update an existing note in Notesify. Use mode='append' to add new material, or mode='replace' to overwrite when requested.",
     parameters: {
       type: "object",
       properties: {
         noteId: {
           type: "string",
-          description: "The unique ID of the existing note to update (e.g. from [ACTIVE NOTE]). Required.",
+          description: "The unique ID of the existing note to update.",
         },
         title: {
           type: "string",
-          description: "New title for the note (if renaming)",
+          description: "New title for the note (if renaming).",
         },
         content: {
           type: "string",
-          description:
-            "mode='append': provide ONLY the new section(s) to add at the end. mode='replace': provide the complete replacement content.",
+          description: "Content to append, or full replacement content.",
         },
         mode: {
           type: "string",
           enum: ["append", "replace"],
-          description:
-            "Default 'append' adds content to the end without modifying existing text. Use 'replace' only when user explicitly asks to replace or rewrite the whole note.",
+          description: "Default 'append' adds to end; 'replace' overwrites.",
         },
       },
       required: ["noteId"],
@@ -383,37 +347,14 @@ export const createLearningTasksTool = {
   type: "function",
   function: {
     name: "create_learning_tasks",
-    description: `Assign concrete practice questions, exercises, or action items for the user to retain and apply what they just learned.
-
-Learning tasks are optional, not mandatory. Prioritize understanding over task generation. Create tasks only at natural practice points.
-
-WHEN TO USE:
-- The user explicitly asks for practice questions, exercises, homework, assignments, or tasks.
-- You have just taught a substantial concept and practice would meaningfully improve retention.
-- The user asks what they should work on next or how to prepare for an interview/exam.
-- The user asks for a learning roadmap and needs actionable milestones.
-
-WHEN NOT TO USE:
-- Simple factual or procedural questions.
-- After every explanation or answer.
-- When the user only wants clarification or is having casual conversation.
-- When practice adds unnecessary friction.
-- When the user says they completed or finished tasks (use update_task_status instead).
-- Never create duplicate tasks that already exist in ACTIVE LEARNING TASKS.
-
-TEST BEFORE CALLING:
-"Would giving this user a concrete task right now materially improve their ability to retain or apply what they just learned?" If no, do not call this tool.
-
-QUALITY RULES:
-- Prefer 1–3 focused, high-yield tasks over a large list.
-- Concrete and independently actionable without requiring another explanation.
-- Match difficulty (easy/medium/hard) to demonstrated understanding, not merely the topic.`,
+    description:
+      "Assign 1–3 concrete practice questions or tasks in the user's queue when they request practice, exercises, or after completing a major topic.",
     parameters: {
       type: "object",
       properties: {
         tasks: {
           type: "array",
-          description: "List of 1–3 (max 5) focused learning tasks or practice questions to assign.",
+          description: "List of 1–3 focused learning tasks or practice questions to assign.",
           minItems: 1,
           maxItems: 5,
           items: {
@@ -421,15 +362,21 @@ QUALITY RULES:
             properties: {
               title: {
                 type: "string",
-                description: "Concise actionable title or question (e.g., 'Implement Two Sum in Python')",
+                description: "Concise actionable title or question.",
               },
               description: {
                 type: "string",
-                description: "Optional details, test cases, or hints",
+                description: "Optional details, test cases, or hints.",
               },
               type: {
                 type: "string",
-                enum: ["practice_question", "concept_review", "coding_task", "quiz", "todo"],
+                enum: [
+                  "practice_question",
+                  "concept_review",
+                  "coding_task",
+                  "quiz",
+                  "todo",
+                ],
                 default: "practice_question",
               },
               difficulty: {
@@ -439,7 +386,7 @@ QUALITY RULES:
               },
               topic: {
                 type: "string",
-                description: "Topic or subject tag (e.g., 'React', 'DSA', 'Calculus')",
+                description: "Topic tag (e.g. 'React', 'DSA').",
               },
             },
             required: ["title"],
@@ -455,24 +402,19 @@ export const updateTaskStatusTool = {
   type: "function",
   function: {
     name: "update_task_status",
-    description: `Update the status of an existing learning task in the user's queue (e.g. mark 'completed', 'in_progress', 'skipped').
-
-RULES FOR CALLING:
-- Completion criteria: Call only when the user explicitly indicates completion (e.g. "I finished task 1", "done with the coding question") or provides work that satisfies the task's criteria. A user saying "I understand now" or "makes sense" indicates comprehension, NOT task completion. Do not mark practice tasks completed for expressions of understanding.
-- Target the exact task: Target only the specific task the user actually finished. For example, if the user completed an explanation/review, target the concept_review task, NOT a separate coding_task.
-- Disambiguation: If multiple tasks exist on the same topic and the target is ambiguous, ask the user a brief clarification ("Did you complete the coding implementation or the concept review?") rather than guessing and updating the wrong task.
-- Pass the exact taskId (preferred, from [ID: "..."] in ACTIVE LEARNING TASKS), task number (e.g. '1'), or title.`,
+    description:
+      "Update the status of a learning task in the user's queue (e.g. 'completed', 'in_progress', 'skipped') when the user confirms completion.",
     parameters: {
       type: "object",
       properties: {
         taskId: {
           type: "string",
-          description: "The exact taskId (from [ID: '...'] in ACTIVE LEARNING TASKS), task number (e.g. '1'), or title.",
+          description: "The taskId, task number, or title.",
         },
         status: {
           type: "string",
           enum: ["in_progress", "completed", "pending", "skipped"],
-          description: "The updated status of the task.",
+          description: "The updated status.",
         },
       },
       required: ["taskId", "status"],

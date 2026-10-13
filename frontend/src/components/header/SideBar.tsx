@@ -93,11 +93,11 @@ const ActivityBar = () => {
             {/* AI Chat */}
             {/* Iris AI */}
             <NavLink
-              to={`/chat${location.search}`}
+              to={typeof window !== "undefined" && sessionStorage.getItem("notesify_last_chat_session") ? `/chat/${sessionStorage.getItem("notesify_last_chat_session")}` : "/chat"}
               className={({ isActive }) =>
                 cn(
-                  "ai-rail-button group mx-auto mb-2 flex items-center justify-center transition-all",
-                  isActive && "ai-rail-button-active"
+                  "ai-rail-button group mx-auto mb-1 flex items-center justify-center transition-all",
+                  (isActive || location.pathname.startsWith("/chat")) && "ai-rail-button-active"
                 )
               }
               title="Iris AI"

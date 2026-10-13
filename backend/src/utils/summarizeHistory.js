@@ -2,16 +2,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { executeOpenRouter, QUICK_MODEL } from "../services/ai/index.js";
 import { client as groqClient } from "./groqClient.js";
 
-const SUMMARIZER_SYSTEM_INSTRUCTION = `You are an expert technical conversation summarizer.
-Your job is to produce a state-preserving, comprehensive summary of the conversation so far.
-
-CRITICAL RETENTION RULES:
-1. Preserve State, Not Just a Recap: Retain the ongoing status of technical tasks, decisions made, architecture choices, and user constraints.
-2. Decisions & Rationale: Record what approaches were selected or rejected and why.
-3. Unresolved & Pending: Note any unresolved bugs, pending questions, or planned next steps.
-4. Technical Names: Keep exact names of components, files, functions, APIs, models, and dependencies.
-5. User Preferences: Retain user preferences, tech stack constraints, and working style.
-6. Conciseness & Range: Keep the summary cohesive, technical, and structured, targeting 300 to 600 words. Avoid conversational filler or greetings.`;
+const SUMMARIZER_SYSTEM_INSTRUCTION = `Summarize this conversation for future continuation. Preserve current task state, decisions and rationale, unresolved issues, next steps, exact technical identifiers, constraints, and relevant user preferences. Prioritize actionable state over narrative recap. Use concise, structured prose, targeting 300–600 words when warranted. Never invent missing details.`;
 
 /**
  * Summarizes older conversation history, consolidating with any existing summary.

@@ -28,6 +28,10 @@ export const executeOpenRouter = async (
     max_tokens: maxTokens,
   };
 
+  if (stream) {
+    bodyPayload.stream_options = { include_usage: true };
+  }
+
   if (isGlm) {
     bodyPayload.provider = {
       order: [
@@ -41,10 +45,9 @@ export const executeOpenRouter = async (
   } else if (isDeepseek) {
     bodyPayload.provider = {
       order: [
-        "makora",
         "digitalocean",
         "deepinfra/fp8",
-        "streamlake/fp8",
+        "wafer/fast",
       ],
       allow_fallbacks: true,
     };

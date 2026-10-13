@@ -5,6 +5,11 @@ export interface UserStats {
   notesCount: number;
   aiCount: number;
   limit: number;
+  tokensUsed?: number;
+  tokensLimit?: number;
+  tokensInput?: number;
+  tokensOutput?: number;
+  tier?: string;
   name: string;
   email: string;
   avatar?: string;
@@ -22,7 +27,7 @@ export const useUserStats = () => {
   return useQuery({
     queryKey: ["user", "stats"],
     queryFn: fetchUserStats,
-    staleTime: 0, // 0 ensures it fetches immediately on mount/focus
+    staleTime: 30 * 1000,
     retry: 1,
   });
 };

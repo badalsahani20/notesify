@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { CheckCircle2, Calendar, Mail, Pencil, Check, X, ShieldCheck } from "lucide-react";
+import { CheckCircle2, Calendar, Mail, Pencil, Check, X, ShieldCheck, Sparkles } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useUserStats } from "@/hooks/user/useUserStats";
@@ -49,6 +49,7 @@ export const UserProfileCard = ({
   const displayAvatar = user?.avatar || stats?.avatar || GoogleIcon;
   const provider = stats?.provider ?? user?.provider;
   const isVerified = user?.isVerified ?? stats?.isVerified ?? false;
+  const tier = (stats?.tier || "free").toLowerCase();
   const memberSince = stats?.memberSince ?? user?.createdAt;
   const formattedMemberSince = formatMemberSinceDate(memberSince, memberSinceFormat);
 
@@ -205,6 +206,21 @@ export const UserProfileCard = ({
                 Since {formattedMemberSince}
               </span>
             )}
+
+            {/* Plan Tier Badge */}
+            <span
+              className={cn(
+                "inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full capitalize",
+                tier === "enterprise"
+                  ? "bg-purple-500/10 text-purple-300 border border-purple-500/25"
+                  : tier === "pro"
+                  ? "bg-amber-500/10 text-amber-300 border border-amber-500/25"
+                  : "bg-indigo-500/10 text-indigo-300 border border-indigo-500/20"
+              )}
+            >
+              <Sparkles size={10} className={tier === "pro" || tier === "enterprise" ? "text-amber-400" : "text-indigo-400"} />
+              {tier} Tier
+            </span>
           </div>
         </div>
       </div>

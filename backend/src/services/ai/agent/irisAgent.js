@@ -38,6 +38,8 @@ export class IrisAgent {
     const extraMessages = [...initialExtraMessages];
     let pdfContextToEmit = pdfContext || "";
     let currentRound = startRound;
+    let totalUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+    let lastModel = null;
 
     while (currentRound < this.maxToolRounds) {
       currentRound++;
@@ -86,8 +88,17 @@ export class IrisAgent {
         break;
       }
 
+      if (roundResult.model) {
+        lastModel = roundResult.model;
+      }
+
       if (!stream) {
         finalReply = roundResult.reply;
+        const estimatedPrompt = Math.ceil((message?.length || 500) / 3.8);
+        const estimatedCompletion = Math.ceil((roundResult.reply?.length || 0) / 3.8);
+        totalUsage.promptTokens += estimatedPrompt;
+        totalUsage.completionTokens += estimatedCompletion;
+        totalUsage.totalTokens += estimatedPrompt + estimatedCompletion;
         break;
       }
 
@@ -98,6 +109,12 @@ export class IrisAgent {
           currentRound === 1 ? noteFetched : false,
           userId,
         );
+
+        if (responseObj.tokenUsage) {
+          totalUsage.promptTokens += responseObj.tokenUsage.promptTokens || 0;
+          totalUsage.completionTokens += responseObj.tokenUsage.completionTokens || 0;
+          totalUsage.totalTokens += responseObj.tokenUsage.totalTokens || 0;
+        }
 
         if (responseObj.finalReply) {
           finalReply = finalReply
@@ -116,6 +133,8 @@ export class IrisAgent {
             toolCalls,
             interaction: responseObj.interaction,
             pdfContext: pdfContextToEmit,
+            tokenUsage: totalUsage,
+            model: lastModel,
           };
         }
 
@@ -216,6 +235,8 @@ export class IrisAgent {
       finalReply: finalReply || "",
       toolCalls,
       pdfContext: pdfContextToEmit,
+      tokenUsage: totalUsage,
+      model: lastModel,
     };
   }
 }

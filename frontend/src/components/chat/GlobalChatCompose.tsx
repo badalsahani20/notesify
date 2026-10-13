@@ -6,6 +6,8 @@ import { toast } from "sonner";
 import { AnimatedAIChat } from "@/components/ui/animated-ai-chat";
 import { useGlobalChatStore } from "@/store/useGlobalChatStore";
 import { VoiceDictationButton } from "./VoiceDictationButton";
+import { AiUsageContextIndicator } from "./AiUsageContextIndicator";
+import { useUserStats } from "@/hooks/user/useUserStats";
 import type { ChatAttachmentBundle } from "@/components/ai/types";
 import {
   Attachments,
@@ -80,6 +82,11 @@ export const GlobalChatCompose = ({
   setUseWebSearch,
 }: GlobalChatComposeProps) => {
   const { chatMode, setChatMode } = useGlobalChatStore();
+  const { data: userStats } = useUserStats();
+  const tokensUsed = userStats?.tokensUsed ?? userStats?.aiCount ?? 0;
+  const tokensLimit = userStats?.tokensLimit ?? userStats?.limit ?? 100000;
+  const isLimitReached = Boolean(userStats && tokensLimit > 0 && tokensUsed >= tokensLimit);
+
   const [fileAccept, setFileAccept] = useState("image/*,.pdf");
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [isUploadingDoc, setIsUploadingDoc] = useState(false);
@@ -326,8 +333,9 @@ export const GlobalChatCompose = ({
         onChange={setInput}
         onSubmit={handleSend}
         isTyping={isSending || isUploadingDoc}
+        disabled={isLimitReached}
         onStop={onStop}
-        placeholder={placeholder}
+        placeholder={isLimitReached ? "Daily AI token limit reached (Resets at 00:00 UTC)" : placeholder}
         textareaRef={textareaRef as any}
         showHeading={false}
         onAttachClick={() => {
@@ -339,15 +347,18 @@ export const GlobalChatCompose = ({
         }}
         extraActionButtons={extraActionButtons}
         rightActionButtons={
-          <VoiceDictationButton
-            onTranscript={(text) => {
-              setInput(input ? `${input.trim()} ${text}` : text);
-              setTimeout(() => {
-                textareaRef.current?.focus();
-              }, 60);
-            }}
-            disabled={isSending}
-          />
+          <div className="flex items-center gap-1.5 shrink-0">
+            <AiUsageContextIndicator variant="rail" />
+            <VoiceDictationButton
+              onTranscript={(text) => {
+                setInput(input ? `${input.trim()} ${text}` : text);
+                setTimeout(() => {
+                  textareaRef.current?.focus();
+                }, 60);
+              }}
+              disabled={isSending}
+            />
+          </div>
         }
         commands={DEFAULT_CHAT_COMMANDS}
       />

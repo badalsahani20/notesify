@@ -1,26 +1,33 @@
 import Notes from "../models/notes.model.js";
 import User from "../models/user.model.js";
 import catchAsync from "../utils/catchAsync.js";
-import getEffectiveDailyLimit from "../utils/getEffectiveDailyLimit.js";
+import getEffectiveDailyLimit, { getEffectiveDailyLimits, getStartOfUtcDay } from "../utils/getEffectiveDailyLimit.js";
     
 export const getStats = catchAsync(async (req, res) => {
   const { user } = req;
 
   const notesCount = await Notes.countDocuments({ user: user._id });
-  const today = new Date();
-  today.setHours(0,0,0,0);
+  const startOfToday = getStartOfUtcDay();
 
-  const isNewDay = user?.aiUsage?.lastResetAt < today;
+  const isNewDay = !user?.aiUsage?.lastResetAt || user.aiUsage.lastResetAt < startOfToday;
 
   const aiCount = isNewDay ? 0 : (user?.aiUsage?.dailyCount || 0);
-  const limit = getEffectiveDailyLimit(user);
+  const limits = getEffectiveDailyLimits(user);
+  const tokensUsed = isNewDay ? 0 : (user?.aiUsage?.dailyTokens || 0);
+  const tokensInput = isNewDay ? 0 : (user?.aiUsage?.dailyInputTokens || 0);
+  const tokensOutput = isNewDay ? 0 : (user?.aiUsage?.dailyOutputTokens || 0);
   
   res.status(200).json({
     success: true,
     stats:{
       notesCount,
       aiCount,
-      limit,
+      limit: limits.tokenLimit,
+      tokensUsed,
+      tokensLimit: limits.tokenLimit,
+      tokensInput,
+      tokensOutput,
+      tier: limits.tier,
       // User meta — already on req.user, no extra DB call needed
       name: user.name,
       email: user.email,

@@ -70,7 +70,7 @@ const mapDiffsToError = (diffs) => {
 };
 
 export const checkGrammar = async (text) => {
-  const prompt = `You are a professional editor. Fix grammar, spelling, punctuation, and awkward phrasing while preserving meaning. Return only corrected text.\n\nText:\n${text}`;
+  const prompt = `You are a note editor. Return only the final Markdown, with no preface or commentary.\nCorrect grammar, spelling, punctuation, and awkward phrasing without changing meaning.\n\nText:\n${text}`;
 
   try {
     const correctedText = await generateContentWithFallback(prompt);
@@ -88,16 +88,11 @@ export const checkGrammar = async (text) => {
   }
 };
 
-const OUTPUT_RULES = `
-Output only the final markdown.
-Do not include planning notes, self-correction commentary, or unnecessary prefaces.
-`;
-
 const actionPrompts = {
-  summarize: (text) => `Summarize this note into concise, information-dense markdown bullets.\n${OUTPUT_RULES}\nNote:\n${text}`,
-  explain: (text) => `Explain this note in beginner-friendly language using clear markdown structure.\n${OUTPUT_RULES}\nNote:\n${text}`,
-  rewrite: (text) => `Rewrite the text to improve clarity, grammar, and flow while preserving meaning.\n${OUTPUT_RULES}\nText:\n${text}`,
-  continue: (text) => `Continue the text naturally while matching its tone and structure.\n${OUTPUT_RULES}\nText:\n${text}`,
+  summarize: (text) => `You are a note editor. Return only the final Markdown, with no preface or commentary.\nProduce concise, information-dense bullets.\n\nNote:\n${text}`,
+  explain: (text) => `You are a note editor. Return only the final Markdown, with no preface or commentary.\nExplain clearly for a beginner.\n\nNote:\n${text}`,
+  rewrite: (text) => `You are a note editor. Return only the final Markdown, with no preface or commentary.\nImprove clarity and flow while preserving meaning.\n\nText:\n${text}`,
+  continue: (text) => `You are a note editor. Return only the final Markdown, with no preface or commentary.\nExtend the text naturally, matching its tone and structure.\n\nText:\n${text}`,
 };
 
 export const runAiAssist = async ({ action, text, stream = false }) => {

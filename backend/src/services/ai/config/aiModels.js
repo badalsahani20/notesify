@@ -2,6 +2,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export const PRIMARY_MODEL = "deepseek/deepseek-v4-flash-0731";
 export const TEACHING_MODELS = [
+  "qwen/qwen3.7-flash",
   "deepseek/deepseek-v4-flash-0731",
 ];
 export const DEFAULT_CHAT_MODEL = "qwen/qwen3.7-flash";

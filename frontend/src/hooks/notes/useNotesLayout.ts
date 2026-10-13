@@ -23,7 +23,11 @@ export const useNotesLayout = () => {
     lazyCreatedNoteId = null;
   }
 
-  let animationKey = noteId ? `note-${noteId}` : "empty-state";
+  let animationKey = isChatRoute
+    ? "global-chat"
+    : noteId
+    ? `note-${noteId}`
+    : "empty-state";
   if (noteId && noteId === lazyCreatedNoteId) {
     animationKey = "note-new";
   }

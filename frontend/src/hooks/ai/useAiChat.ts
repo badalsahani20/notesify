@@ -11,6 +11,7 @@ import { useAiChatSession } from "./useAiChatSession";
 import { useAiChatStreaming } from "./useAiChatStreaming";
 import { postAiChatStream } from "@/services/ai/aiChatApi";
 import { uploadChatAttachment } from "@/services/ai/uploadChatAttachment";
+import { queryClient } from "@/lib/queryClient";
 
 import { useGlobalChatStore } from "@/store/useGlobalChatStore";
 
@@ -238,6 +239,7 @@ export const useAiChat = (noteId: string, noteContent: string, editor: Editor | 
       setMessages(failedMessages);
     } finally {
       setIsSendingChat(false);
+      void queryClient.invalidateQueries({ queryKey: ["user", "stats"] });
     }
   };
 

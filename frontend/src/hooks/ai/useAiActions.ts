@@ -6,6 +6,7 @@ import type { AiAction, AssistResult, SelectionRange } from "@/components/ai/typ
 import { getSelection } from "@/utils/ai/aiContext";
 import { consumeAiChatStream } from "@/utils/consumeAiChatStream";
 import { postAiAssistStream, postAiAssistBlocking } from "@/services/ai/aiAssistApi";
+import { queryClient } from "@/lib/queryClient";
 
 interface UseAiActionsOptions {
   editor: Editor | null;
@@ -150,6 +151,7 @@ export const useAiActions = ({
       }
     } finally {
       setLoadingAction(null);
+      void queryClient.invalidateQueries({ queryKey: ["user", "stats"] });
     }
   };
 

@@ -15,8 +15,10 @@ import {
 import GlobalChatSession from "../models/globalChatSession.model.js";
 import { stripHtml } from "../utils/stripHtml.js";
 import { parseIrisResponse } from "../utils/parseIrisResponse.js";
-import getEffectiveDailyLimit from "../utils/getEffectiveDailyLimit.js";
-import { SseStreamParser } from "../utils/sseParser.js";
+import getEffectiveDailyLimit, {
+  getEffectiveDailyLimits,
+  getStartOfUtcDay,
+} from "../utils/getEffectiveDailyLimit.js";
 import agentRunService from "../services/ai/agent/agentRunService.js";
 import {cleanSessionTitle, hashText} from "../utils/hashText.js"
 import { uploadImageToCloudinary } from "../services/imageUpload.service.js";
@@ -102,31 +104,26 @@ export const aiAssistController = catchAsync(async (req, res) => {
     });
   }
 
-  // Reserve a daily credit only after validation and cache lookup.
-  // If the model request fails, the credit is refunded below.
-  let creditReserved = false;
-  const rateLimitResult = await checkAndIncrementRateLimit(req.user._id);
+  // 2. Check daily token quota
+  const rateLimitResult = await checkDailyQuota(req.user._id);
   if (!rateLimitResult.allowed) {
     return res.status(429).json({
       success: false,
-      code: "AI_DAILY_LIMIT_EXCEEDED",
-      message: `Daily AI usage limit reached. Used ${rateLimitResult.used} of ${rateLimitResult.limit} today.`,
+      code: rateLimitResult.code || "AI_TOKEN_LIMIT_EXCEEDED",
+      message: rateLimitResult.message,
+      used: rateLimitResult.used,
+      limit: rateLimitResult.limit,
+      tier: rateLimitResult.tier,
     });
   }
-  creditReserved = true;
 
   // 3. Call AI Service (Stream or Static)
   let result;
-  try {
-    result = await runAiAssist({
-      action,
-      text: sourceText,
-      stream: !!stream,
-    });
-  } catch (error) {
-    if (creditReserved) await refundDailyCount(req.user._id);
-    throw error;
-  }
+  result = await runAiAssist({
+    action,
+    text: sourceText,
+    stream: !!stream,
+  });
 
   if (stream) {
     res.setHeader("Content-Type", "text/event-stream");
@@ -196,11 +193,17 @@ export const aiAssistController = catchAsync(async (req, res) => {
         },
         { upsert: true, new: true, setDefaultsOnInsert: true },
       );
+
+      // Record token usage on successful completion
+      const promptTokens = Math.ceil((sourceText?.length || 0) / 3.8);
+      const completionTokens = Math.ceil((finalSuggestion?.length || 0) / 3.8);
+      void recordAiUsage(req.user._id, {
+        model: "ai-assist",
+        promptTokens,
+        completionTokens,
+        totalTokens: promptTokens + completionTokens,
+      }).catch((err) => console.error("Failed to record assist usage:", err));
     } catch (err) {
-      if (creditReserved) {
-        await refundDailyCount(req.user._id);
-        creditReserved = false;
-      }
       console.error("AI Assist Stream Error:", err.message);
       res.write(
         `data: ${JSON.stringify({ type: "error", message: err.message })}\n\n`,
@@ -242,8 +245,17 @@ export const aiAssistController = catchAsync(async (req, res) => {
       },
       { upsert: true, new: true, setDefaultsOnInsert: true },
     );
+
+    // Record token usage on successful static generation
+    const promptTokens = Math.ceil((sourceText?.length || 0) / 3.8);
+    const completionTokens = Math.ceil((result?.suggestion?.length || 0) / 3.8);
+    void recordAiUsage(req.user._id, {
+      model: "ai-assist",
+      promptTokens,
+      completionTokens,
+      totalTokens: promptTokens + completionTokens,
+    }).catch((err) => console.error("Failed to record assist usage:", err));
   } catch (error) {
-    if (creditReserved) await refundDailyCount(req.user._id);
     throw error;
   }
 
@@ -474,7 +486,20 @@ export const chatWithAiController = catchAsync(async (req, res) => {
       .json({ success: false, message: "Message or Image is required" });
   }
 
-  // 1. Resolve session & history
+  // 1. Check daily token quota before doing ANY session creation or processing
+  const quotaResult = await checkDailyQuota(req.user._id);
+  if (!quotaResult.allowed) {
+    return res.status(429).json({
+      success: false,
+      code: quotaResult.code || "AI_TOKEN_LIMIT_EXCEEDED",
+      message: quotaResult.message,
+      used: quotaResult.used,
+      limit: quotaResult.limit,
+      tier: quotaResult.tier,
+    });
+  }
+
+  // 2. Resolve session & history
   let sessionData = await resolveSession(req);
   let {
     isGlobalChat,
@@ -728,6 +753,14 @@ export const chatWithAiController = catchAsync(async (req, res) => {
     // only the bundle id; the server resolves it again for future turns.
     pdfContextToEmit = pdfContext || "";
 
+    // Record token usage atomically in MongoDB
+    if (agentResult.tokenUsage) {
+      void recordAiUsage(req.user._id, {
+        model: agentResult.model,
+        ...agentResult.tokenUsage,
+      }).catch((err) => console.error("Failed to record AI token usage:", err));
+    }
+
     // Resolve Cloudinary URL if uploaded in background
     let persistedImageUrl = imageBase64;
     if (cloudinaryUploadPromise) {
@@ -865,6 +898,7 @@ export const getAllSessionsController = catchAsync(async (req, res) => {
   const filter = {
     user: req.user._id,
     $or: [{ scope: "global" }, { scope: { $exists: false } }],
+    "messages.0": { $exists: true },
   };
 
   if (req.query.cursor) {
@@ -928,13 +962,18 @@ export const getDynamicPromptsController = catchAsync(async (req, res) => {
   });
 });
 
-async function incrementDailyCount(userId) {
+export async function recordAiUsage(
+  userId,
+  { model = "default", promptTokens = 0, completionTokens = 0, totalTokens = 0 } = {}
+) {
   const now = new Date();
-  // Midnight of today in server's local time
-  const startOfToday = new Date(now);
-  startOfToday.setHours(0, 0, 0, 0);
+  const startOfToday = getStartOfUtcDay(now);
+  const sanitizedModel = String(model).replace(/[\.\$]/g, "_");
 
-  // Atomic update: if lastResetAt is before today OR doesn't exist, reset to 1.
+  const effectiveTotal =
+    totalTokens > 0 ? totalTokens : (promptTokens + completionTokens);
+
+  // Atomic update: if lastResetAt is before today's UTC boundary OR missing, reset daily stats
   const resetUpdate = await User.findOneAndUpdate(
     {
       _id: userId,
@@ -944,48 +983,82 @@ async function incrementDailyCount(userId) {
         { aiUsage: { $exists: false } },
       ],
     },
-    { $set: { "aiUsage.dailyCount": 1, "aiUsage.lastResetAt": now } },
+    {
+      $set: {
+        "aiUsage.dailyCount": 1,
+        "aiUsage.dailyTokens": effectiveTotal,
+        "aiUsage.dailyInputTokens": promptTokens,
+        "aiUsage.dailyOutputTokens": completionTokens,
+        "aiUsage.lastResetAt": now,
+        [`aiUsage.modelBreakdown.${sanitizedModel}.totalTokens`]: effectiveTotal,
+        [`aiUsage.modelBreakdown.${sanitizedModel}.promptTokens`]: promptTokens,
+        [`aiUsage.modelBreakdown.${sanitizedModel}.completionTokens`]: completionTokens,
+      },
+    }
   );
 
-  // If the above didn't match anything, it means lastResetAt is today. Just increment.
+  // If lastResetAt is already today's UTC day, increment atomically
   if (!resetUpdate) {
     await User.findOneAndUpdate(
       { _id: userId },
-      { $inc: { "aiUsage.dailyCount": 1 } },
+      {
+        $inc: {
+          "aiUsage.dailyCount": 1,
+          "aiUsage.dailyTokens": effectiveTotal,
+          "aiUsage.dailyInputTokens": promptTokens,
+          "aiUsage.dailyOutputTokens": completionTokens,
+          [`aiUsage.modelBreakdown.${sanitizedModel}.totalTokens`]: effectiveTotal,
+          [`aiUsage.modelBreakdown.${sanitizedModel}.promptTokens`]: promptTokens,
+          [`aiUsage.modelBreakdown.${sanitizedModel}.completionTokens`]: completionTokens,
+        },
+      }
     );
   }
 }
 
-async function refundDailyCount(userId) {
-  await User.findOneAndUpdate(
-    { _id: userId, "aiUsage.dailyCount": { $gt: 0 } },
-    { $inc: { "aiUsage.dailyCount": -1 } },
-  );
+export async function checkDailyQuota(userId) {
+  const now = new Date();
+  const startOfToday = getStartOfUtcDay(now);
+
+  const user = await User.findById(userId).select("plan aiUsage");
+  if (!user) return { allowed: false, code: "USER_NOT_FOUND", reason: "User not found" };
+
+  const limits = getEffectiveDailyLimits(user);
+
+  const isNewDay =
+    !user.aiUsage?.lastResetAt || user.aiUsage.lastResetAt < startOfToday;
+  const effectiveTokens = isNewDay ? 0 : user.aiUsage?.dailyTokens || 0;
+  const effectiveCount = isNewDay ? 0 : user.aiUsage?.dailyCount || 0;
+
+  if (effectiveTokens >= limits.tokenLimit) {
+    return {
+      allowed: false,
+      code: "AI_TOKEN_LIMIT_EXCEEDED",
+      message: `Daily AI token limit reached (used ${effectiveTokens.toLocaleString()} of ${limits.tokenLimit.toLocaleString()} tokens today). Resets at 00:00 UTC.`,
+      used: effectiveTokens,
+      limit: limits.tokenLimit,
+      tier: limits.tier,
+    };
+  }
+
+  return {
+    allowed: true,
+    used: effectiveTokens,
+    count: effectiveCount,
+    limit: limits.tokenLimit,
+    tier: limits.tier,
+  };
 }
 
 async function checkAndIncrementRateLimit(userId) {
-  const now = new Date();
-  const startOfToday = new Date(now);
-  startOfToday.setHours(0, 0, 0, 0);
-
-  // Fetch only the fields we need — don't load the whole user document
-  const user = await User.findById(userId).select("aiUsage");
-  if (!user) return { allowed: false, reason: "User not found" };
-
-  const limit = getEffectiveDailyLimit(user);
-
-  // If their last reset was yesterday (or earlier), or missing, their effective count is 0
-  const isNewDay =
-    !user.aiUsage?.lastResetAt || user.aiUsage.lastResetAt < startOfToday;
-  const effectiveCount = isNewDay ? 0 : user.aiUsage?.dailyCount || 0;
-
-  if (effectiveCount >= limit) {
-    return { allowed: false, used: effectiveCount, limit };
-  }
-
-  // Under the limit — record this usage
-  await incrementDailyCount(userId);
-  return { allowed: true, used: effectiveCount + 1, limit };
+  const quota = await checkDailyQuota(userId);
+  return {
+    allowed: quota.allowed,
+    code: quota.code,
+    message: quota.message,
+    used: quota.used,
+    limit: quota.limit,
+  };
 }
 
 export const reportToolResultController = catchAsync(async (req, res) => {

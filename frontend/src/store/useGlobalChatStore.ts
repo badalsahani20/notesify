@@ -6,6 +6,7 @@ import { prepareChatImage } from "@/utils/uploadImage";
 import { consumeAiChatStream } from "@/utils/consumeAiChatStream";
 import { startGlobalChatRequest } from "@/services/ai/chatRequest";
 import { createChatToolHandler } from "@/services/ai/chatToolHandler";
+import { queryClient } from "@/lib/queryClient";
 
 import type {
   IrisSegment,
@@ -579,9 +580,22 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
       } else {
         console.error("[IrisRun] chat request failed", {
           name: err?.name,
+          code: err?.code,
           message: err?.message,
         });
         const hasStreamedContent = Boolean(get().messages.find((m) => m.id === aiMsgId)?.text);
+        
+        let userFriendlyError = "⚠️ Something went wrong. Please try again.";
+        if (err?.code === "AI_BURST_LIMIT_EXCEEDED") {
+          userFriendlyError = "⏳ You're sending messages too fast. Please wait a minute before trying again.";
+        } else if (err?.code === "AI_CONCURRENCY_LIMIT_EXCEEDED") {
+          userFriendlyError = "⚠️ An AI generation is already in progress. Please wait for it to finish.";
+        } else if (err?.code === "AI_TOKEN_LIMIT_EXCEEDED") {
+          userFriendlyError = err.message || "🛑 Daily AI token limit reached (100,000 tokens). Resets at 00:00 UTC.";
+        } else if (err?.message && err.message !== "Failed to connect to AI") {
+          userFriendlyError = `⚠️ ${err.message}`;
+        }
+
         set((state) => ({
           isSending: false,
           messages: state.messages.map((m) =>
@@ -589,7 +603,7 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
               ? {
                   ...m,
                   isThinking: false,
-                  text: m.text ? m.text : "⚠️ Something went wrong. Please try again.",
+                  text: m.text ? m.text : userFriendlyError,
                 }
               : m
           ),
@@ -604,6 +618,7 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
       if (activeChatAbortController === abortController) {
         activeChatAbortController = null;
       }
+      void queryClient.invalidateQueries({ queryKey: ["user", "stats"] });
     }
   },
 

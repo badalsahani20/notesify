@@ -11,6 +11,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@assistant-ui/ai-sdk": "^0.0.12",
+    "@assistant-ui/react": "^0.15.28",
     "@base-ui/react": "^1.8.0",
     "@radix-ui/react-dropdown-menu": "^2.1.2",
     "@radix-ui/react-use-controllable-state": "^1.2.6",

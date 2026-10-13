@@ -109,7 +109,21 @@ export const startGlobalChatRequest = async ({
     signal,
   });
 
-  if (!response.ok) throw new Error("Failed to connect to AI");
+  if (!response.ok) {
+    let errMessage = "Failed to connect to AI";
+    let errCode = "AI_REQUEST_FAILED";
+    try {
+      const errJson = await response.json();
+      if (errJson?.message) errMessage = errJson.message;
+      if (errJson?.code) errCode = errJson.code;
+    } catch {
+      // response might not be JSON, keep defaults
+    }
+    const err: any = new Error(errMessage);
+    err.status = response.status;
+    err.code = errCode;
+    throw err;
+  }
   if (!response.body) throw new Error("No response body");
 
   return {
