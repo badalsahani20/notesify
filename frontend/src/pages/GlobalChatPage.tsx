@@ -98,7 +98,6 @@ const GlobalChatPage = () => {
     });
   }, [fetchSessions]);
 
-  // ── Sync URL param and activeSessionId cleanly without double-navigation ──
   useEffect(() => {
     if (sessionId) {
       if (sessionId !== activeSessionId) {
@@ -106,12 +105,20 @@ const GlobalChatPage = () => {
       }
       sessionStorage.setItem("notesify_last_chat_session", sessionId);
     } else {
-      const targetSession = activeSessionId || sessionStorage.getItem("notesify_last_chat_session");
-      if (targetSession) {
-        navigate(`/chat/${targetSession}`, { replace: true });
+      sessionStorage.removeItem("notesify_last_chat_session");
+      if (activeSessionId) {
+        startNewChat();
       }
     }
-  }, [sessionId, activeSessionId, loadSession, navigate]);
+  }, [sessionId, activeSessionId, loadSession, startNewChat]);
+
+  // ── When a new session is created during chat, sync URL ──
+  useEffect(() => {
+    if (!sessionId && activeSessionId && isSending) {
+      sessionStorage.setItem("notesify_last_chat_session", activeSessionId);
+      navigate(`/chat/${activeSessionId}`, { replace: true });
+    }
+  }, [sessionId, activeSessionId, isSending, navigate]);
 
   const handleStartNewChat = useCallback(() => {
     sessionStorage.removeItem("notesify_last_chat_session");
