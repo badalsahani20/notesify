@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 // ─── Bump this string every time you want the modal to re-appear ───
-export const CURRENT_VERSION = "1.4.0";
+export const CURRENT_VERSION = "1.3.0";
 const LS_KEY = "notesify_last_seen_version";
 
 export const useWhatsNew = () => {

@@ -82,14 +82,37 @@ export const DownloadPage = () => {
     };
   }, []);
 
+  // Detect mobile devices and touch screens to prevent unintended downloads
+  const [isMobile, setIsMobile] = useState<boolean>(() => {
+    if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
+    const ua = navigator.userAgent || navigator.vendor || (window as unknown as { opera?: string }).opera || '';
+    const mobileRegex = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini|mobile/i;
+    const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 1;
+    return mobileRegex.test(ua) || (isTouch && window.innerWidth < 768);
+  });
+
+  useEffect(() => {
+    const handleResize = () => {
+      const ua = navigator.userAgent || navigator.vendor || (window as unknown as { opera?: string }).opera || '';
+      const mobileRegex = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini|mobile/i;
+      const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 1;
+      setIsMobile(mobileRegex.test(ua) || (isTouch && window.innerWidth < 768));
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const latestRelease = releases[0] || FALLBACK_RELEASES[0];
   const activeRelease = releases[activeReleaseIndex] || latestRelease;
   const platform = resolvePlatformState(selectedOS, latestRelease);
 
-  // Auto-start download for ready platform (e.g. Windows)
+  // Auto-start download ONLY for Windows on desktop browsers.
+  // Mobile devices, Linux, and macOS never auto-trigger downloads.
+  const shouldAutoDownload = selectedOS === 'windows' && platform.isReady && !isMobile;
+
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
-    if (platform.isReady) {
+    if (shouldAutoDownload) {
       timer = setTimeout(() => {
         setDownloadStarted(true);
         window.location.href = platform.downloadUrl;
@@ -101,7 +124,7 @@ export const DownloadPage = () => {
     return () => {
       if (timer) clearTimeout(timer);
     };
-  }, [selectedOS, platform.isReady, platform.downloadUrl]);
+  }, [shouldAutoDownload, platform.downloadUrl]);
 
   return (
     <div className="min-h-screen flex flex-col bg-[#050505] text-stone-200 selection:bg-indigo-500/30 font-sans relative overflow-x-hidden">
@@ -185,9 +208,13 @@ export const DownloadPage = () => {
             <p className="text-stone-400 text-base sm:text-lg max-w-xl mx-auto mb-8 leading-relaxed">
               {downloadStarted 
                 ? `Your Notesify for ${platform.name} installer is downloading. Check your browser's download shelf to launch setup.`
-                : platform.isReady 
+                : shouldAutoDownload
                   ? `Your download will start automatically in a moment. You can also trigger the direct installer below.`
-                  : `Desktop build for ${platform.name} is in active preview. You can launch the full web application immediately.`}
+                  : isMobile
+                    ? `Notesify desktop is optimized for Windows PC. Download from your computer or launch the full web app below.`
+                    : platform.isReady
+                      ? `Click below to download the official Notesify installer for ${platform.name}.`
+                      : `Desktop build for ${platform.name} is in active preview. You can launch the full web application immediately.`}
             </p>
           </FadeIn>
 
@@ -243,6 +270,7 @@ export const DownloadPage = () => {
               {platform.isReady ? (
                 <a 
                   href={platform.downloadUrl}
+                  onClick={() => setDownloadStarted(true)}
                   className="group relative inline-flex items-center justify-center rounded-2xl px-8 sm:px-10 py-4 sm:py-5 text-base sm:text-lg font-bold bg-white text-black hover:bg-stone-200 transition-all duration-300 shadow-[0_0_40px_rgba(255,255,255,0.25)] hover:shadow-[0_0_50px_rgba(255,255,255,0.4)] hover:-translate-y-0.5"
                 >
                   <Download className="size-5 sm:size-6 mr-3 text-black group-hover:scale-110 transition-transform" />

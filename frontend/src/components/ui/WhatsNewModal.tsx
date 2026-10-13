@@ -1,52 +1,52 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { Share2, Bot, ArrowRight, Globe, Image, Sparkles } from "lucide-react";
+import { Share2, Bot, ArrowRight, Globe, ShieldCheck, Gauge } from "lucide-react";
 import { CURRENT_VERSION } from "@/hooks/user/useWhatsNew";
 
 // ─── Feature definitions ─────────────────────────────────────────────────────
 const FEATURES = [
   {
-    icon: Sparkles,
-    iconClass: "bg-amber-500/10 text-amber-400",
-    label: "AI Note Generation",
+    icon: ShieldCheck,
+    iconClass: "bg-emerald-500/10 text-emerald-400",
+    label: "AI Quotas & Concurrency Guard",
     description:
-      "Instantly generate comprehensive, beautifully structured notes on any topic using our advanced AI assistant.",
+      "Daily token quotas with UTC midnight reset across Free (100k) and Pro tiers, paired with concurrency limits to prevent lockups.",
+    badge: "New",
+    badgeClass: "text-emerald-400 bg-emerald-500/10 border border-emerald-500/20",
+  },
+  {
+    icon: Gauge,
+    iconClass: "bg-amber-500/10 text-amber-400",
+    label: "Token Usage & Tier Badges",
+    description:
+      "Monitor your token usage in real-time with compact shorthand metrics and dynamic plan badges on your profile and composer.",
     badge: "New",
     badgeClass: "text-amber-400 bg-amber-500/10 border border-amber-500/20",
   },
   {
     icon: Bot,
-    iconClass: "bg-emerald-500/10 text-emerald-400",
-    label: "AI Study Tools",
-    description:
-      "Master any subject instantly. Turn your notes into interactive quizzes and spaced-repetition flashcards with one click.",
-    badge: "LIVE",
-    badgeClass: "text-emerald-400 bg-emerald-500/10 border border-emerald-500/20",
-  },
-  {
-    icon: Globe,
-    iconClass: "bg-blue-500/10 text-blue-400",
-    label: "Agentic Web Intelligence",
-    description:
-      "Iris can now autonomously search the live web and crawl URLs to fetch real-time facts and documentation.",
-    badge: "New",
-    badgeClass: "text-blue-400 bg-blue-500/10 border border-blue-500/20",
-  },
-  {
-    icon: Image,
     iconClass: "bg-purple-500/10 text-purple-400",
-    label: "Multimodal Perception",
+    label: "Context Window Optimization",
     description:
-      "Upload images or PDFs directly into Iris. Analyze complex documents, diagrams, and photos with full vision support.",
-    badge: "New",
+      "Sliding 16-message conversation window with intelligent automated background summarization to eliminate token bloat.",
+    badge: "Improved",
     badgeClass: "text-purple-400 bg-purple-500/10 border border-purple-500/20",
   },
   {
     icon: Share2,
-    iconClass: "bg-indigo-500/10 text-indigo-400",
-    label: "Logic Visualizer",
+    iconClass: "bg-blue-500/10 text-blue-400",
+    label: "Native LaTeX Mathematics",
     description:
-      "Iris now renders dynamic Mermaid diagrams for math, code structure, and complex workflows.",
+      "Iris now natively formats equations with inline and block LaTeX syntax, rendered crisply with KaTeX.",
     badge: "Improved",
+    badgeClass: "text-blue-400 bg-blue-500/10 border border-blue-500/20",
+  },
+  {
+    icon: Globe,
+    iconClass: "bg-indigo-500/10 text-indigo-400",
+    label: "Stutter-Free Iris Drawer",
+    description:
+      "Responsive layout collapse guards and stabilized session routing deliver a silky-smooth global chat drawer transition.",
+    badge: "Polished",
     badgeClass: "text-indigo-400 bg-indigo-500/10 border border-indigo-500/20",
   },
 ];
@@ -97,7 +97,7 @@ export const WhatsNewModal = ({ isOpen, onDismiss }: WhatsNewModalProps) => {
                       ✦ What's New
                     </span>
                     <span className="text-[11px] text-white/20 font-medium">
-                      v{CURRENT_VERSION} · May 2026
+                      v{CURRENT_VERSION} · October 2026
                     </span>
                   </div>
 

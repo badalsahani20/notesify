@@ -132,6 +132,52 @@ export function normalizeGitHubRelease(raw: any): NormalizedRelease {
 // Built-in fallback snapshot if offline or GitHub API is unavailable
 export const FALLBACK_RELEASES: NormalizedRelease[] = [
   {
+    id: 393500000,
+    version: 'v1.3.0',
+    tagName: 'v1.3.0',
+    name: '⚡ Notesify v1.3.0 — AI Rate Limiting, Token Optimization & Tier Quotas',
+    publishedAt: '2026-10-14T00:00:00Z',
+    publishedDateFormatted: 'Oct 14, 2026',
+    htmlUrl: 'https://github.com/badalsahani20/notesify/releases/tag/v1.3.0',
+    body: `## ⚡ Notesify v1.3.0 — AI Rate Limiting, Token Optimization & Tier Quotas\n\nThis release introduces fair-use token budgeting, tiered daily quotas, sliding-window context compression, native LaTeX math rendering, and butter-smooth Iris panel transitions.\n\n### ✨ What's New\n\n- **Fair-Use AI Quotas & Concurrency Limiting** — Daily token tracking with UTC midnight auto-reset across Free (100k), Pro (500k), and Enterprise tiers, paired with concurrency guards.\n- **Token Consumption Optimization** — Rolling 16-turn conversation history with automated background summarization at 20+ turns, slashing token overhead by over 70%.\n- **Dynamic Tool Gating** — Smarter tool resolution ensuring ask_question remains native while notes, tasks, and study workflows are strictly scoped to user intent.\n- **Native LaTeX Mathematics** — Iris now natively formats math equations in clean LaTeX notation for flawless KaTeX rendering.\n- **Silky-Smooth Iris Panel** — Guarded layout collapse and stable session sync eliminating Global Chat drawer stutter.`,
+    highlights: [
+      {
+        title: 'Tiered Token Quotas & Reset',
+        tag: 'Infrastructure',
+        description: 'Automatic daily limits (100k Free, 500k Pro) with clean UTC midnight reset and concurrency guards.',
+      },
+      {
+        title: 'Context Window Optimization',
+        tag: 'Efficiency',
+        description: '16-turn history sliding window with intelligent automated summarization to eliminate prompt bloat.',
+      },
+      {
+        title: 'LaTeX Math Constitution',
+        tag: 'Iris AI',
+        description: 'Native inline and block LaTeX formatting tailored to KaTeX rendering in chat responses.',
+      },
+      {
+        title: 'Stutter-Free Iris Drawer',
+        tag: 'UI / UX',
+        description: 'Refined responsive layout collapse and stable session routing eliminating panel opening lag.',
+      },
+    ],
+    technicalNotes: [
+      'Built-in rate limiter middleware with UTC midnight boundary reset and concurrency semaphore.',
+      'Chat context resolver sliding window capped at 16 messages with 20-message summary trigger.',
+      'Chat compose button gracefully disables with tooltip when daily quota is depleted.',
+      'Resolved GlobalChatPage duplicate effect mount and AppLayout resize jitter.',
+    ],
+    assets: [
+      {
+        name: 'Notesify.Setup.1.3.0.exe',
+        size: 102400000,
+        sizeFormatted: '97.6 MB',
+        downloadUrl: 'https://github.com/badalsahani20/notesify/releases/download/v1.3.0/Notesify.Setup.1.3.0.exe',
+      },
+    ],
+  },
+  {
     id: 393000000,
     version: 'v1.2.3',
     tagName: 'v1.2.3',
