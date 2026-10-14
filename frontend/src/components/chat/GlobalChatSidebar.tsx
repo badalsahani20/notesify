@@ -8,6 +8,7 @@ import {
   MoreHorizontal,
   Trash2,
 } from "lucide-react";
+import { TypewriterText } from "@/components/ui/typewriter-text";
 
 interface GlobalChatSidebarProps {
   isMobile: boolean;
@@ -187,9 +188,7 @@ export const GlobalChatSidebar = memo(({
                         )}
                         title={cleanTitle}
                       >
-                        <span className="truncate leading-normal flex-1">
-                          {cleanTitle}
-                        </span>
+                        <TypewriterText text={cleanTitle} className="truncate leading-normal flex-1" />
                       </button>
                       <button
                         type="button"

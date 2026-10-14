@@ -53,6 +53,23 @@ export type PendingInteraction = {
 };
 
 let activeChatAbortController: AbortController | null = null;
+// A session request can resolve after the user has already navigated away.
+// Keep a monotonically increasing token so stale responses cannot restore an
+// older chat after starting a new one.
+let sessionLoadSequence = 0;
+const activeTitleSyncTimers = new Map<string, number>();
+
+const isGenericTitle = (title?: string | null) => {
+  if (!title) return true;
+  const normalized = title.trim().toLowerCase();
+  return (
+    normalized === "new chat" ||
+    normalized === "new conversation" ||
+    normalized === "untitled chat" ||
+    normalized === "untitled" ||
+    normalized === ""
+  );
+};
 
 type GlobalChatStore = {
   // Sidebar
@@ -96,6 +113,7 @@ type GlobalChatStore = {
   setUseReasoning: (val: boolean) => void;
   setUseWebSearch: (val: boolean) => void;
   setChatMode: (mode: "study" | "casual") => void;
+  syncSessionTitle: (sessionId: string, attempt?: number, maxAttempts?: number) => void;
   reset: () => void;
 };
 
@@ -126,7 +144,17 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
     try {
       const { data } = await api.get("/ai/sessions", { params: { limit: 30 } });
       const currentSessions = get().sessions;
-      const newSessions: ChatSession[] = data.data.sessions || [];
+      const rawNewSessions: ChatSession[] = data.data.sessions || [];
+
+      // Avoid overwriting a locally established non-generic title with a stale generic backend title
+      const newSessions = rawNewSessions.map((incoming) => {
+        const current = currentSessions.find((s) => s._id === incoming._id);
+        if (current && !isGenericTitle(current.title) && isGenericTitle(incoming.title)) {
+          return { ...incoming, title: current.title };
+        }
+        return incoming;
+      });
+
       const hasChanged =
         currentSessions.length !== newSessions.length ||
         currentSessions.some(
@@ -178,6 +206,9 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
   },
 
   deleteSession: async (sessionId: string) => {
+    if (get().activeSessionId === sessionId) {
+      sessionLoadSequence += 1;
+    }
     try {
       await api.delete(`/ai/sessions/${sessionId}`);
       const wasActive = get().activeSessionId === sessionId;
@@ -188,6 +219,7 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
           ? {
               activeSessionId: null,
               messages: [],
+              messagesLoading: false,
               pendingInteraction: null,
               attachedImage: null,
               attachedDoc: null,
@@ -200,6 +232,7 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
   },
 
   loadSession: async (sessionId: string, options?: { background?: boolean }) => {
+    const requestSequence = ++sessionLoadSequence;
     const isSameSession = get().activeSessionId === sessionId && get().messages.length > 0;
     const isBackground = options?.background || isSameSession;
 
@@ -215,6 +248,16 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
     }
     try {
       const { data } = await api.get(`/ai/chat/session/${sessionId}`);
+
+      // The user may have started a new chat (or selected another session)
+      // while this request was in flight. Do not let this response resurrect
+      // the session that is no longer active.
+      if (
+        requestSequence !== sessionLoadSequence ||
+        get().activeSessionId !== sessionId
+      ) {
+        return;
+      }
 
       set({
         pendingInteraction: data.data.pendingInteraction || null,
@@ -245,20 +288,22 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
       });
       set({ messages: mapped });
     } catch {
-      if (!isBackground) {
+      if (!isBackground && requestSequence === sessionLoadSequence && get().activeSessionId === sessionId) {
         set({ messages: [], pendingInteraction: null });
       }
     } finally {
-      if (!isBackground) {
+      if (!isBackground && requestSequence === sessionLoadSequence && get().activeSessionId === sessionId) {
         set({ messagesLoading: false });
       }
     }
   },
 
   startNewChat: () => {
+    sessionLoadSequence += 1;
     set({
       activeSessionId: null,
       messages: [],
+      messagesLoading: false,
       pendingInteraction: null,
       attachedImage: null,
       attachedDoc: null,
@@ -404,6 +449,11 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
         sessionId: activeSessionId,
         responseLength: fullText.length,
       });
+
+      const userTurnCount = get().messages.filter((message) => message.role === "user").length;
+      if (activeSessionId && (userTurnCount === 1 || userTurnCount === 2)) {
+        get().syncSessionTitle(activeSessionId);
+      }
     } catch (error) {
       if (abortController.signal.aborted) {
         console.info("[IrisInteraction] resume stream stopped by user", {
@@ -561,11 +611,9 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
       const userTurnCount = get().messages.filter((message) => message.role === "user").length;
 
       // The backend generates/refines a high-quality title after conversation turns.
-      // Fetch updated sessions once title generation completes in the background.
+      // Progressively poll until the title updates on screen without waiting for tab switch.
       if (effectiveSessionId && (userTurnCount === 1 || userTurnCount === 2)) {
-        window.setTimeout(() => {
-          get().fetchSessions({ silent: true });
-        }, 2200);
+        get().syncSessionTitle(effectiveSessionId);
       }
 
     } catch (err: any) {
@@ -632,19 +680,59 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
   setUseReasoning: (val) => set({ useReasoning: val }),
   setUseWebSearch: (val) => set({ useWebSearch: val }),
   setChatMode: (mode) => set({ chatMode: mode }),
-  reset: () => set({
-    sessions: [],
-    sessionsLoading: false,
-    sessionsLoadingMore: false,
-    sessionsHasMore: false,
-    sessionsCursor: null,
-    activeSessionId: null,
-    messages: [],
-    messagesLoading: false,
-    pendingInteraction: null,
-    isSending: false,
-    attachedImage: null,
-    attachedDoc: null,
-    imageDisabled: false,
-  }),
+  syncSessionTitle: (sessionId: string, attempt = 0, maxAttempts = 8) => {
+    if (!sessionId || attempt >= maxAttempts) return;
+
+    const existingTimer = activeTitleSyncTimers.get(sessionId);
+    if (existingTimer) {
+      window.clearTimeout(existingTimer);
+      activeTitleSyncTimers.delete(sessionId);
+    }
+
+    // Delays for progressive polling: ~1.2s, 2.0s, 2.8s, 3.8s, 5.0s, 6.5s, 8.5s, 11s
+    const delays = [1200, 2000, 2800, 3800, 5000, 6500, 8500, 11000];
+    const delay = delays[attempt] ?? 3000;
+
+    const timer = window.setTimeout(async () => {
+      activeTitleSyncTimers.delete(sessionId);
+
+      const sessionBefore = get().sessions.find((s) => s._id === sessionId);
+      const titleBefore = sessionBefore?.title?.trim() || "";
+
+      await get().fetchSessions({ silent: true });
+
+      const sessionAfter = get().sessions.find((s) => s._id === sessionId);
+      const titleAfter = sessionAfter?.title?.trim() || "";
+
+      const hasArrived =
+        Boolean(titleAfter) &&
+        !isGenericTitle(titleAfter) &&
+        titleAfter !== titleBefore;
+
+      if (!hasArrived && attempt + 1 < maxAttempts) {
+        get().syncSessionTitle(sessionId, attempt + 1, maxAttempts);
+      }
+    }, delay);
+
+    activeTitleSyncTimers.set(sessionId, timer);
+  },
+  reset: () => {
+    activeTitleSyncTimers.forEach((timer) => window.clearTimeout(timer));
+    activeTitleSyncTimers.clear();
+    set({
+      sessions: [],
+      sessionsLoading: false,
+      sessionsLoadingMore: false,
+      sessionsHasMore: false,
+      sessionsCursor: null,
+      activeSessionId: null,
+      messages: [],
+      messagesLoading: false,
+      pendingInteraction: null,
+      isSending: false,
+      attachedImage: null,
+      attachedDoc: null,
+      imageDisabled: false,
+    });
+  },
 }));

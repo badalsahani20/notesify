@@ -7667,3 +7667,18 @@ html:not(.dark) .dock-btn-active {
   }
 }
 
+/* Keep contextual-chat transcript edges aligned with its centered composer. */
+.assistant-rail .gc-messages {
+  padding-inline: 1rem;
+}
+
+.assistant-rail .gc-msg {
+  max-width: 48rem;
+}
+
+@media (max-width: 639px) {
+  .assistant-rail-mobile .gc-messages {
+    padding-inline: 0.5rem;
+  }
+}
+

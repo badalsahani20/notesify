@@ -12,7 +12,6 @@ import { GlobalChatMessages } from "@/components/chat/GlobalChatMessages";
 import { GlobalChatCompose } from "@/components/chat/GlobalChatCompose";
 import { ChatArtifactViewer } from "@/components/chat/ChatArtifactViewer";
 import { InteractivePromptDialog } from "@/components/chat/InteractivePromptDialog";
-import { LearningTasksQueue } from "@/components/chat/LearningTasksQueue";
 import { SelectionToolbar } from "@/components/chat/SelectionToolbar";
 import type { InteractiveQuestion } from "@/components/ai/types";
 
@@ -79,6 +78,8 @@ const GlobalChatPage = () => {
 
   const { sessionId } = useParams<{ sessionId?: string }>();
   const navigate = useNavigate();
+  const previousRouteSessionIdRef = useRef(sessionId);
+  const routeInitializedRef = useRef(false);
 
   useEffect(() => {
     fetchSessions();
@@ -100,17 +101,23 @@ const GlobalChatPage = () => {
 
   useEffect(() => {
     if (sessionId) {
-      if (sessionId !== activeSessionId) {
+      if (sessionId !== useGlobalChatStore.getState().activeSessionId) {
         loadSession(sessionId);
       }
       sessionStorage.setItem("notesify_last_chat_session", sessionId);
     } else {
       sessionStorage.removeItem("notesify_last_chat_session");
-      if (activeSessionId) {
+      const leavingSessionRoute = previousRouteSessionIdRef.current !== undefined;
+      const enteringWithStaleSession =
+        !routeInitializedRef.current &&
+        useGlobalChatStore.getState().activeSessionId !== null;
+      if (leavingSessionRoute || enteringWithStaleSession) {
         startNewChat();
       }
     }
-  }, [sessionId, activeSessionId, loadSession, startNewChat]);
+    previousRouteSessionIdRef.current = sessionId;
+    routeInitializedRef.current = true;
+  }, [sessionId, loadSession, startNewChat]);
 
   useEffect(() => {
     if (!sessionId && activeSessionId && isSending) {
@@ -323,9 +330,7 @@ const GlobalChatPage = () => {
                       onSubmit={handlePromptSubmit}
                       onDismiss={handlePromptDismiss}
                     />
-                  ) : (
-                    <LearningTasksQueue className="mb-2" defaultOpen={true} />
-                  )
+                  ) : null
                 }
               />
             </>

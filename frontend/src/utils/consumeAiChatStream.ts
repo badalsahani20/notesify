@@ -53,14 +53,17 @@ export const consumeAiChatStream = async (
   const parser = new SseStreamParser();
   const startTime = Date.now();
   let fullText = "";
+  let revealedTextLength = 0;
   let fullThought = "";
   let thinkingEndTime = 0;
   let pendingFrame: number | null = null;
-  let updatePending = false;
+  const prefersReducedMotion =
+    typeof globalThis.matchMedia === "function" &&
+    globalThis.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   // Keep the stream consumer usable in non-browser tests as well. In the
-  // browser this is always requestAnimationFrame, so deltas received during
-  // one frame result in one presentation update.
+  // browser this is always requestAnimationFrame, keeping presentation updates
+  // synchronized with paints.
   const scheduleFrame = (callback: FrameRequestCallback) => {
     if (typeof globalThis.requestAnimationFrame === "function") {
       return globalThis.requestAnimationFrame(callback);
@@ -83,30 +86,46 @@ export const consumeAiChatStream = async (
 
   const emitUpdate = () => {
     onUpdate?.({
-      fullText,
+      fullText: fullText.slice(0, revealedTextLength),
       fullThought,
       isThinking: fullText.length === 0,
       thinkingTime: getThinkingTime(),
     });
   };
 
-  const cancelPendingUpdate = () => {
-    if (pendingFrame !== null) {
-      cancelFrame(pendingFrame);
-      pendingFrame = null;
-    }
-    updatePending = false;
-  };
-
-  const scheduleUpdate = () => {
-    updatePending = true;
+  const scheduleFrameUpdate = () => {
     if (pendingFrame !== null) return;
-
     pendingFrame = scheduleFrame(() => {
       pendingFrame = null;
-      if (!updatePending) return;
-      updatePending = false;
+
+      const pendingCharacters = fullText.length - revealedTextLength;
+      if (pendingCharacters > 0) {
+        // Honor reduced-motion preferences by displaying received text without
+        // the additional reveal pacing. Otherwise, small bursts follow the
+        // model's cadence and large bursts catch up over a few frames.
+        const charactersToReveal = prefersReducedMotion
+          ? pendingCharacters
+          : Math.min(
+              pendingCharacters,
+              Math.min(64, Math.max(8, Math.ceil(pendingCharacters / 3))),
+            );
+        revealedTextLength += charactersToReveal;
+
+        // Avoid exposing half of a UTF-16 surrogate pair (for example, emoji).
+        if (
+          revealedTextLength < fullText.length &&
+          fullText.charCodeAt(revealedTextLength - 1) >= 0xd800 &&
+          fullText.charCodeAt(revealedTextLength - 1) <= 0xdbff
+        ) {
+          revealedTextLength += 1;
+        }
+      }
+
       emitUpdate();
+
+      if (revealedTextLength < fullText.length) {
+        scheduleFrameUpdate();
+      }
     });
   };
 
@@ -115,7 +134,7 @@ export const consumeAiChatStream = async (
       cancelFrame(pendingFrame);
       pendingFrame = null;
     }
-    updatePending = false;
+    revealedTextLength = fullText.length;
     emitUpdate();
   };
 
@@ -173,23 +192,24 @@ export const consumeAiChatStream = async (
         fullText += content;
         fullThought += reasoning;
 
-        // Accumulate synchronously, then let the browser coalesce presentation
-        // updates to one callback per animation frame.
-        scheduleUpdate();
+        // Keep the complete response for the final result, while revealing the
+        // visible text progressively at no more than one update per frame.
+        scheduleFrameUpdate();
       }
     }
 
     // Do not leave the last delta waiting for the next paint after [DONE].
     flushUpdate();
   } catch (error) {
-    // An aborted reader can reject while a frame is pending. Publish the
-    // accumulated partial response once, then cancel the callback so it cannot
-    // fire after the caller has handled the error.
-    cancelPendingUpdate();
-    emitUpdate();
+    // Publish accumulated partial text once, then cancel any scheduled frame
+    // so it cannot fire after the caller has handled the error.
+    flushUpdate();
     throw error;
   } finally {
-    cancelPendingUpdate();
+    if (pendingFrame !== null) {
+      cancelFrame(pendingFrame);
+      pendingFrame = null;
+    }
   }
 
   return {

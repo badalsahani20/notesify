@@ -4,7 +4,71 @@ import { stripHtml } from "../../utils/stripHtml.js";
 import { summarizeHistory } from "../../utils/summarizeHistory.js";
 import { formatStructuredNoteContext } from "./chatService.js";
 import { getChatTools } from "./tools/chatTools.js";
-import { getActiveTasks } from "../learningTask.service.js";
+
+const DEFAULT_RECENT_HISTORY_TOKEN_BUDGET = 8000;
+
+const getRecentHistoryTokenBudget = () => {
+  const configuredBudget = Number.parseInt(
+    process.env.CHAT_RECENT_HISTORY_TOKEN_BUDGET,
+    10,
+  );
+
+  return Number.isFinite(configuredBudget) && configuredBudget > 0
+    ? configuredBudget
+    : DEFAULT_RECENT_HISTORY_TOKEN_BUDGET;
+};
+
+/**
+ * Provider-independent estimate for a message's token cost: word-like pieces
+ * are split into roughly four-character tokens, punctuation/symbols count
+ * individually, and message framing adds overhead. This is approximate, not a
+ * tokenizer's exact count.
+ */
+const estimateMessageTokens = (message) => {
+  let serializedMessage;
+  try {
+    serializedMessage = JSON.stringify(message ?? {});
+  } catch (_) {
+    serializedMessage = String(message?.content ?? "");
+  }
+
+  const pieces = serializedMessage.match(/[\p{L}\p{N}_]+|[^\s]/gu) || [];
+  const contentTokens = pieces.reduce((total, piece) => {
+    // CJK characters commonly map close to one token each; other word-like
+    // pieces average several characters per token across common tokenizers.
+    if (/[\u3400-\u9FFF\uF900-\uFAFF]/u.test(piece)) {
+      return total + Array.from(piece).length;
+    }
+    return (
+      total +
+      (/[\p{L}\p{N}_]/u.test(piece)
+        ? Math.ceil(Array.from(piece).length / 4)
+        : 1)
+    );
+  }, 0);
+
+  return contentTokens + 4;
+};
+
+const getRecentHistoryWithinTokenBudget = (history, tokenBudget) => {
+  let tokenCount = 0;
+  let startIndex = history.length;
+
+  for (let index = history.length - 1; index >= 0; index -= 1) {
+    const nextMessageTokens = estimateMessageTokens(history[index]);
+    // Keep at least the newest message, even if it alone exceeds the budget.
+    if (startIndex < history.length && tokenCount + nextMessageTokens > tokenBudget) {
+      break;
+    }
+    tokenCount += nextMessageTokens;
+    startIndex = index;
+  }
+
+  return {
+    recentHistory: history.slice(startIndex),
+    olderMessages: history.slice(0, startIndex),
+  };
+};
 
 /**
  * Fetch note context when the message is plausibly about the note.
@@ -92,18 +156,20 @@ export class ChatContextResolver {
       clientToolResults,
     } = body || {};
 
-    // Context-aware history management (15-20 message sliding window with summarization)
-    // Keep the most recent 16 messages (~8 back-and-forth turns) verbatim for immediate conversational fidelity.
-    // When history reaches 20 messages, older messages are summarized in the background and injected as concise reference context.
-    const RECENT_MESSAGE_COUNT = 16;
-    const SUMMARY_TRIGGER_COUNT = 20;
-
     let effectiveHistory = history;
     let sessionSummary = summary;
 
-    if (history && history.length >= SUMMARY_TRIGGER_COUNT) {
-      const recentHistory = history.slice(-RECENT_MESSAGE_COUNT);
-      const olderMessages = history.slice(0, -RECENT_MESSAGE_COUNT);
+    const recentHistoryTokenBudget = getRecentHistoryTokenBudget();
+    const historyTokenCount = history.reduce(
+      (total, item) => total + estimateMessageTokens(item),
+      0,
+    );
+
+    if (historyTokenCount > recentHistoryTokenBudget) {
+      const { recentHistory, olderMessages } = getRecentHistoryWithinTokenBudget(
+        history,
+        recentHistoryTokenBudget,
+      );
 
       if (olderMessages.length > 0) {
         try {
@@ -192,21 +258,7 @@ export class ChatContextResolver {
       activeNoteContext = `\n\n[ACTIVE NOTE]\nid: ${activeNoteId}\ntitle: "${activeNoteTitle || "Untitled"}"\n[/ACTIVE NOTE]`;
     }
 
-    // Retrieve Active Learning Tasks / Practice Goals (Non-stale, max 3)
-    let taskContext = "";
-    if (user?._id) {
-      try {
-        const activeTasks = await getActiveTasks(user._id, 10);
-        if (activeTasks?.length > 0) {
-          taskContext = `Active learning queue for this user (inspect before calling create_learning_tasks or update_task_status):\n${activeTasks
-            .map(
-              (t, idx) =>
-                `- Task ${idx + 1} [ID: "${t._id}", Type: "${t.type || "practice_question"}", Topic: "${t.topic || "General"}", Status: "${t.status}"]: ${t.title}${t.description ? ` (Criteria/Details: ${t.description})` : ""}`,
-            )
-            .join("\n")}`;
-        }
-      } catch (_) {}
-    }
+    const taskContext = "";
 
     const userName = user?.name ? `User: ${user.name}` : "";
     const finalSystemPrompt = [userName, memoryContext, activeNoteContext].filter(Boolean).join("\n");

@@ -1,6 +1,8 @@
 import React from "react";
 import { Sparkles, Clock } from "lucide-react";
 import { useUserStats } from "@/hooks/user/useUserStats";
+import { useMediaQuery } from "@/hooks/ui/useMediaQuery";
+import { Popover } from "radix-ui";
 import {
   Tooltip,
   TooltipContent,
@@ -18,6 +20,8 @@ export const AiUsageContextIndicator: React.FC<AiUsageContextIndicatorProps> = (
   className = "",
 }) => {
   const { data: stats, isLoading } = useUserStats();
+  const isMobile = useMediaQuery("(max-width: 960px)");
+  const [mobilePopoverOpen, setMobilePopoverOpen] = React.useState(false);
 
   const tokensUsed = stats?.tokensUsed ?? stats?.aiCount ?? 0;
   const tokensLimit = stats?.tokensLimit ?? 100000;
@@ -42,90 +46,58 @@ export const AiUsageContextIndicator: React.FC<AiUsageContextIndicatorProps> = (
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (pct / 100) * circumference;
 
-  return (
-    <TooltipProvider delayDuration={150}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          {variant === "rail" ? (
-            <button
-              type="button"
-              className={`group flex items-center justify-center gap-1 px-1.5 py-0.5 rounded-full border transition-all cursor-pointer hover:scale-105 active:scale-95 ${status.bg} ${status.border} ${className}`}
-              style={{ WebkitAppRegion: "no-drag" } as any}
-              aria-label={`AI Token Usage: ${pct}%`}
-            >
-              <svg className="w-3.5 h-3.5 -rotate-90 shrink-0" viewBox="0 0 24 24">
-                <circle
-                  cx="12"
-                  cy="12"
-                  r={radius}
-                  className="stroke-white/10"
-                  strokeWidth="3.5"
-                  fill="transparent"
-                />
-                <circle
-                  cx="12"
-                  cy="12"
-                  r={radius}
-                  stroke={status.stroke}
-                  strokeWidth="3.5"
-                  strokeDasharray={circumference}
-                  strokeDashoffset={strokeDashoffset}
-                  strokeLinecap="round"
-                  fill="transparent"
-                  className="transition-all duration-700 ease-out"
-                />
-              </svg>
-              <span className={`text-[10px] font-bold tracking-tighter ${status.text}`}>
-                {isLoading ? "…" : `${pct}%`}
-              </span>
-            </button>
-          ) : variant === "badge" ? (
-            <button
-              type="button"
-              className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[11px] font-medium transition-all hover:bg-white/5 cursor-pointer ${status.bg} ${status.border} ${className}`}
-              style={{ WebkitAppRegion: "no-drag" } as any}
-            >
-              <svg className="w-3.5 h-3.5 -rotate-90 shrink-0" viewBox="0 0 24 24">
-                <circle
-                  cx="12"
-                  cy="12"
-                  r={radius}
-                  className="stroke-white/10"
-                  strokeWidth="3"
-                  fill="transparent"
-                />
-                <circle
-                  cx="12"
-                  cy="12"
-                  r={radius}
-                  stroke={status.stroke}
-                  strokeWidth="3"
-                  strokeDasharray={circumference}
-                  strokeDashoffset={strokeDashoffset}
-                  strokeLinecap="round"
-                  fill="transparent"
-                  className="transition-all duration-700 ease-out"
-                />
-              </svg>
-              <span className={status.text}>{pct}%</span>
-              <span className="text-white/40">quota</span>
-            </button>
-          ) : (
-            <span
-              className={`inline-flex items-center justify-center w-6 h-6 rounded-full border ${status.bg} ${status.border} cursor-pointer ${className}`}
-            >
-              <span className={`text-[9px] font-bold ${status.text}`}>
-                {pct}%
-              </span>
-            </span>
-          )}
-        </TooltipTrigger>
+  const indicator = variant === "rail" ? (
+    <button
+      type="button"
+      aria-label={`AI Token Usage: ${pct}%`}
+      aria-expanded={isMobile ? mobilePopoverOpen : undefined}
+      className={`group flex items-center justify-center gap-1 px-1.5 py-0.5 rounded-full border transition-all cursor-pointer hover:scale-105 active:scale-95 ${status.bg} ${status.border} ${className}`}
+      style={{ WebkitAppRegion: "no-drag" } as any}
+    >
+      <svg className="w-3.5 h-3.5 -rotate-90 shrink-0" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r={radius} className="stroke-white/10" strokeWidth="3.5" fill="transparent" />
+        <circle
+          cx="12" cy="12" r={radius} stroke={status.stroke} strokeWidth="3.5"
+          strokeDasharray={circumference} strokeDashoffset={strokeDashoffset}
+          strokeLinecap="round" fill="transparent" className="transition-all duration-700 ease-out"
+        />
+      </svg>
+      <span className={`text-[10px] font-bold tracking-tighter ${status.text}`}>
+        {isLoading ? "…" : `${pct}%`}
+      </span>
+    </button>
+  ) : variant === "badge" ? (
+    <button
+      type="button"
+      aria-label={`AI Token Usage: ${pct}%`}
+      aria-expanded={isMobile ? mobilePopoverOpen : undefined}
+      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[11px] font-medium transition-all hover:bg-white/5 cursor-pointer ${status.bg} ${status.border} ${className}`}
+      style={{ WebkitAppRegion: "no-drag" } as any}
+    >
+      <svg className="w-3.5 h-3.5 -rotate-90 shrink-0" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r={radius} className="stroke-white/10" strokeWidth="3" fill="transparent" />
+        <circle
+          cx="12" cy="12" r={radius} stroke={status.stroke} strokeWidth="3"
+          strokeDasharray={circumference} strokeDashoffset={strokeDashoffset}
+          strokeLinecap="round" fill="transparent" className="transition-all duration-700 ease-out"
+        />
+      </svg>
+      <span className={status.text}>{pct}%</span>
+      <span className="text-white/40">quota</span>
+    </button>
+  ) : (
+    <button
+      type="button"
+      aria-label={`AI Token Usage: ${pct}%`}
+      aria-expanded={isMobile ? mobilePopoverOpen : undefined}
+      className={`inline-flex items-center justify-center w-6 h-6 rounded-full border ${status.bg} ${status.border} cursor-pointer ${className}`}
+    >
+      <span className={`text-[9px] font-bold ${status.text}`}>{pct}%</span>
+    </button>
+  );
 
-        <TooltipContent
-          side="right"
-          sideOffset={8}
-          className="z-50 w-64 p-3.5 rounded-xl border border-white/15 bg-zinc-950/95 backdrop-blur-xl text-zinc-100 shadow-2xl animate-in fade-in-0 zoom-in-95"
-        >
+  const quotaContent = (
+    <>
           {/* Header */}
           <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/10">
             <div className="flex items-center gap-1.5 text-xs font-semibold text-white/90">
@@ -176,8 +148,37 @@ export const AiUsageContextIndicator: React.FC<AiUsageContextIndicatorProps> = (
             <Clock size={11} className="shrink-0" />
             <span>Resets daily at 00:00 UTC</span>
           </div>
-        </TooltipContent>
-      </Tooltip>
+    </>
+  );
+
+  return (
+    <TooltipProvider delayDuration={150}>
+      {isMobile ? (
+        <Popover.Root open={mobilePopoverOpen} onOpenChange={setMobilePopoverOpen}>
+          <Popover.Trigger asChild>{indicator}</Popover.Trigger>
+          <Popover.Portal>
+            <Popover.Content
+              side="top"
+              align="center"
+              sideOffset={8}
+              className="z-50 w-64 rounded-xl border border-white/15 bg-zinc-950/95 p-3.5 text-zinc-100 shadow-2xl backdrop-blur-xl data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95"
+            >
+              {quotaContent}
+            </Popover.Content>
+          </Popover.Portal>
+        </Popover.Root>
+      ) : (
+        <Tooltip>
+          <TooltipTrigger asChild>{indicator}</TooltipTrigger>
+          <TooltipContent
+            side="right"
+            sideOffset={8}
+            className="z-50 w-64 rounded-xl border border-white/15 bg-zinc-950/95 p-3.5 text-zinc-100 shadow-2xl backdrop-blur-xl animate-in fade-in-0 zoom-in-95"
+          >
+            {quotaContent}
+          </TooltipContent>
+        </Tooltip>
+      )}
     </TooltipProvider>
   );
 };
