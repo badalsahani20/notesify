@@ -56,7 +56,7 @@
     ],
     "asar": true
   },
-  "description": "A production-grade, full-stack notes application built on the MERN stack — featuring a professional rich-text editor, multi-provider AI orchestration, optimistic concurrency control, and banking-level authentication patterns.",
+  "description": "A production-grade, full-stack notes application built on the MERN stack — featuring a professional rich-text editor, multi-provider AI orchestration, optimistic concurrency control, and robust, secure authentication.",
   "dependencies": {
     "7zip-bin": "^5.2.0",
     "agent-base": "^6.0.2",

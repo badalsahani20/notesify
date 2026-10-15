@@ -1,4 +1,4 @@
-import { Moon, Plus, Sun } from "lucide-react";
+import { Moon, Plus, Sun, Sparkles } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import UserMenu from "@/components/header/UserMenu";
 import HeaderSearch from "@/components/header/HeaderSearch";
@@ -7,6 +7,7 @@ import { useState } from "react";
 import { FolderFormDialog } from "@/components/folders/FolderFormDialog";
 import { useFolderStore } from "@/store/useFolderStore";
 import notesifyLogo from "@/assets/notesify-favicon.png";
+import { useDesktopUpdateStore } from "@/store/useDesktopUpdateStore";
 
 type AppHeaderProps = {
   theme: "light" | "dark";
@@ -20,6 +21,8 @@ const AppHeader = ({ theme, onToggleTheme, onMenuOpen }: AppHeaderProps) => {
 
   const [isNewNotebookOpen, setIsNewNotebookOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  const { status: updateStatus, latestRelease, openDownload } = useDesktopUpdateStore();
 
   const isDesktop = typeof window !== "undefined" && (
     Boolean((window as any).electronAPI) ||
@@ -78,6 +81,17 @@ const AppHeader = ({ theme, onToggleTheme, onMenuOpen }: AppHeaderProps) => {
       </div>
 
       <div className="desktop-header-actions">
+        {isDesktop && updateStatus === "available" && latestRelease ? (
+          <button
+            type="button"
+            onClick={openDownload}
+            className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-500/15 text-indigo-400 border border-indigo-500/30 hover:bg-indigo-500/25 transition shadow-sm animate-pulse"
+            title={`Notesify ${latestRelease.version} is available. Click to download.`}
+          >
+            <Sparkles size={12} />
+            <span>Update v{latestRelease.version}</span>
+          </button>
+        ) : null}
         <button
           type="button"
           onClick={(e) => onToggleTheme(e)}

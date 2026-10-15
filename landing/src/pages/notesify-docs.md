@@ -22,9 +22,9 @@
 
 Notesify is a focused writing environment with an AI assistant built in. The philosophy is simple: the editor stays quiet and out of your way, and Iris — the AI — only shows up when you invite it.
 
-Under the hood, Notesify is a production-grade MERN stack application with multi-provider AI orchestration, optimistic concurrency control, and banking-level authentication patterns. It is not a tutorial app.
+Under the hood, Notesify is a production-grade MERN stack application with multi-provider AI orchestration, optimistic concurrency control, and robust, secure authentication.
 
-**Live app:** [notesify.in](https://notesify.in)
+**Live app:** [notesify.in](https://notesify.in) 
 
 ---
 
@@ -137,7 +137,7 @@ The chat panel slides in alongside the editor. Iris has full context of your act
 
 **Streaming:** Responses appear token by token in real time. You can see Iris's reasoning process via a live Thinking indicator before the final answer arrives.
 
-**Conversation memory:** Chat history is managed automatically. Chat history beyond 40 messages triggers an automatic AI summarization task, compressing older messages into a rolling context snapshot — preserving continuity without hitting token limits.
+**Conversation memory:** Chat history is managed through an intelligent token-budget sliding window. Active history is maintained within an 8,000-token allowance; older messages that exceed this budget are automatically consolidated via a multi-provider background summarizer into a rolling technical context snapshot, preserving continuous context without hitting token limits or clipping verbose code.
 
 ### AI suggestion caching
 

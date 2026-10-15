@@ -13,6 +13,8 @@ import { WhatsNewModal } from "@/components/ui/WhatsNewModal";
 import { useWhatsNew } from "@/hooks/user/useWhatsNew";
 import { SettingsDialog } from "@/components/settings/SettingsDialog";
 import { useSettingsUIStore } from "@/store/useSettingsStore";
+import { DesktopUpdateToast } from "@/components/desktop/DesktopUpdateToast";
+import { useDesktopUpdateStore } from "@/store/useDesktopUpdateStore";
 
 type Pops = {
   middlePanel: React.ReactNode;
@@ -43,6 +45,16 @@ const MainLayout = ({ middlePanel }: Pops) => {
     bootstrapStartedRef.current = true;
     void fetchFolders();
   }, [fetchFolders]);
+
+  const checkForDesktopUpdates = useDesktopUpdateStore((s) => s.checkForUpdates);
+
+  useEffect(() => {
+    // Check for updates 4 seconds after mount to keep startup instant
+    const timer = setTimeout(() => {
+      void checkForDesktopUpdates(false);
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [checkForDesktopUpdates]);
 
   const onToggleTheme = (event: React.MouseEvent) => {
     const isDark = theme === "dark";
@@ -132,6 +144,7 @@ const MainLayout = ({ middlePanel }: Pops) => {
       )}
       <WhatsNewModal isOpen={isWhatsNewOpen} onDismiss={dismissWhatsNew} />
       <SettingsDialog open={settingsOpen} onOpenChange={(v) => !v && closeSettings()} />
+      <DesktopUpdateToast />
     </>
   );
 };

@@ -32,22 +32,23 @@ export const askQuestionTool = {
   function: {
     name: "ask_question",
     description:
-      "Present an interactive question, quiz, or ranking dialog to the user when testing knowledge or collecting structured choices/priorities.",
+      "Present an interactive question, quiz, topic selection, or preference dialog directly in the Notesify chat UI. ALWAYS call this tool when: (1) Suggesting options, topics, or learning paths (e.g. user says 'teach me something', 'help me learn', 'what should I study?'); (2) Clarifying ambiguous or broad requests with structured selectable choices; (3) Testing the user's knowledge with a quick quiz; (4) Letting the user prioritize or pick their next direction. Do not just list options in raw text when you can give them clickable options through this tool.",
     parameters: {
       type: "object",
       properties: {
         purpose: {
           type: "string",
           enum: ["quiz", "clarification", "preference", "ranking"],
-          description: "Purpose of the question set.",
+          description:
+            "Purpose of the question set: 'preference' or 'clarification' for topic suggestions and choosing options; 'quiz' for testing knowledge; 'ranking' for prioritizing.",
         },
         title: {
           type: "string",
-          description: "Short label for this question set (2-4 words).",
+          description: "Short label for this question set (2-4 words, e.g. 'Choose a Topic', 'Select Track', 'Quick Quiz').",
         },
         questions: {
           type: "array",
-          description: "List of questions to ask the user.",
+          description: "List of questions or choices to present to the user.",
           minItems: 1,
           maxItems: 15,
           items: {
@@ -55,16 +56,16 @@ export const askQuestionTool = {
             properties: {
               id: {
                 type: "string",
-                description: "Unique identifier for this question (e.g. 'q1').",
+                description: "Unique identifier for this question (e.g. 'q1', 'topic_choice').",
               },
               question: {
                 type: "string",
-                description: "The question or instruction prompt.",
+                description: "The prompt or question shown above the options (e.g. 'What would you like to explore today?').",
               },
               type: {
                 type: "string",
                 enum: ["single_select", "multi_select", "rank_priority"],
-                description: "Interaction type (single_select, multi_select, or rank_priority).",
+                description: "Interaction type (single_select for one choice, multi_select for multiple, rank_priority for ordering).",
               },
               allowOther: {
                 type: "boolean",
@@ -74,7 +75,7 @@ export const askQuestionTool = {
               options: {
                 type: "array",
                 items: { type: "string" },
-                description: "List of 2 to 5 selectable options.",
+                description: "List of 2 to 5 curated selectable options for the user.",
               },
             },
             required: ["id", "question", "type", "options"],

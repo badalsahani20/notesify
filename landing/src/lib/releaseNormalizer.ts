@@ -139,7 +139,7 @@ export const FALLBACK_RELEASES: NormalizedRelease[] = [
     publishedAt: '2026-10-14T00:00:00Z',
     publishedDateFormatted: 'Oct 14, 2026',
     htmlUrl: 'https://github.com/badalsahani20/notesify/releases/tag/v1.3.0',
-    body: `## ⚡ Notesify v1.3.0 — AI Rate Limiting, Token Optimization & Tier Quotas\n\nThis release introduces fair-use token budgeting, tiered daily quotas, sliding-window context compression, native LaTeX math rendering, and butter-smooth Iris panel transitions.\n\n### ✨ What's New\n\n- **Fair-Use AI Quotas & Concurrency Limiting** — Daily token tracking with UTC midnight auto-reset across Free (100k), Pro (500k), and Enterprise tiers, paired with concurrency guards.\n- **Token Consumption Optimization** — Rolling 16-turn conversation history with automated background summarization at 20+ turns, slashing token overhead by over 70%.\n- **Dynamic Tool Gating** — Smarter tool resolution ensuring ask_question remains native while notes, tasks, and study workflows are strictly scoped to user intent.\n- **Native LaTeX Mathematics** — Iris now natively formats math equations in clean LaTeX notation for flawless KaTeX rendering.\n- **Silky-Smooth Iris Panel** — Guarded layout collapse and stable session sync eliminating Global Chat drawer stutter.`,
+    body: `## ⚡ Notesify v1.3.0 — AI Rate Limiting, Token Optimization & Tier Quotas\n\nThis release introduces fair-use token budgeting, tiered daily quotas, sliding-window context compression, native LaTeX math rendering, and butter-smooth Iris panel transitions.\n\n### ✨ What's New\n\n- **Fair-Use AI Quotas & Concurrency Limiting** — Daily token tracking with UTC midnight auto-reset across Free (100k), Pro (500k), and Enterprise tiers, paired with concurrency guards.\n- **Token Consumption Optimization** — Token-budget sliding window (8,000 tokens) with multi-provider background summarization for older messages, slashing prompt overhead without sacrificing conversation depth.\n- **Dynamic Tool Gating** — Smarter tool resolution ensuring ask_question remains native while notes, tasks, and study workflows are strictly scoped to user intent.\n- **Native LaTeX Mathematics** — Iris now natively formats math equations in clean LaTeX notation for flawless KaTeX rendering.\n- **Silky-Smooth Iris Panel** — Guarded layout collapse and stable session sync eliminating Global Chat drawer stutter.`,
     highlights: [
       {
         title: 'Tiered Token Quotas & Reset',
@@ -149,7 +149,7 @@ export const FALLBACK_RELEASES: NormalizedRelease[] = [
       {
         title: 'Context Window Optimization',
         tag: 'Efficiency',
-        description: '16-turn history sliding window with intelligent automated summarization to eliminate prompt bloat.',
+        description: '8,000-token sliding window with multi-provider background summarization to eliminate prompt bloat.',
       },
       {
         title: 'LaTeX Math Constitution',
@@ -164,7 +164,7 @@ export const FALLBACK_RELEASES: NormalizedRelease[] = [
     ],
     technicalNotes: [
       'Built-in rate limiter middleware with UTC midnight boundary reset and concurrency semaphore.',
-      'Chat context resolver sliding window capped at 16 messages with 20-message summary trigger.',
+      'Chat context resolver evaluates messages against an 8,000-token budget with 3-tier background summarization.',
       'Chat compose button gracefully disables with tooltip when daily quota is depleted.',
       'Resolved GlobalChatPage duplicate effect mount and AppLayout resize jitter.',
     ],

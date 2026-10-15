@@ -1,24 +1,68 @@
-import { FileText, Shield, ChevronRight } from "lucide-react";
+import { FileText, Shield, ChevronRight, RefreshCw, CheckCircle2, Download } from "lucide-react";
 import { SectionLabel } from "./SettingsShared";
 import notesifyLogo from "@/assets/notesify-favicon.png";
+import { CURRENT_VERSION } from "@/hooks/user/useWhatsNew";
+import { useDesktopUpdateStore } from "@/store/useDesktopUpdateStore";
 
-export const AboutTab = () => (
-  <div className="space-y-1">
-    <div className="flex flex-col items-center gap-3 py-8 text-center">
-      <img src={notesifyLogo} alt="Notesify" className="h-14 w-14 rounded-2xl shadow-lg" />
-      <div>
-        <p className="text-xl font-bold text-white tracking-tight">Notesify</p>
-        <p className="text-sm text-zinc-500 mt-1">The AI-powered notes workspace</p>
+export const AboutTab = () => {
+  const { status, latestRelease, checkForUpdates, openDownload } = useDesktopUpdateStore();
+
+  return (
+    <div className="space-y-1">
+      <div className="flex flex-col items-center gap-3 py-8 text-center">
+        <img src={notesifyLogo} alt="Notesify" className="h-14 w-14 rounded-2xl shadow-lg" />
+        <div>
+          <p className="text-xl font-bold text-white tracking-tight">Notesify</p>
+          <p className="text-sm text-zinc-500 mt-1">The AI-powered notes workspace</p>
+        </div>
+        <div className="flex flex-col items-center gap-2 mt-2">
+          <div className="flex items-center gap-2">
+            <span className="px-2.5 py-1 rounded-full bg-indigo-500/10 text-indigo-400 text-xs font-semibold border border-indigo-500/20">
+              Version {CURRENT_VERSION}
+            </span>
+            <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-semibold border border-emerald-500/20">
+              Release
+            </span>
+          </div>
+
+          <div className="mt-2">
+            {status === "checking" ? (
+              <div className="inline-flex items-center gap-2 text-xs text-zinc-400">
+                <RefreshCw size={13} className="animate-spin text-indigo-400" />
+                <span>Checking GitHub for updates...</span>
+              </div>
+            ) : status === "available" && latestRelease ? (
+              <button
+                type="button"
+                onClick={openDownload}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] transition shadow-md"
+              >
+                <Download size={13} />
+                <span>Update to v{latestRelease.version}</span>
+              </button>
+            ) : status === "up-to-date" ? (
+              <button
+                type="button"
+                onClick={() => void checkForUpdates(true)}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs text-emerald-400/90 hover:bg-white/5 transition"
+                title="Click to check again"
+              >
+                <CheckCircle2 size={13} />
+                <span>Up to date (v{CURRENT_VERSION})</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => void checkForUpdates(true)}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs text-zinc-400 hover:text-zinc-200 hover:bg-white/5 transition border border-white/5"
+              >
+                <RefreshCw size={12} />
+                <span>Check for updates</span>
+              </button>
+            )}
+          </div>
+        </div>
       </div>
-      <div className="flex items-center gap-2 mt-2">
-        <span className="px-2.5 py-1 rounded-full bg-indigo-500/10 text-indigo-400 text-xs font-semibold border border-indigo-500/20">
-          Version 1.3.0
-        </span>
-        <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-semibold border border-emerald-500/20">
-          Release
-        </span>
-      </div>
-    </div>
 
     <SectionLabel>Legal</SectionLabel>
     <div className="rounded-xl border border-white/8 bg-white/4 overflow-hidden divide-y divide-white/5">
@@ -77,4 +121,5 @@ export const AboutTab = () => (
       </a>
     </div>
   </div>
-);
+  );
+};
