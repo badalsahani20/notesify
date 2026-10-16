@@ -10,7 +10,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { useNoteConflict } from "@/hooks/notes/useNoteConflict";
 import { stripHtml } from "@/utils/stripHtml";
-import { AlertTriangle, Check, ArrowRightLeft, Laptop, Cloud, GitMerge } from "lucide-react";
+import { AlertTriangle, Check, ArrowRightLeft, Laptop, Cloud, GitMerge, GitCompare } from "lucide-react";
+import { NoteDiffViewer } from "./NoteDiffViewer";
 
 interface NoteConflictModalProps {
   noteId: string;
@@ -35,7 +36,7 @@ export const NoteConflictModal: React.FC<NoteConflictModalProps> = ({
     isResolving,
   } = useNoteConflict(noteId);
 
-  const [activeTab, setActiveTab] = useState<"compare" | "merge">("compare");
+  const [activeTab, setActiveTab] = useState<"diff" | "compare" | "merge">("diff");
   const [mergedContent, setMergedContent] = useState("");
   const [mergedTitle, setMergedTitle] = useState("");
 
@@ -50,7 +51,7 @@ export const NoteConflictModal: React.FC<NoteConflictModalProps> = ({
       setMergedTitle(localTitle || serverTitle);
       const combined = `${localDraft?.content || ""}\n\n<!-- Server Content Below -->\n${serverState?.content || ""}`;
       setMergedContent(combined);
-      setActiveTab("compare");
+      setActiveTab("diff");
     }
   }, [isOpen, localDraft, serverState, localTitle, serverTitle]);
 
@@ -85,7 +86,7 @@ export const NoteConflictModal: React.FC<NoteConflictModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col bg-neutral-950 border-white/10 text-neutral-100 p-0 overflow-hidden shadow-2xl">
+      <DialogContent className="max-w-4xl max-h-[92vh] flex flex-col bg-neutral-950 border-white/10 text-neutral-100 p-0 overflow-hidden shadow-2xl">
         <DialogHeader className="p-6 pb-4 border-b border-white/10 bg-neutral-900/60">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
@@ -99,12 +100,23 @@ export const NoteConflictModal: React.FC<NoteConflictModalProps> = ({
                 </span>
               </DialogTitle>
               <DialogDescription className="text-xs text-neutral-400 mt-1">
-                This note was modified in another session or device. Choose how to reconcile your changes.
+                This note was modified in another session or device. Review the changed parts and choose how to reconcile.
               </DialogDescription>
             </div>
           </div>
 
-          <div className="flex gap-2 mt-4">
+          <div className="flex flex-wrap gap-2 mt-4">
+            <button
+              type="button"
+              onClick={() => setActiveTab("diff")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
+                activeTab === "diff"
+                  ? "bg-white/15 text-white"
+                  : "bg-white/5 text-neutral-400 hover:text-neutral-200"
+              }`}
+            >
+              <GitCompare size={13} className="text-indigo-400" /> Changes Only (Diff)
+            </button>
             <button
               type="button"
               onClick={() => setActiveTab("compare")}
@@ -114,7 +126,7 @@ export const NoteConflictModal: React.FC<NoteConflictModalProps> = ({
                   : "bg-white/5 text-neutral-400 hover:text-neutral-200"
               }`}
             >
-              <ArrowRightLeft size={13} /> Side-by-Side Comparison
+              <ArrowRightLeft size={13} /> Full Note Side-by-Side
             </button>
             <button
               type="button"
@@ -130,8 +142,21 @@ export const NoteConflictModal: React.FC<NoteConflictModalProps> = ({
           </div>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto p-6 min-h-[320px]">
-          {activeTab === "compare" ? (
+        <div className="flex-1 overflow-y-auto p-6 min-h-[360px]">
+          {activeTab === "diff" ? (
+            /* Diff View: Shows only changed parts with hunk folding */
+            <div className="h-full">
+              <NoteDiffViewer
+                serverTitle={serverTitle}
+                localTitle={localTitle}
+                serverContent={serverState?.content || ""}
+                localContent={localDraft?.content || ""}
+                serverVersion={serverVersion}
+                localVersion={localVersion}
+              />
+            </div>
+          ) : activeTab === "compare" ? (
+            /* Full Note Side-by-Side */
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full">
               {/* Local Draft */}
               <div className="flex flex-col rounded-xl border border-white/10 bg-neutral-900/40 p-4">
@@ -213,7 +238,7 @@ export const NoteConflictModal: React.FC<NoteConflictModalProps> = ({
           </Button>
 
           <div className="flex items-center gap-2">
-            {activeTab === "compare" ? (
+            {activeTab !== "merge" ? (
               <>
                 <Button
                   type="button"

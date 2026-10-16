@@ -83,15 +83,40 @@ export class HybridNoteRepository implements INoteRepository {
     async getNote(noteId: string): Promise<Note> {
         const localNote = await this.localDB.getById(noteId);
 
+        if (!navigator.onLine) {
+            if (localNote) return localNote;
+            throw new Error("No note found locally");
+        }
+
+        // Check if there are active offline mutations or unresolved conflicts queued locally
+        const pendingOp = await db.syncQueue.where("entityId").equals(noteId).first();
+        const conflict = await db.conflictLog
+            .where("entityId")
+            .equals(noteId)
+            .filter(c => c.status === "UNRESOLVED")
+            .first();
+
+        // If this note has pending un-synced edits or active conflicts, protect the local copy
+        if (localNote && (pendingOp || conflict)) {
+            return localNote;
+        }
+
+        // When online and no pending mutations, fetch latest authoritative version from server
+        try {
+            const remoteNote = await this.remoteAPI.getNote(noteId);
+            if (remoteNote) {
+                await this.localDB.save(remoteNote);
+                return remoteNote;
+            }
+        } catch (err) {
+            console.warn("[HybridNoteRepository] Remote fetch failed, falling back to local:", err);
+        }
+
         if (localNote) {
             return localNote;
         }
 
-        if (!navigator.onLine) throw new Error("No note found locally");
-
-        const remoteNote = await this.remoteAPI.getNote(noteId);
-        await this.localDB.save(remoteNote);
-        return remoteNote;
+        throw new Error("No note found locally or remotely");
     }
 
     async createNote(data: { _id?: string; folderId?: string | null; title?: string; content?: string }): Promise<Note> {

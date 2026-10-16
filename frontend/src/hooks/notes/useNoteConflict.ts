@@ -35,6 +35,9 @@ export const useNoteConflict = (noteId: string | undefined | null) => {
     const handleLocalResolution = (e: Event) => {
       const customEvent = e as CustomEvent;
       if (customEvent.detail?.entityId === noteId) {
+        if (customEvent.detail?.note) {
+          queryClient.setQueryData(["note", noteId], customEvent.detail.note);
+        }
         queryClient.invalidateQueries({ queryKey: ["note-conflict", noteId] });
         queryClient.invalidateQueries({ queryKey: ["note", noteId] });
         queryClient.invalidateQueries({ queryKey: ["notes"] });
@@ -46,6 +49,9 @@ export const useNoteConflict = (noteId: string | undefined | null) => {
       channel = new BroadcastChannel("notesify_conflicts");
       channel.onmessage = (event) => {
         if (event.data?.entityId === noteId) {
+          if (event.data?.note) {
+            queryClient.setQueryData(["note", noteId], event.data.note);
+          }
           queryClient.invalidateQueries({ queryKey: ["note-conflict", noteId] });
           queryClient.invalidateQueries({ queryKey: ["note", noteId] });
           queryClient.invalidateQueries({ queryKey: ["notes"] });

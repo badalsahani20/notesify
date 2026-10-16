@@ -8,18 +8,23 @@ class ConflictResolutionEngine {
       ? new BroadcastChannel("notesify_conflicts")
       : null;
 
-  private broadcastResolution(noteId: string, resolution: "KEEP_MINE" | "KEEP_SERVER" | "MERGED") {
+  private broadcastResolution(
+    noteId: string,
+    resolution: "KEEP_MINE" | "KEEP_SERVER" | "MERGED",
+    note?: Note
+  ) {
     try {
       if (typeof window !== "undefined") {
         window.dispatchEvent(
           new CustomEvent("notesify:conflict-resolved", {
-            detail: { entityId: noteId, resolution, timestamp: Date.now() },
+            detail: { entityId: noteId, resolution, note, timestamp: Date.now() },
           })
         );
         this.conflictChannel?.postMessage({
           type: "CONFLICT_RESOLVED",
           entityId: noteId,
           resolution,
+          note,
           timestamp: Date.now(),
         });
       }
@@ -57,7 +62,7 @@ class ConflictResolutionEngine {
     }
 
     const localNote = await db.notes.get(noteId);
-    if (!localNote) {
+    if (!localNote && !conflict.localDraft) {
       throw new Error(`Local note ${noteId} not found`);
     }
 
@@ -67,13 +72,17 @@ class ConflictResolutionEngine {
       conflict.serverState?.version ??
       conflict.localVersion;
 
+    const draft = conflict.localDraft || {};
+
     const rebasedNote: Note = {
-      ...localNote,
+      ...(localNote || {}),
+      ...draft,
+      _id: noteId,
       version: targetServerVersion + 1,
       isConflicted: false,
       conflictId: undefined,
       updatedAt: new Date().toISOString(),
-    };
+    } as Note;
 
     await db.transaction("rw", [db.notes, db.syncQueue, db.conflictLog], async () => {
       // 1. Save rebased note in local Dexie
@@ -111,8 +120,8 @@ class ConflictResolutionEngine {
       });
     });
 
-    // Notify listeners and trigger queue drainage
-    this.broadcastResolution(noteId, "KEEP_MINE");
+    // Notify listeners with the rebased note and trigger queue drainage
+    this.broadcastResolution(noteId, "KEEP_MINE", rebasedNote);
     SyncService.processQueue().catch(console.error);
 
     return rebasedNote;
@@ -139,6 +148,7 @@ class ConflictResolutionEngine {
       ...serverState,
       isConflicted: false,
       conflictId: undefined,
+      updatedAt: new Date().toISOString(),
     };
 
     await db.transaction("rw", [db.notes, db.syncQueue, db.conflictLog], async () => {
@@ -159,8 +169,8 @@ class ConflictResolutionEngine {
       }
     });
 
-    // Notify listeners and drain queue for any other notes
-    this.broadcastResolution(noteId, "KEEP_SERVER");
+    // Notify listeners with accepted server note and drain queue for any other notes
+    this.broadcastResolution(noteId, "KEEP_SERVER", acceptedServerNote);
     SyncService.processQueue().catch(console.error);
 
     return acceptedServerNote;
@@ -235,7 +245,7 @@ class ConflictResolutionEngine {
       });
     });
 
-    this.broadcastResolution(noteId, "MERGED");
+    this.broadcastResolution(noteId, "MERGED", mergedNote);
     SyncService.processQueue().catch(console.error);
 
     return mergedNote;

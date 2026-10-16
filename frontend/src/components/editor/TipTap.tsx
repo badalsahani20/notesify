@@ -429,6 +429,42 @@ const TipTap = ({ noteId, content, onChange, onEditorReady, aiChat, editable = t
     }
   }, [noteId, editor]);
 
+  // Synchronize editor content immediately when a conflict is resolved (locally or in another tab)
+  useEffect(() => {
+    if (!editor || !noteId) return;
+
+    const handleResolved = (resolvedContent: string) => {
+      const currentContent = editor.getHTML();
+      if (currentContent !== resolvedContent) {
+        editor.commands.setContent(resolvedContent, { emitUpdate: false });
+      }
+    };
+
+    const onCustomEvent = (e: Event) => {
+      const ce = e as CustomEvent;
+      if (ce.detail?.entityId === noteId && ce.detail?.note?.content !== undefined) {
+        handleResolved(ce.detail.note.content);
+      }
+    };
+
+    let channel: BroadcastChannel | null = null;
+    if (typeof window !== "undefined" && "BroadcastChannel" in window) {
+      channel = new BroadcastChannel("notesify_conflicts");
+      channel.onmessage = (event) => {
+        if (event.data?.entityId === noteId && event.data?.note?.content !== undefined) {
+          handleResolved(event.data.note.content);
+        }
+      };
+    }
+
+    window.addEventListener("notesify:conflict-resolved", onCustomEvent);
+
+    return () => {
+      window.removeEventListener("notesify:conflict-resolved", onCustomEvent);
+      channel?.close();
+    };
+  }, [editor, noteId]);
+
   if (!editor) return <div>Loading editor...</div>;
 
   return (
