@@ -4,6 +4,7 @@ import { CURRENT_VERSION } from "@/hooks/user/useWhatsNew";
 import {
   fetchLatestRelease,
   compareSemver,
+  getInstalledAppVersion,
   triggerNativeNotification,
   openExternalUrl,
   type UpdateInfo,
@@ -13,6 +14,7 @@ interface DesktopUpdateState {
   status: "idle" | "checking" | "available" | "up-to-date" | "error";
   latestRelease: UpdateInfo | null;
   dismissedVersion: string | null;
+  currentVersion: string;
   lastChecked: number | null;
   checkForUpdates: (force?: boolean) => Promise<void>;
   dismissUpdate: () => void;
@@ -27,6 +29,7 @@ export const useDesktopUpdateStore = create<DesktopUpdateState>((set, get) => ({
   latestRelease: null,
   dismissedVersion:
     typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null,
+  currentVersion: CURRENT_VERSION,
   lastChecked: null,
 
   checkForUpdates: async (force = false) => {
@@ -47,18 +50,22 @@ export const useDesktopUpdateStore = create<DesktopUpdateState>((set, get) => ({
 
     set({ status: "checking" });
 
+    const activeVersion = await getInstalledAppVersion(CURRENT_VERSION);
+    set({ currentVersion: activeVersion });
+
     const release = await fetchLatestRelease();
     if (!release) {
-      set({ status: "error", lastChecked: now });
+      set({ status: "error", lastChecked: now, currentVersion: activeVersion });
       return;
     }
 
-    const hasUpdate = compareSemver(release.version, CURRENT_VERSION) > 0;
+    const hasUpdate = compareSemver(release.version, activeVersion) > 0;
 
     if (hasUpdate) {
       set({
         status: "available",
         latestRelease: release,
+        currentVersion: activeVersion,
         lastChecked: now,
       });
 
@@ -71,6 +78,7 @@ export const useDesktopUpdateStore = create<DesktopUpdateState>((set, get) => ({
       set({
         status: "up-to-date",
         latestRelease: release,
+        currentVersion: activeVersion,
         lastChecked: now,
       });
     }

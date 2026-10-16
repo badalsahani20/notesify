@@ -1,4 +1,5 @@
 import { transcribeAudio } from "../services/stt/stt.service.js";
+import { checkDailyQuota, recordAiUsage } from "./ai.controller.js";
 
 /**
  * Controller for handling audio transcription requests.
@@ -13,10 +14,24 @@ export async function transcribe(req, res) {
       });
     }
 
+    // 1. Quota Check - Prevent bypass when daily AI limits are reached
+    if (req.user?._id) {
+      const quota = await checkDailyQuota(req.user._id);
+      if (!quota.allowed) {
+        return res.status(429).json({
+          success: false,
+          code: quota.code || "AI_TOKEN_LIMIT_EXCEEDED",
+          message: quota.message || "Daily AI token limit reached. Resets at 00:00 UTC.",
+          used: quota.used,
+          limit: quota.limit,
+        });
+      }
+    }
+
     const { language } = req.body;
     const { buffer, mimetype, originalname, size } = req.file;
 
-    // Minimum file sanity check (at least 1KB of audio)
+    // Minimum file sanity check (at least 500 bytes of audio)
     if (size < 500) {
       return res.status(400).json({
         success: false,
@@ -30,6 +45,20 @@ export async function transcribe(req, res) {
       filename: originalname || "recording.webm",
       language: language?.trim() || undefined,
     });
+
+    // 2. Track usage against user's daily quota
+    if (req.user?._id && result.text) {
+      const estimatedTokens = Math.max(
+        50,
+        Math.ceil((result.text.length / 4) + (result.durationSeconds || 1) * 10)
+      );
+      void recordAiUsage(req.user._id, {
+        model: "openai/whisper-large-v3-turbo",
+        promptTokens: estimatedTokens,
+        completionTokens: Math.ceil(result.text.length / 4),
+        totalTokens: estimatedTokens,
+      }).catch((err) => console.warn("[STT Controller] Failed to record usage:", err.message));
+    }
 
     return res.status(200).json({
       success: true,

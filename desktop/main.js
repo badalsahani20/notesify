@@ -1,4 +1,4 @@
-import { app, BrowserWindow, screen, ipcMain, shell, safeStorage } from 'electron';
+import { app, BrowserWindow, screen, ipcMain, shell, safeStorage, session } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
@@ -45,6 +45,20 @@ if (!gotTheLock) {
   });
 
   app.whenReady().then(() => {
+    // Explicitly allow microphone/media access for desktop environment
+    if (session.defaultSession) {
+      session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
+        if (permission === 'media') {
+          return callback(true);
+        }
+        callback(false);
+      });
+
+      session.defaultSession.setPermissionCheckHandler((webContents, permission) => {
+        return permission === 'media';
+      });
+    }
+
     setupIpcHandlers();
     createWindow();
 
@@ -189,5 +203,9 @@ function setupIpcHandlers() {
 
   ipcMain.handle('open-external', async (event, url) => {
     shell.openExternal(url);
+  });
+
+  ipcMain.handle('get-app-version', async () => {
+    return app.getVersion();
   });
 }

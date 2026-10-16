@@ -2,6 +2,8 @@ import { jest } from "@jest/globals";
 import {
   aiConcurrencyLimiter,
   aiBurstLimiter,
+  sttConcurrencyLimiter,
+  sttBurstLimiter,
 } from "../../src/middleware/aiRateLimit.middleware.js";
 import {
   getStartOfUtcDay,
@@ -98,6 +100,87 @@ describe("AI Rate Limiting & Quota Management", () => {
       finish2();
       const finish4 = res4.on.mock.calls.find((call) => call[0] === "finish")[1];
       finish4();
+    });
+
+    it("should allow only 1 concurrent STT request and reject the 2nd", () => {
+      const userId = "user_stt_concurrent_test_1";
+      const req1 = { user: { _id: userId }, on: jest.fn() };
+      const req2 = { user: { _id: userId }, on: jest.fn() };
+
+      const res1 = { on: jest.fn(), status: jest.fn().mockReturnThis(), json: jest.fn() };
+      const res2 = { on: jest.fn(), status: jest.fn().mockReturnThis(), json: jest.fn() };
+
+      const next1 = jest.fn();
+      const next2 = jest.fn();
+
+      sttConcurrencyLimiter(req1, res1, next1);
+      sttConcurrencyLimiter(req2, res2, next2);
+
+      expect(next1).toHaveBeenCalled();
+      expect(next2).not.toHaveBeenCalled();
+      expect(res2.status).toHaveBeenCalledWith(429);
+      expect(res2.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          code: "STT_CONCURRENCY_LIMIT_EXCEEDED",
+        })
+      );
+
+      // Clean up
+      const finish1 = res1.on.mock.calls.find((call) => call[0] === "finish")[1];
+      finish1();
+    });
+  });
+
+  describe("Burst Rate Limiters", () => {
+    it("should allow requests under the limit and reject when sttBurstLimiter is exceeded", async () => {
+      const userId = `stt_burst_user_${Date.now()}`;
+      const createReq = () => ({
+        user: { _id: userId },
+        ip: "127.0.0.1",
+        headers: {},
+      });
+
+      // sttBurstLimiter max is 10 per minute
+      for (let i = 0; i < 10; i++) {
+        const req = createReq();
+        const res = { setHeader: jest.fn(), getHeader: jest.fn(), status: jest.fn().mockReturnThis(), json: jest.fn() };
+        const next = jest.fn();
+        await new Promise((resolve) => {
+          sttBurstLimiter(req, res, () => {
+            next();
+            resolve();
+          });
+        });
+        expect(next).toHaveBeenCalled();
+      }
+
+      // 11th request should be rejected with 429 STT_BURST_LIMIT_EXCEEDED
+      const req11 = createReq();
+      const next11 = jest.fn();
+
+      await new Promise((resolve) => {
+        const res11 = {
+          setHeader: jest.fn(),
+          getHeader: jest.fn(),
+          status: jest.fn().mockReturnThis(),
+          json: jest.fn((body) => {
+            expect(res11.status).toHaveBeenCalledWith(429);
+            expect(body).toEqual(
+              expect.objectContaining({
+                code: "STT_BURST_LIMIT_EXCEEDED",
+              })
+            );
+            resolve();
+          }),
+        };
+
+        sttBurstLimiter(req11, res11, () => {
+          next11();
+          resolve();
+        });
+      });
+
+      expect(next11).not.toHaveBeenCalled();
     });
   });
 

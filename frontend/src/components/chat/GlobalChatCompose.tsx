@@ -356,7 +356,7 @@ export const GlobalChatCompose = ({
                   textareaRef.current?.focus();
                 }, 60);
               }}
-              disabled={isSending}
+              disabled={isSending || isLimitReached}
             />
           </div>
         }

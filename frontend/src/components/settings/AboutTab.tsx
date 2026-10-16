@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { FileText, Shield, ChevronRight, RefreshCw, CheckCircle2, Download } from "lucide-react";
 import { SectionLabel } from "./SettingsShared";
 import notesifyLogo from "@/assets/notesify-favicon.png";
@@ -5,7 +6,14 @@ import { CURRENT_VERSION } from "@/hooks/user/useWhatsNew";
 import { useDesktopUpdateStore } from "@/store/useDesktopUpdateStore";
 
 export const AboutTab = () => {
-  const { status, latestRelease, checkForUpdates, openDownload } = useDesktopUpdateStore();
+  const { status, latestRelease, currentVersion, checkForUpdates, openDownload } = useDesktopUpdateStore();
+  const displayVersion = currentVersion || CURRENT_VERSION;
+
+  useEffect(() => {
+    if (status === "idle") {
+      void checkForUpdates(false);
+    }
+  }, [status, checkForUpdates]);
 
   return (
     <div className="space-y-1">
@@ -18,7 +26,7 @@ export const AboutTab = () => {
         <div className="flex flex-col items-center gap-2 mt-2">
           <div className="flex items-center gap-2">
             <span className="px-2.5 py-1 rounded-full bg-indigo-500/10 text-indigo-400 text-xs font-semibold border border-indigo-500/20">
-              Version {CURRENT_VERSION}
+              Version {displayVersion}
             </span>
             <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-semibold border border-emerald-500/20">
               Release
@@ -48,7 +56,7 @@ export const AboutTab = () => {
                 title="Click to check again"
               >
                 <CheckCircle2 size={13} />
-                <span>Up to date (v{CURRENT_VERSION})</span>
+                <span>Up to date (v{displayVersion})</span>
               </button>
             ) : (
               <button

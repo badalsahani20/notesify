@@ -86,10 +86,31 @@ export async function fetchLatestRelease(): Promise<UpdateInfo | null> {
 
 interface ElectronWindow extends Window {
   electronAPI?: {
+    getAppVersion?: () => Promise<string>;
     auth?: {
       openExternal?: (url: string) => Promise<void>;
     };
   };
+}
+
+/**
+ * Retrieves the currently running application version.
+ */
+export async function getInstalledAppVersion(fallbackVersion = "1.3.1"): Promise<string> {
+  if (typeof window !== "undefined") {
+    const win = window as unknown as ElectronWindow;
+    if (win.electronAPI?.getAppVersion) {
+      try {
+        const nativeVer = await win.electronAPI.getAppVersion();
+        if (nativeVer && typeof nativeVer === "string") {
+          return nativeVer.replace(/^v/i, "").trim();
+        }
+      } catch (err) {
+        console.warn("[DesktopUpdate] Failed to get app version from Electron:", err);
+      }
+    }
+  }
+  return fallbackVersion;
 }
 
 /**

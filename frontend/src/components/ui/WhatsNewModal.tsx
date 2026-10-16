@@ -1,53 +1,43 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { Share2, Bot, ArrowRight, Globe, ShieldCheck, Gauge } from "lucide-react";
+import { GitCompare, History, RefreshCw, Radio, ArrowRight } from "lucide-react";
 import { CURRENT_VERSION } from "@/hooks/user/useWhatsNew";
 
-// ─── Feature definitions ─────────────────────────────────────────────────────
 const FEATURES = [
   {
-    icon: ShieldCheck,
-    iconClass: "bg-emerald-500/10 text-emerald-400",
-    label: "AI Quotas & Concurrency Guard",
+    icon: GitCompare,
+    iconClass: "bg-indigo-500/10 text-indigo-400",
+    label: "Interactive Note Diff Viewer",
     description:
-      "Daily token quotas with UTC midnight reset across Free (100k) and Pro tiers, paired with concurrency limits to prevent lockups.",
+      "Inspect multi-device conflicts with hunk folding, 3-line context preservation, and a unified/split view toggle.",
+    badge: "New",
+    badgeClass: "text-indigo-400 bg-indigo-500/10 border border-indigo-500/20",
+  },
+  {
+    icon: History,
+    iconClass: "bg-emerald-500/10 text-emerald-400",
+    label: "Conflict Draft Snapshots",
+    description:
+      "Frozen local drafts prevent concurrent autosaves from contaminating changes during conflict resolution.",
     badge: "New",
     badgeClass: "text-emerald-400 bg-emerald-500/10 border border-emerald-500/20",
   },
   {
-    icon: Gauge,
-    iconClass: "bg-amber-500/10 text-amber-400",
-    label: "Token Usage & Tier Badges",
-    description:
-      "Monitor your token usage in real-time with compact shorthand metrics and dynamic plan badges on your profile and composer.",
-    badge: "New",
-    badgeClass: "text-amber-400 bg-amber-500/10 border border-amber-500/20",
-  },
-  {
-    icon: Bot,
-    iconClass: "bg-purple-500/10 text-purple-400",
-    label: "Context Window Optimization",
-    description:
-      "Sliding 16-message conversation window with intelligent automated background summarization to eliminate token bloat.",
-    badge: "Improved",
-    badgeClass: "text-purple-400 bg-purple-500/10 border border-purple-500/20",
-  },
-  {
-    icon: Share2,
+    icon: RefreshCw,
     iconClass: "bg-blue-500/10 text-blue-400",
-    label: "Native LaTeX Mathematics",
+    label: "Online Reload Revalidation",
     description:
-      "Iris now natively formats equations with inline and block LaTeX syntax, rendered crisply with KaTeX.",
+      "Reloading notes while online revalidates against the remote database without wiping offline mutations.",
     badge: "Improved",
     badgeClass: "text-blue-400 bg-blue-500/10 border border-blue-500/20",
   },
   {
-    icon: Globe,
-    iconClass: "bg-indigo-500/10 text-indigo-400",
-    label: "Stutter-Free Iris Drawer",
+    icon: Radio,
+    iconClass: "bg-purple-500/10 text-purple-400",
+    label: "Live Cross-Tab Editor Sync",
     description:
-      "Responsive layout collapse guards and stabilized session routing deliver a silky-smooth global chat drawer transition.",
-    badge: "Polished",
-    badgeClass: "text-indigo-400 bg-indigo-500/10 border border-indigo-500/20",
+      "Conflict resolutions broadcast live across open browser tabs via BroadcastChannel, updating editors instantly.",
+    badge: "New",
+    badgeClass: "text-purple-400 bg-purple-500/10 border border-purple-500/20",
   },
 ];
 

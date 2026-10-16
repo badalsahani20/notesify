@@ -62,3 +62,59 @@ export const aiBurstLimiter = rateLimit({
         });
     }
 });
+
+const inFlightSTT = new Map();
+const MAX_CONCURRENT_STT = 1;
+
+export const sttConcurrencyLimiter = (req, res, next) => {
+    const userId = req.user?._id?.toString();
+    if (!userId) return next();
+
+    const currentCount = inFlightSTT.get(userId) || 0;
+    if (currentCount >= MAX_CONCURRENT_STT) {
+        return res.status(429).json({
+            success: false,
+            code: "STT_CONCURRENCY_LIMIT_EXCEEDED",
+            message: "A voice transcription is already in progress. Please wait for it to complete.",
+        });
+    }
+
+    inFlightSTT.set(userId, currentCount + 1);
+
+    let cleanedUp = false;
+    const cleanup = () => {
+        if (cleanedUp) return;
+        cleanedUp = true;
+
+        if (timeoutId) clearTimeout(timeoutId);
+
+        const count = inFlightSTT.get(userId) || 1;
+        if (count <= 1) {
+            inFlightSTT.delete(userId);
+        } else {
+            inFlightSTT.set(userId, count - 1);
+        }
+    };
+
+    const timeoutId = setTimeout(cleanup, REQUEST_TIMEOUT_MS);
+    req.on("close", cleanup);
+    res.on("finish", cleanup);
+
+    next();
+};
+
+export const sttBurstLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 10, // Max 10 transcriptions per minute
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => req.user?._id?.toString() || req.ip,
+    validate: { keyGeneratorIpFallback: false },
+    handler: (req, res) => {
+        return res.status(429).json({
+            success: false,
+            code: "STT_BURST_LIMIT_EXCEEDED",
+            message: "Too many voice dictation requests. Please wait a minute before trying again."
+        });
+    }
+});

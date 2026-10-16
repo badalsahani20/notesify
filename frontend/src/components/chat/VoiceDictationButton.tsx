@@ -87,7 +87,9 @@ export const VoiceDictationButton: React.FC<VoiceDictationButtonProps> = ({
             : "bg-white text-black shadow-md hover:bg-white/90 active:scale-95"
         )}
         title={
-          isRecording
+          disabled
+            ? "Voice dictation disabled"
+            : isRecording
             ? "Click to finish recording"
             : isTranscribing
             ? "Transcribing voice..."
