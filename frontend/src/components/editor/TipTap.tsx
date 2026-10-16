@@ -335,6 +335,44 @@ const TipTap = ({ noteId, content, onChange, onEditorReady, aiChat, editable = t
       return;
     }
 
+    // Ctrl/⌘ + J → toggle Contextual Iris AI panel
+    if (mod && !event.shiftKey && event.key.toLowerCase() === "j") {
+      event.preventDefault();
+      const panelStore = usePanelStore.getState();
+      const willOpen = !panelStore.isAiPanelOpen;
+
+      if (willOpen && aiChat) {
+        // If text is selected, pull it into the contextual prompt
+        const { from, to } = editor.state.selection;
+        if (!editor.state.selection.empty && to > from) {
+          const selectedText = editor.state.doc.textBetween(from, to, " ");
+          if (selectedText.trim()) {
+            aiChat.setChatInput(`explain this part:\n"${selectedText.trim()}"`);
+          }
+        }
+      }
+
+      panelStore.setAiPanelOpen(willOpen);
+
+      if (willOpen) {
+        let attempts = 0;
+        const focusTextarea = () => {
+          const chatInputEl = document.querySelector(".gc-textarea") as HTMLTextAreaElement;
+          if (chatInputEl) {
+            chatInputEl.focus();
+            chatInputEl.setSelectionRange(chatInputEl.value.length, chatInputEl.value.length);
+          } else if (attempts < 20) {
+            attempts++;
+            setTimeout(focusTextarea, 80);
+          }
+        };
+        setTimeout(focusTextarea, 80);
+      } else {
+        editor.chain().focus().run();
+      }
+      return;
+    }
+
     // Ctrl/⌘ + / → open keyboard shortcuts guide
     if (mod && event.key === "/") {
       event.preventDefault();

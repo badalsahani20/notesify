@@ -165,8 +165,53 @@ const NoteEditor = () => {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/i.test(navigator.platform);
+      const mod = isMac ? e.metaKey : e.ctrlKey;
+
+      // Ctrl/⌘ + J → toggle Contextual Iris AI Panel
+      if (mod && !e.shiftKey && e.key.toLowerCase() === "j") {
+        e.preventDefault();
+        const panelStore = usePanelStore.getState();
+        const willOpen = !panelStore.isAiPanelOpen;
+
+        if (willOpen && editorInstance && aiChat) {
+          const { from, to } = editorInstance.state.selection;
+          if (!editorInstance.state.selection.empty && to > from) {
+            const selectedText = editorInstance.state.doc.textBetween(from, to, " ");
+            if (selectedText.trim()) {
+              aiChat.setChatInput(`explain this part:\n"${selectedText.trim()}"`);
+            }
+          }
+        }
+
+        panelStore.setAiPanelOpen(willOpen);
+
+        if (willOpen) {
+          let attempts = 0;
+          const focusTextarea = () => {
+            const chatInputEl = document.querySelector(".gc-textarea") as HTMLTextAreaElement;
+            if (chatInputEl) {
+              chatInputEl.focus();
+              chatInputEl.setSelectionRange(chatInputEl.value.length, chatInputEl.value.length);
+            } else if (attempts < 20) {
+              attempts++;
+              setTimeout(focusTextarea, 80);
+            }
+          };
+          setTimeout(focusTextarea, 80);
+        } else {
+          editorInstance?.commands.focus();
+        }
+        return;
+      }
+
       if (e.key === "Escape") {
         if (document.querySelector("[data-radix-popper-content-wrapper], [data-slot='dialog-content']")) {
+          return;
+        }
+        if (usePanelStore.getState().isAiPanelOpen) {
+          usePanelStore.getState().setAiPanelOpen(false);
+          editorInstance?.commands.focus();
           return;
         }
         handleCloseNote();
@@ -174,7 +219,7 @@ const NoteEditor = () => {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleCloseNote]);
+  }, [handleCloseNote, editorInstance, aiChat]);
 
   const isTransitioning = isCreating || (noteId && noteId === createdNoteIdRef.current);
   if ((isNoteLoading && !isTransitioning) || (!note && !hasFetchedFolders && !isNew)) {

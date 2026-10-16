@@ -54,6 +54,14 @@ const SECTIONS: Section[] = [
     ],
   },
   {
+    title: "Iris AI Assistant",
+    rows: [
+      { keys: [[MOD, "J"]], label: "Toggle contextual Iris panel (with selection context)" },
+      { keys: [[MOD, "⇧", "J"]], label: "Toggle full Global Iris Chat" },
+      { keys: [["Esc"]], label: "Close Iris panel & return focus" },
+    ],
+  },
+  {
     title: "Editor Actions",
     rows: [
       { keys: [[MOD, "/"]], label: "Open this shortcuts guide" },

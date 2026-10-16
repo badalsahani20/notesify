@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import FoldersPanel from "./folders/FolderPanel";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import AppHeader from "./header/AppHeader";
@@ -48,6 +48,9 @@ const MainLayout = ({ middlePanel }: Pops) => {
 
   const checkForDesktopUpdates = useDesktopUpdateStore((s) => s.checkForUpdates);
 
+  const location = useLocation();
+  const navigate = useNavigate();
+
   useEffect(() => {
     // Check for updates 4 seconds after mount to keep startup instant
     const timer = setTimeout(() => {
@@ -55,6 +58,41 @@ const MainLayout = ({ middlePanel }: Pops) => {
     }, 4000);
     return () => clearTimeout(timer);
   }, [checkForDesktopUpdates]);
+
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/i.test(navigator.platform);
+      const mod = isMac ? e.metaKey : e.ctrlKey;
+
+      // Ctrl/⌘ + Shift + J → Toggle full Global Iris Chat from anywhere
+      if (mod && e.shiftKey && e.key.toLowerCase() === "j") {
+        e.preventDefault();
+        if (location.pathname.startsWith("/chat")) {
+          navigate(-1);
+        } else {
+          const lastSession = sessionStorage.getItem("notesify_last_chat_session");
+          navigate(lastSession ? `/chat/${lastSession}` : "/chat");
+        }
+        return;
+      }
+
+      // Ctrl/⌘ + J when NOT in a note editor → Open Global Iris Chat
+      if (mod && !e.shiftKey && e.key.toLowerCase() === "j") {
+        if (!isNoteEditor) {
+          e.preventDefault();
+          if (location.pathname.startsWith("/chat")) {
+            navigate(-1);
+          } else {
+            const lastSession = sessionStorage.getItem("notesify_last_chat_session");
+            navigate(lastSession ? `/chat/${lastSession}` : "/chat");
+          }
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, [location.pathname, navigate, isNoteEditor]);
 
   const onToggleTheme = (event: React.MouseEvent) => {
     const isDark = theme === "dark";

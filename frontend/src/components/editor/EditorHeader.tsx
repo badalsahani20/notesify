@@ -311,6 +311,7 @@ const EditorHeader = ({
               onFocus={onAskAiHover}
               className={`ignite-button h-7 !px-3 text-[0.8rem] ${isAiOpen ? "nav-action-btn-active" : ""}`}
               aria-label="Toggle Iris AI Assistant"
+              title={`Iris AI (${typeof navigator !== "undefined" && /Mac|iPhone|iPad/i.test(navigator.platform) ? "⌘J" : "Ctrl+J"})`}
             >
               {loadingAction ? (
                 <Loader2 size={14} className="animate-spin" />
