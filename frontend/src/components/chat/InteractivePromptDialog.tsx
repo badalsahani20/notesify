@@ -11,7 +11,9 @@ import {
   Trophy,
   RotateCcw,
   Send,
-  BrainCircuit
+  BrainCircuit,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { InteractiveQuestion } from "@/components/ai/types";
@@ -36,6 +38,12 @@ export const InteractivePromptDialog = ({
 }: InteractivePromptDialogProps) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showCompletionScreen, setShowCompletionScreen] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
+
+  // Reset minimized state when question set changes
+  useEffect(() => {
+    setIsMinimized(false);
+  }, [questions]);
 
   // Explicit quiz mode vs general preference / topic / clarification choice
   const isQuiz = purpose === "quiz" || 
@@ -297,13 +305,78 @@ export const InteractivePromptDialog = ({
     : "Topic Choice";
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 14, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: 10, scale: 0.98 }}
-      transition={{ duration: 0.2, ease: "easeOut" }}
-      className="w-full bg-[#161618]/95 dark:bg-[#131316]/98 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl text-zinc-100 overflow-hidden mb-2 sm:mb-3 select-none"
-    >
+    <AnimatePresence mode="wait">
+      {isMinimized ? (
+        <motion.div
+          key="minimized-prompt-dock"
+          initial={{ opacity: 0, y: 8, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 8, scale: 0.98 }}
+          transition={{ duration: 0.18, ease: "easeOut" }}
+          className="w-full bg-[#161618]/95 dark:bg-[#131316]/98 backdrop-blur-2xl border border-violet-500/30 hover:border-violet-500/60 rounded-xl shadow-lg text-zinc-100 px-3.5 py-2 mb-2 sm:mb-2.5 flex items-center justify-between gap-3 cursor-pointer group transition-all select-none hover:shadow-violet-500/10"
+          onClick={() => setIsMinimized(false)}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              setIsMinimized(false);
+            }
+          }}
+          title="Click to resume answering"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-6 h-6 rounded-lg bg-violet-500/15 border border-violet-500/30 flex items-center justify-center text-violet-400 shrink-0 group-hover:scale-105 transition-transform">
+              {isQuiz ? <BrainCircuit size={13} /> : <Sparkles size={13} />}
+            </div>
+            <div className="flex items-center gap-2 min-w-0 text-xs">
+              <span className="font-semibold text-zinc-200 truncate">
+                {title || (isQuiz ? "Quiz in Progress" : "Question from Iris")}
+              </span>
+              <span className="text-[11px] text-zinc-400 shrink-0">
+                {showCompletionScreen ? "• Ready to submit" : `• Step ${currentIndex + 1} of ${total}`}
+              </span>
+              {answeredCount > 0 && !showCompletionScreen && (
+                <span className="text-[10px] font-medium text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 shrink-0 hidden sm:inline">
+                  {answeredCount}/{total} answered
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              onClick={() => setIsMinimized(false)}
+              className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-violet-600 hover:bg-violet-500 active:bg-violet-700 text-white flex items-center gap-1 shadow-sm shadow-violet-600/25 transition-all cursor-pointer"
+              title="Expand question panel"
+            >
+              <ChevronUp size={13} />
+              <span>{showCompletionScreen ? "Review Answers" : "Resume"}</span>
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDismiss();
+              }}
+              className="p-1 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
+              title="Dismiss question"
+              aria-label="Dismiss question"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        </motion.div>
+      ) : (
+        <motion.div
+          key="expanded-prompt-dialog"
+          initial={{ opacity: 0, y: 14, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 10, scale: 0.98 }}
+          transition={{ duration: 0.2, ease: "easeOut" }}
+          className="w-full bg-[#161618]/95 dark:bg-[#131316]/98 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl text-zinc-100 overflow-hidden mb-2 sm:mb-3 select-none"
+        >
       {/* ── 1. Top Slim Progress Bar (Only shown for quizzes or multi-question series) ── */}
       {(isQuiz || total > 1) && (
         <div className="w-full bg-white/[0.06] h-[3px] overflow-hidden">
@@ -338,14 +411,26 @@ export const InteractivePromptDialog = ({
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={onDismiss}
-                className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.08] transition-colors"
-                title="Close"
-              >
-                <X size={16} />
-              </button>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsMinimized(true)}
+                  className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
+                  title="Minimize to read chat first"
+                  aria-label="Minimize quiz dialog"
+                >
+                  <ChevronDown size={16} />
+                </button>
+                <button
+                  type="button"
+                  onClick={onDismiss}
+                  className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
+                  title="Close"
+                  aria-label="Close"
+                >
+                  <X size={16} />
+                </button>
+              </div>
             </div>
 
             {/* Answer Summary Card */}
@@ -470,6 +555,16 @@ export const InteractivePromptDialog = ({
                       </button>
                     </div>
                   )}
+
+                  <button
+                    type="button"
+                    onClick={() => setIsMinimized(true)}
+                    className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
+                    title="Minimize to read chat first"
+                    aria-label="Minimize question panel"
+                  >
+                    <ChevronDown size={15} />
+                  </button>
 
                   <button
                     type="button"
@@ -735,5 +830,7 @@ export const InteractivePromptDialog = ({
         )}
       </AnimatePresence>
     </motion.div>
+  )}
+</AnimatePresence>
   );
 };
