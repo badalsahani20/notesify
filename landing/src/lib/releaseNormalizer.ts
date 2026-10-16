@@ -132,6 +132,52 @@ export function normalizeGitHubRelease(raw: any): NormalizedRelease {
 // Built-in fallback snapshot if offline or GitHub API is unavailable
 export const FALLBACK_RELEASES: NormalizedRelease[] = [
   {
+    id: 393600000,
+    version: 'v1.3.1',
+    tagName: 'v1.3.1',
+    name: '🔍 Notesify v1.3.1 — Interactive Diff Viewer & Real-Time Conflict Sync',
+    publishedAt: '2026-10-16T00:00:00Z',
+    publishedDateFormatted: 'Oct 16, 2026',
+    htmlUrl: 'https://github.com/badalsahani20/notesify/releases/tag/v1.3.1',
+    body: `## 🔍 Notesify v1.3.1 — Interactive Diff Viewer & Real-Time Conflict Sync\n\nThis release delivers an intelligent, Git-style diffing experience for conflict resolution, paired with robust multi-tab editor synchronization and offline draft protection.\n\n### ✨ What's New\n\n- **Interactive Note Diff Viewer** — Inspect multi-device conflicts with hunk folding, 3-line context preservation, and a unified/split view toggle.\n- **Accurate Conflict Draft Snapshots** — Frozen drafts prevent concurrent autosaves from contaminating local changes during conflict resolution.\n- **Authoritative Online Reload Revalidation** — Reloading notes while connected automatically synchronizes the latest remote state without wiping local un-synced mutations.\n- **Live Cross-Tab Editor Sync** — Conflict resolutions broadcast live across browser sessions via BroadcastChannel, updating open TipTap editors in real time.`,
+    highlights: [
+      {
+        title: 'Interactive Diff Viewer',
+        tag: 'UI / UX',
+        description: 'Context-aware hunk folding hides large unchanged blocks and isolates changed sentences.',
+      },
+      {
+        title: 'Conflict Draft Snapshots',
+        tag: 'Data Reliability',
+        description: 'Guarantees the exact frozen draft captured at conflict time is rebased and preserved.',
+      },
+      {
+        title: 'Authoritative Revalidation',
+        tag: 'Sync Engine',
+        description: 'Fetches latest cloud version on page reload while protecting active offline edits.',
+      },
+      {
+        title: 'Cross-Tab Sync Channel',
+        tag: 'Architecture',
+        description: 'BroadcastChannel relays resolutions so open tabs update editor state instantly.',
+      },
+    ],
+    technicalNotes: [
+      'Implemented NoteDiffViewer using diffLines with 3-line context window and accordion chunk folding.',
+      'ConflictResolutionService now consumes conflict.localDraft snapshot in resolveKeepMine.',
+      'HybridNoteRepository.getNote revalidates against remoteAPI when online and no pending mutations exist.',
+      'TipTap editor listens to notesify:conflict-resolved and BroadcastChannel to sync content live.',
+    ],
+    assets: [
+      {
+        name: 'Notesify.Setup.1.3.1.exe',
+        size: 102500000,
+        sizeFormatted: '97.7 MB',
+        downloadUrl: 'https://github.com/badalsahani20/notesify/releases/download/v1.3.1/Notesify.Setup.1.3.1.exe',
+      },
+    ],
+  },
+  {
     id: 393500000,
     version: 'v1.3.0',
     tagName: 'v1.3.0',

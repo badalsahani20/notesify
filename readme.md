@@ -10,7 +10,19 @@ A production-grade, full-stack notes and intelligent thinking workspace built on
 
 ---
 
-## 🚀 What's New in v1.3.0
+## 🚀 What's New in v1.3.1
+
+- **Interactive Diff Viewer with Context Hunk Folding:** Replaces full-text conflict comparisons with a dedicated `<NoteDiffViewer />` featuring **Unified** and **Split** (side-by-side) modes. Unchanged sections collapse into expandable pills (`↕ Expand N unchanged lines`), highlighting only modified sentences.
+- **Accurate Conflict Draft Snapshotting:** Conflict resolution now freezes and restores the exact local draft captured at conflict time, preventing concurrent autosaves from contaminating the chosen resolution.
+- **Authoritative Online Reload Revalidation:** Reloading a note while online revalidates against the latest cloud version, seamlessly updating local Dexie cache without risking un-synced offline edits.
+- **Instant Cross-Tab Editor Synchronization:** When a conflict is resolved in any tab, the resolved note broadcasts live via `BroadcastChannel`, updating TipTap editor content in other open tabs without requiring a page reload.
+
+---
+
+## 📜 Previous Release Highlights
+
+<details>
+<summary><b>v1.3.0 Release Notes</b></summary>
 
 - **Fair-Use AI Quotas & Concurrency Limiting:** Daily token tracking with UTC midnight auto-reset across Free (100k), Pro (500k), and Enterprise (2M) tiers, paired with concurrency semaphores to protect API limits while keeping interactions fair.(Currently Free)
 - **Token-Budget History & Sliding Context Summarization:** Dynamic 8,000-token sliding window with provider-independent estimation. Messages overflowing the token budget are seamlessly consolidated in the background into an actionable, state-preserving summary without arbitrary turn truncation.
@@ -19,9 +31,7 @@ A production-grade, full-stack notes and intelligent thinking workspace built on
 - **Native LaTeX Mathematics (KaTeX):** Iris now formats mathematical formulas and equations in standard LaTeX notation (both inline `$x$` and block `$$...$$`), seamlessly rendered with KaTeX.
 - **Butter-Smooth Iris Panel & Layout Polish:** Guarded layout transitions in `AppLayout` and stabilized session sync eliminate Global Chat drawer stutter and resize jitter.
 
----
-
-## 📜 Previous Release Highlights
+</details>
 
 <details>
 <summary><strong>v1.2.3 — Agentic Learning Tasks & Composer Polish</strong></summary>
