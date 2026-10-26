@@ -325,6 +325,7 @@ const EditorHeader = ({
               >
                 <DropdownMenuItem
                   onSelect={() => setIsShareOpen(true)}
+                  onClick={() => setIsShareOpen(true)}
                   className="cursor-pointer text-[13px] text-[var(--text-main)] focus:bg-[var(--surface-ghost)] focus:text-[var(--text-strong)] gap-2.5"
                 >
                   <Share2 size={14} className={note.isShared ? "text-[var(--accent-strong)]" : "opacity-40"} />
@@ -335,6 +336,7 @@ const EditorHeader = ({
 
                 <DropdownMenuItem
                   onSelect={() => onTogglePin(note._id)}
+                  onClick={() => onTogglePin(note._id)}
                   className="cursor-pointer text-[13px] text-[var(--text-main)] focus:bg-[var(--surface-ghost)] focus:text-[var(--text-strong)] gap-2.5"
                 >
                   <Star
@@ -347,6 +349,7 @@ const EditorHeader = ({
 
                 <DropdownMenuItem
                   onSelect={() => onToggleArchive(note._id)}
+                  onClick={() => onToggleArchive(note._id)}
                   className="cursor-pointer text-[13px] text-[var(--text-main)] focus:bg-[var(--surface-ghost)] focus:text-[var(--text-strong)] gap-2.5"
                 >
                   <Archive size={14} className={note.isArchived ? "text-[var(--accent-strong)]" : "opacity-40"} />

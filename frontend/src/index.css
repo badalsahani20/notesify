@@ -7387,7 +7387,7 @@ html:not(.dark) .dock-btn-active {
 
 /* Desktop Electron Window Controls Overlay Spacing */
 .desktop-header,
-.desktop-editor-header {
+.desktop-editor-header.is-desktop-app {
   -webkit-app-region: drag;
 }
 .desktop-header button,
@@ -7402,10 +7402,33 @@ html:not(.dark) .dock-btn-active {
 .desktop-editor-header a,
 .desktop-editor-header [role="button"],
 .editor-meta-stack,
+.editor-meta-stack *,
+.editor-title-meta,
+.editor-title-meta *,
 .assistant-rail button,
 .assistant-header-action,
 .assistant-close-button {
   -webkit-app-region: no-drag;
+}
+
+/* Ensure all portalled floating UI, dropdowns, menus, modals, dialogs, popovers and tooltips are NEVER draggable in Electron */
+[data-radix-popper-content-wrapper],
+[data-radix-popper-content-wrapper] *,
+[data-radix-menu-content],
+[role="menu"],
+[role="menuitem"],
+[role="menuitemcheckbox"],
+[role="menuitemradio"],
+[role="dialog"],
+[role="alertdialog"],
+[role="listbox"],
+[role="option"],
+[role="tooltip"],
+[data-slot="dialog-content"],
+[data-slot="dialog-content"] *,
+[data-slot="dialog-overlay"],
+.dropdown-menu-content {
+  -webkit-app-region: no-drag !important;
 }
 
 /* Clear the native Windows minimize/maximize/close window controls in Electron */
