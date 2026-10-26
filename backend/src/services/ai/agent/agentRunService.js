@@ -121,6 +121,21 @@ class AgentRunService {
     );
   }
 
+  _formatError(error) {
+    if (!error) return null;
+    if (typeof error === "string") return error;
+    if (error instanceof Error) return error.message || error.toString();
+    if (typeof error === "object") {
+      if (error.message) return error.message;
+      try {
+        return JSON.stringify(error);
+      } catch {
+        return String(error);
+      }
+    }
+    return String(error);
+  }
+
   async markFailed({
     runId,
     userId,
@@ -130,7 +145,7 @@ class AgentRunService {
   }) {
     const update = {
       status: "failed",
-      error,
+      error: this._formatError(error),
       failedAt: new Date(),
     };
 
@@ -142,8 +157,30 @@ class AgentRunService {
         runId,
         user: userId,
         status: {
-          $in: ["queued", "running"],
+          $in: ["queued", "running", "waiting_for_user"],
         },
+      },
+      {
+        $set: update,
+      },
+      {
+        new: true,
+      },
+    );
+  }
+
+  async updateState({ runId, userId, agentState = null, checkpoint = null }) {
+    const update = {};
+    if (agentState !== null) update.agentState = agentState;
+    if (checkpoint !== null) update.checkpoint = checkpoint;
+
+    if (Object.keys(update).length === 0) return null;
+
+    return AgentRun.findOneAndUpdate(
+      {
+        runId,
+        user: userId,
+        status: "running",
       },
       {
         $set: update,
@@ -171,6 +208,24 @@ class AgentRunService {
       },
       {
         new: true,
+      },
+    );
+  }
+
+  async failStaleRuns({ timeoutMinutes = 30 } = {}) {
+    const cutoff = new Date(Date.now() - timeoutMinutes * 60 * 1000);
+
+    return AgentRun.updateMany(
+      {
+        status: { $in: ["queued", "running"] },
+        updatedAt: { $lt: cutoff },
+      },
+      {
+        $set: {
+          status: "failed",
+          error: `Execution timed out after ${timeoutMinutes} minutes of inactivity.`,
+          failedAt: new Date(),
+        },
       },
     );
   }

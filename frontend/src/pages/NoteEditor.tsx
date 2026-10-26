@@ -14,7 +14,6 @@ import StudyPanel from "@/components/study/StudyPanel";
 
 import EmptyEditorState from "@/components/editor/EmptyEditorState";
 import EditorHeader from "@/components/editor/EditorHeader";
-import { GenerateNotesDialog } from "@/components/editor/GenerateNotesDialog";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { useMediaQuery } from "@/hooks/ui/useMediaQuery";
 import { useAiChat } from "@/hooks/ai/useAiChat";
@@ -43,7 +42,6 @@ const NoteEditor = () => {
 
   const [editorInstance, setEditorInstance] = useState<Editor | null>(null);
   const createdNoteIdRef = useRef<string | null>(null);
-  const [isGenerateNotesOpen, setIsGenerateNotesOpen] = useState(false);
 
   const activeNoteId = (isNew && createdNoteIdRef.current) ? createdNoteIdRef.current : noteId;
   const cachedNote = activeNoteId ? queryClient.getQueryData<any>(["note", activeNoteId]) : undefined;
@@ -86,7 +84,7 @@ const NoteEditor = () => {
   const handleEditorScroll = useCallback(() => {
     if (!editorScrollRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = editorScrollRef.current;
-    
+
     setShowScrollTop(scrollTop > 300);
     setShowScrollBottom(scrollHeight > clientHeight && (scrollHeight - scrollTop - clientHeight > 300));
   }, []);
@@ -94,6 +92,12 @@ const NoteEditor = () => {
   useEffect(() => {
     handleEditorScroll();
   }, [note?.content, handleEditorScroll]);
+
+  // Reset scroll to top when switching between notes
+  useEffect(() => {
+    if (!noteId) return;
+    editorScrollRef.current?.scrollTo({ top: 0 });
+  }, [noteId]);
 
   useEffect(() => {
     // Panel preload removed
@@ -206,14 +210,25 @@ const NoteEditor = () => {
       }
 
       if (e.key === "Escape") {
-        if (document.querySelector("[data-radix-popper-content-wrapper], [data-slot='dialog-content']")) {
+        if (e.defaultPrevented) return;
+
+        // 1. Guard against open dialogs, popovers, inline review bar, inline slash menu, or result dialog
+        if (
+          document.querySelector(
+            "[data-radix-popper-content-wrapper], [data-slot='dialog-content'], [data-inline-review-bar], [data-inline-command-menu], [data-ai-result-dialog]"
+          )
+        ) {
           return;
         }
+
+        // 2. If Iris Panel is open, close only Iris panel
         if (usePanelStore.getState().isAiPanelOpen) {
           usePanelStore.getState().setAiPanelOpen(false);
           editorInstance?.commands.focus();
           return;
         }
+
+        // 3. Lowest priority: Close the active note
         handleCloseNote();
       }
     };
@@ -230,18 +245,18 @@ const NoteEditor = () => {
     return <EmptyEditorState />;
   }
 
-  const editorKey = (isNew || noteId === "new" || (createdNoteIdRef.current && (noteId === createdNoteIdRef.current || note?._id === createdNoteIdRef.current))) 
-    ? "stable-new-note-editor" 
+  const editorKey = (isNew || noteId === "new" || (createdNoteIdRef.current && (noteId === createdNoteIdRef.current || note?._id === createdNoteIdRef.current)))
+    ? "stable-new-note-editor"
     : `editor-${noteId}`;
 
   const editorPane = (
-    <AnimatePresence mode="wait" initial={false}>
+    <AnimatePresence initial={false}>
       <motion.section
         key={editorKey}
-        initial={isNew ? {} : { opacity: 0, x: 16 }}
+        initial={isNew ? {} : { opacity: 0, x: 8 }}
         animate={{ opacity: 1, x: 0 }}
-        exit={{ opacity: 0, x: -12 }}
-        transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+        exit={{ opacity: 0, x: -8 }}
+        transition={{ duration: 0.14, ease: [0.16, 1, 0.3, 1] }}
         className="relative flex min-w-0 flex-1 flex-col h-full min-h-0"
       >
         <EditorHeader
@@ -255,12 +270,12 @@ const NoteEditor = () => {
           onTogglePin={handleTogglePin}
           onToggleArchive={handleToggleArchive}
           onAskAi={() => setAiPanelOpen(!isAiPanelOpen)}
-          onAskAiHover={() => {}}
+          onAskAiHover={() => { }}
           isAiOpen={isAiPanelOpen}
           onStudy={() => {
             const nextOpen = !isStudyPanelOpen;
             setStudyPanelOpen(nextOpen);
-            
+
             const params = new URLSearchParams(location.search);
             if (nextOpen) {
               params.set("focus", "2");
@@ -275,7 +290,6 @@ const NoteEditor = () => {
           isSaving={isSavingNote}
           loadingAction={aiChat.loadingAction}
           onRunAction={aiChat.runAction}
-          onOpenGenerateNotes={() => setIsGenerateNotesOpen(true)}
           onClose={handleCloseNote}
         />
 
@@ -283,7 +297,7 @@ const NoteEditor = () => {
           <NoteConflictBanner noteId={note._id} />
         )}
 
-        <div 
+        <div
           ref={editorScrollRef}
           onScroll={handleEditorScroll}
           className="editor-workspace custom-scrollbar flex-1 overflow-y-auto px-8 pb-8 pt-4"
@@ -309,7 +323,6 @@ const NoteEditor = () => {
             editor={editorInstance}
             isMobile={isMobile}
             yOffset={isMobile ? keyboardOffset : 0}
-            aiChat={aiChat}
           />
         )}
       </motion.section>
@@ -389,12 +402,6 @@ const NoteEditor = () => {
         result={aiChat.result}
         onApply={aiChat.applySuggestionToSelection}
         onClose={() => aiChat.setResult(null)}
-      />
-
-      <GenerateNotesDialog
-        isOpen={isGenerateNotesOpen}
-        onClose={() => setIsGenerateNotesOpen(false)}
-        onGenerate={(promptContext) => void aiChat.runAction("noteCreation", promptContext)}
       />
 
       <KeyboardShortcutsModal />

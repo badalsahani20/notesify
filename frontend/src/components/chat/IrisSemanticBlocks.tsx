@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import { AlertTriangle, CheckCircle2, Lightbulb, PencilLine, ShieldAlert } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import ComparisonBlock from "@/components/chat/viz/ComparisonBlock";
@@ -7,11 +6,23 @@ import { sharedMarkdownComponents } from "@/utils/sharedMarkdownComponents";
 
 export type CalloutVariant = "insight" | "warning" | "tip" | "correction";
 
-const CALLOUT_META: Record<CalloutVariant, { label: string; icon: typeof Lightbulb }> = {
-  insight: { label: "Insight", icon: Lightbulb },
-  warning: { label: "Watch for", icon: AlertTriangle },
-  tip: { label: "Tip", icon: CheckCircle2 },
-  correction: { label: "Correction", icon: PencilLine },
+interface VariantMeta {
+  mark: string;
+  tag: string;
+  label: string;
+}
+
+const CALLOUT_META: Record<CalloutVariant, VariantMeta> = {
+  insight: { mark: "※", tag: "INSIGHT", label: "Core Observation" },
+  warning: { mark: "▲", tag: "CAUTION", label: "Critical Caveat" },
+  tip: { mark: "✦", tag: "METHOD", label: "Practical Technique" },
+  correction: { mark: "Δ", tag: "REVISION", label: "Direct Adjustment" },
+};
+
+const TAKEAWAY_META: VariantMeta = {
+  mark: "↳",
+  tag: "TAKEAWAY",
+  label: "Executive Synthesis",
 };
 
 export const childrenToText = (children: ReactNode): string => {
@@ -43,26 +54,37 @@ interface IrisCalloutProps {
 export const IrisCallout = ({ variant = "insight", title, children }: IrisCalloutProps) => {
   const safeVariant: CalloutVariant = variant in CALLOUT_META ? variant as CalloutVariant : "insight";
   const meta = CALLOUT_META[safeVariant];
-  const Icon = meta.icon;
 
   return (
     <aside className={`iris-callout iris-callout-${safeVariant}`} role="note">
-      <div className="iris-callout-heading">
-        <span className="iris-callout-icon" aria-hidden="true"><Icon size={15} /></span>
-        <span>{title || meta.label}</span>
+      <header className="iris-callout-header">
+        <div className="iris-callout-meta">
+          <span className="iris-callout-glyph" aria-hidden="true">{meta.mark}</span>
+          <span className="iris-callout-tag">{meta.tag}</span>
+          <span className="iris-callout-sep" aria-hidden="true">/</span>
+          <span className="iris-callout-label">{title || meta.label}</span>
+        </div>
+      </header>
+      <div className="iris-callout-content">
+        <SemanticBody>{children}</SemanticBody>
       </div>
-      <div className="iris-callout-body"><SemanticBody>{children}</SemanticBody></div>
     </aside>
   );
 };
 
 export const IrisKeyTakeaway = ({ title, children }: { title?: string; children?: ReactNode }) => (
   <aside className="iris-key-takeaway" role="note">
-    <div className="iris-key-takeaway-heading">
-      <ShieldAlert size={15} aria-hidden="true" />
-      <span>{title || "Key takeaway"}</span>
+    <header className="iris-callout-header">
+      <div className="iris-callout-meta">
+        <span className="iris-callout-glyph" aria-hidden="true">{TAKEAWAY_META.mark}</span>
+        <span className="iris-callout-tag">{TAKEAWAY_META.tag}</span>
+        <span className="iris-callout-sep" aria-hidden="true">/</span>
+        <span className="iris-callout-label">{title || TAKEAWAY_META.label}</span>
+      </div>
+    </header>
+    <div className="iris-callout-content">
+      <SemanticBody>{children}</SemanticBody>
     </div>
-    <div className="iris-key-takeaway-body"><SemanticBody>{children}</SemanticBody></div>
   </aside>
 );
 

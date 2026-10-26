@@ -68,6 +68,7 @@ export const startGlobalChatRequest = async ({
   chatAttachmentId,
   activeArtifact,
   messages,
+  modelTier,
   useReasoning,
   enableWeb,
   chatMode,
@@ -79,6 +80,7 @@ export const startGlobalChatRequest = async ({
   chatAttachmentId?: string;
   activeArtifact: ChatArtifact | null;
   messages: ChatMessage[];
+  modelTier?: "fast" | "thinking" | "pro";
   useReasoning: boolean;
   enableWeb: boolean;
   chatMode: "study" | "casual";
@@ -100,6 +102,7 @@ export const startGlobalChatRequest = async ({
       imageBase64: imageForApi || undefined,
       chatAttachmentId: chatAttachmentId || undefined,
       stream: true,
+      modelTier,
       useReasoning,
       enableWeb,
       chatMode,

@@ -177,7 +177,7 @@ export const createNote = catchAsync(async (req, res) => {
     await clearNoteCaches(req.user._id);
 
     // queueAutoTitleGeneration(note, req.user._id); // Disabled: frontend scheduleAutoTitleSync handles this
-    queueNoteEmbedding(note, req.user._id);
+    // queueNoteEmbedding(note, req.user._id); // Disabled: prevents background embedding flood on autosave
 
     res.status(201).json(note);
 });
@@ -235,7 +235,7 @@ export const updateNote = catchAsync(async (req, res) => {
     if (result.updatedNote?.shareSlug) await clearSharedNoteCache(result.updatedNote.shareSlug);
 
     // queueAutoTitleGeneration(result.updatedNote, req.user._id); // Disabled: frontend scheduleAutoTitleSync handles this
-    queueNoteEmbedding(result.updatedNote, req.user._id);
+    // queueNoteEmbedding(result.updatedNote, req.user._id); // Disabled: prevents background embedding flood on autosave
 
     res.status(200).json(result.updatedNote);
 });

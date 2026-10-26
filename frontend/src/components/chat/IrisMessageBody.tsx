@@ -3,7 +3,6 @@ import { Streamdown } from "streamdown";
 import { code } from "@streamdown/code";
 import { cjk } from "@streamdown/cjk";
 import { math } from "@streamdown/math";
-import { mermaid } from "@streamdown/mermaid";
 import "katex/dist/katex.min.css";
 import "streamdown/styles.css";
 import IrisMarkdownRenderer, { createIrisMarkdownComponents } from "./IrisMarkdownRenderer";
@@ -60,7 +59,23 @@ interface MarkdownProps {
 }
 
 const streamingMarkdownComponents = createIrisMarkdownComponents(true);
-const streamingPlugins = { code, mermaid, math, cjk };
+const streamingPlugins = { code, math, cjk };
+
+/**
+ * Catches incomplete mermaid code blocks that are midway through streaming.
+ * Replaces the open fence with a valid placeholder so the diagram engine is not
+ * executed on partial, broken code before the closing ``` has arrived.
+ */
+const catchUnclosedMermaid = (content: string): string => {
+  const openFenceMatch = content.match(/(```mermaid)(?![\s\S]*?```)[\s\S]*$/i);
+  if (!openFenceMatch || openFenceMatch.index === undefined) {
+    return content;
+  }
+  return (
+    content.slice(0, openFenceMatch.index) +
+    "```mermaid\n%%iris-streaming-diagram\n```"
+  );
+};
 
 // Streamdown keeps streaming Markdown formatted while reparsing only the
 // active/incomplete block. The completed message still switches to the
@@ -69,9 +84,12 @@ const StreamingMessageText = React.memo(({ text }: { text: string }) => {
   const citations = React.useContext(CitationsContext);
   const linkified = React.useMemo(() => linkifyCitations(text, citations), [text, citations]);
 
+  // Catch unclosed mermaid blocks while streaming so diagrams don't fail midway
+  const contentToStream = React.useMemo(() => catchUnclosedMermaid(linkified), [linkified]);
+
   // Once a complete semantic directive arrives, use the canonical renderer so
   // the callout/table is interactive and visually identical to the final state.
-  if (normalizeIrisDirectives(linkified) !== linkified) {
+  if (linkified.includes(":::") && normalizeIrisDirectives(linkified) !== linkified) {
     return <IrisMarkdownRenderer content={linkified} isStreaming />;
   }
 
@@ -83,7 +101,7 @@ const StreamingMessageText = React.memo(({ text }: { text: string }) => {
       components={streamingMarkdownComponents}
       className="break-words"
     >
-      {linkified}
+      {contentToStream}
     </Streamdown>
   );
 });

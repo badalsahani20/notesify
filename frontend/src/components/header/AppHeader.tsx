@@ -1,4 +1,4 @@
-import { Moon, Plus, Sun, Sparkles } from "lucide-react";
+import { Moon, Plus, Sun } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import UserMenu from "@/components/header/UserMenu";
 import HeaderSearch from "@/components/header/HeaderSearch";
@@ -6,7 +6,7 @@ import NotificationsMenu from "@/components/header/NotificationsMenu";
 import { useState } from "react";
 import { FolderFormDialog } from "@/components/folders/FolderFormDialog";
 import { useFolderStore } from "@/store/useFolderStore";
-import notesifyLogo from "@/assets/notesify-favicon.png";
+import notesifyLogo from "@/assets/notesify-favicon.svg";
 import { useDesktopUpdateStore } from "@/store/useDesktopUpdateStore";
 
 type AppHeaderProps = {
@@ -85,11 +85,12 @@ const AppHeader = ({ theme, onToggleTheme, onMenuOpen }: AppHeaderProps) => {
           <button
             type="button"
             onClick={openDownload}
-            className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-500/15 text-indigo-400 border border-indigo-500/30 hover:bg-indigo-500/25 transition shadow-sm animate-pulse"
+            className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-white/[0.06] text-white/90 border border-white/[0.08] hover:bg-white/[0.1] hover:text-white transition-colors shadow-sm group cursor-pointer"
             title={`Notesify ${latestRelease.version} is available. Click to download.`}
           >
-            <Sparkles size={12} />
-            <span>Update v{latestRelease.version}</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]" />
+            <span className="text-zinc-400 group-hover:text-zinc-200 transition-colors">Update</span>
+            <span className="font-mono text-[11px] text-white/80">v{latestRelease.version}</span>
           </button>
         ) : null}
         <button

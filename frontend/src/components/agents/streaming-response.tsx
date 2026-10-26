@@ -1,13 +1,10 @@
 "use client";
-// beui.dev/components/agents/streaming-response
 
 import {
   Check,
   ChevronDown,
   Copy,
   RotateCcw,
-  ThumbsDown,
-  ThumbsUp,
 } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
@@ -100,9 +97,9 @@ export function StreamingResponse({
   defaultSourcesOpen = false,
   onSourcesOpenChange,
   sourceIdPrefix,
-  feedback,
-  defaultFeedback = null,
-  onFeedbackChange,
+  feedback: _feedback,
+  defaultFeedback: _defaultFeedback,
+  onFeedbackChange: _onFeedbackChange,
   announce = true,
   showActions = true,
   className,
@@ -112,12 +109,9 @@ export function StreamingResponse({
   const reduce = useReducedMotion() ?? false;
   const baseId = useId();
   const [copied, setCopied] = useState(false);
-  const [internalFeedback, setInternalFeedback] =
-    useState<StreamingResponseFeedback>(defaultFeedback);
   const [internalSourcesOpen, setInternalSourcesOpen] =
     useState(defaultSourcesOpen);
   const copyTimer = useRef<number | undefined>(undefined);
-  const currentFeedback = feedback ?? internalFeedback;
   const currentSourcesOpen = sourcesOpen ?? internalSourcesOpen;
   const streaming = status === "streaming";
   const complete = status === "complete";
@@ -144,12 +138,6 @@ export function StreamingResponse({
     if (copyTimer.current) window.clearTimeout(copyTimer.current);
     copyTimer.current = window.setTimeout(() => setCopied(false), 1600);
   }, [copyText, onCopy]);
-
-  const setFeedback = (next: Exclude<StreamingResponseFeedback, null>) => {
-    const value = currentFeedback === next ? null : next;
-    if (feedback === undefined) setInternalFeedback(value);
-    onFeedbackChange?.(value);
-  };
 
   const setSourcesOpen = useCallback(
     (next: boolean) => {
@@ -195,27 +183,9 @@ export function StreamingResponse({
                 </ResponseAction>
               ) : null}
               {onRetry ? (
-                <ResponseAction label="Retry response" onClick={onRetry}>
+                <ResponseAction label="Regenerate response" onClick={onRetry}>
                   <RotateCcw className="size-3.5" />
                 </ResponseAction>
-              ) : null}
-              {complete ? (
-                <>
-                  <ResponseAction
-                    label="Helpful"
-                    active={currentFeedback === "up"}
-                    onClick={() => setFeedback("up")}
-                  >
-                    <ThumbsUp className="size-3.5" />
-                  </ResponseAction>
-                  <ResponseAction
-                    label="Not helpful"
-                    active={currentFeedback === "down"}
-                    onClick={() => setFeedback("down")}
-                  >
-                    <ThumbsDown className="size-3.5" />
-                  </ResponseAction>
-                </>
               ) : null}
               {hasSources ? (
                 <button

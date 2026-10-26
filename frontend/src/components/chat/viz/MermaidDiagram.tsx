@@ -18,26 +18,38 @@ const sanitizeMermaidCode = (rawCode: string) => {
     .replace(/```[a-z]*\n?/gi, "")
     .replace(/```/g, "")
     .trim()
-    .replace(/\|>\s*/g, "| ");
+  // Subgraphs with spaces without quotes: subgraph Input Layer -> subgraph "Input Layer"
+  cleaned = cleaned.replace(/^(\s*subgraph\s+)([^"[\n\r]+)$/gim, (_match, prefix: string, title: string) => {
+    const trimmed = title.trim();
+    if (trimmed.includes(" ") && !trimmed.startsWith('"') && !trimmed.startsWith("[")) {
+      return `${prefix}"${trimmed}"`;
+    }
+    return `${prefix}${trimmed}`;
+  });
 
   // Models sometimes emit flowchart edge labels as -->|Label|> B.
   // Mermaid expects -->|Label| B, so strip the extra chevron.
   cleaned = cleaned.replace(/\|([^|\n]+)\|>/g, "|$1| ");
 
-  // Edge labels sometimes contain square-bracket tokens like [IRIS_VIZ],
-  // which Mermaid can confuse with node syntax inside |label| edges.
+  // Edge labels: quote labels containing arithmetic, parentheses, or math symbols
   cleaned = cleaned.replace(/\|([^|\n]+)\|/g, (_match, label: string) => {
-    const normalizedLabel = label
+    let normalizedLabel = label
       .replace(/\[([^[\]\n]+)\]/g, "$1")
       .replace(/\s+/g, " ")
       .trim();
+    if (
+      !normalizedLabel.startsWith('"') &&
+      /[*()=+<>/\\^Σ₁₂₃₄₅₆₇₈₉₀-]/.test(normalizedLabel)
+    ) {
+      normalizedLabel = `"${normalizedLabel.replace(/"/g, "'")}"`;
+    }
     return `|${normalizedLabel}|`;
   });
 
   // Flowchart labels with parentheses inside square brackets can trip Mermaid.
   // Convert A[Client (Browser)] into A["Client (Browser)"].
   cleaned = cleaned.replace(
-    /\b([A-Za-z0-9_]+)\[([^\]\n]*[()]+[^\]\n]*)\]/g,
+    /\b([A-Za-z0-9_]+)\[([^"\]\n]*[()]+[^"\]\n]*)\]/g,
     (_match, nodeId: string, label: string) => {
       const normalizedLabel = label.replace(/"/g, "&quot;").trim();
       return `${nodeId}["${normalizedLabel}"]`;
@@ -140,10 +152,17 @@ const MermaidDiagram = ({ code }: MermaidDiagramProps) => {
       setError(false);
 
       try {
-        const cleanCode = sanitizeMermaidCode(code);
+        let cleanCode = sanitizeMermaidCode(code);
         setSanitizedCode(cleanCode);
 
-        await mermaid.parse(cleanCode);
+        try {
+          await mermaid.parse(cleanCode);
+        } catch {
+          // Resilient fallback: strip `style ...` statements if they tripped the parser
+          const strippedStyles = cleanCode.replace(/^\s*style\s+[^\n\r]+$/gim, "").trim();
+          await mermaid.parse(strippedStyles);
+          cleanCode = strippedStyles;
+        }
 
         // Generate a fresh ID each time — Mermaid caches by ID and will
         // skip re-renders if the same ID is reused across calls.

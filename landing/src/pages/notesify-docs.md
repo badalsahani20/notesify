@@ -7,14 +7,16 @@
 1. [Introduction](#introduction)
 2. [Getting Started](#getting-started)
 3. [The Editor](#the-editor)
-4. [Iris AI](#iris-ai)
-5. [Organisation](#organisation)
-6. [Search](#search)
-7. [Sharing Notes](#sharing-notes)
-8. [Security & Authentication](#security--authentication)
-9. [Multi-Device & Conflict Safety](#multi-device--conflict-safety)
-10. [Performance](#performance)
-11. [Self-Hosting](#self-hosting)
+4. [Iris AI & Agentic Tools](#iris-ai--agentic-tools)
+5. [Active Study Tools (Quizzes & Flashcards)](#active-study-tools-quizzes--flashcards)
+6. [Offline-First Architecture & Desktop App](#offline-first-architecture--desktop-app)
+7. [Organisation](#organisation)
+8. [Search](#search)
+9. [Sharing Notes](#sharing-notes)
+10. [Security & Authentication](#security--authentication)
+11. [Multi-Device & Conflict Safety](#multi-device--conflict-safety)
+12. [Performance](#performance)
+13. [Self-Hosting](#self-hosting)
 
 ---
 
@@ -80,22 +82,39 @@ When you start writing a new note, Iris generates a meaningful title from your c
 
 ---
 
-## Iris AI
+## Iris AI & Agentic Tools
 
-Iris is Notesify's AI assistant. It is contextually aware of your active note and only activates when you invoke it — it never interrupts your writing.
+Iris is Notesify's context-aware AI assistant. It understands your active note, can research across your entire workspace, and only activates when invoked — never interrupting your writing flow.
 
-Under the hood, Iris routes requests dynamically across three providers based on payload type:
+Under the hood, Iris routes requests dynamically across specialized models configured in the multi-provider orchestrator:
 
-| Provider | Model | Use Case |
-|---|---|---|
-| OpenRouter | DeepSeek V4 Flash | Primary "Brain" for text, complex reasoning, and logic |
-| OpenRouter | Qwen 3.5 Flash | Dedicated Vision model for image analysis and OCR |
-| OpenRouter | Ling 3.0 Flash VL / Qwen 3.7 Flash | Dedicated vision-language model, teaching model, and default chat |
-| OpenRouter | Ling 3.0 Flash / Ring 2.6 1T | Quick operations and complex analysis |
-| Groq | Llama 3.3 70B | High-speed fallback |
-| Google Gemini | 3.1 Flash Lite | High-speed summarization fallback and content extraction |
+| UI Tier / Mode | Model Identifier | Provider | Architecture Role & Use Case |
+|---|---|---|---|
+| **Thinking** | `deepseek/deepseek-v4-flash-0731` | OpenRouter | Primary reasoning engine for complex logic, multi-step deduction, and deep research |
+| **Pro** | `z-ai/glm-5.3-flash` | OpenRouter | Default Chat & Pro mode, vision analysis, teaching, and complex analysis |
+| **Fast** | `qwen/qwen3.7-flash` | OpenRouter | Fast mode, ultra-low latency queries, and structured note generation |
+| **Inline Polish** | `inclusionai/ling-3.0-flash` | OpenRouter | Inline grammar, rewrite, and text improvement actions |
+| **Auto-Titling** | `meta-llama/llama-3.1-8b-instruct` | OpenRouter | High-speed background title generation for new notes |
+| **Fallback** | `openai/gpt-oss-120b` & `20b` | Groq / OpenRouter | High-throughput strong and lightweight cascading fallbacks |
+| **Extraction** | `gemini-3.5-flash-lite` | Google Gemini | High-speed PDF text parsing, content extraction, and summarization |
 
-Cascading fallbacks ensure near-zero AI downtime. This routing is completely invisible to you — you always interact with a single, unified Iris persona.
+Cascading fallbacks ensure near-zero AI downtime. This multi-tiered routing is completely seamless — you always interact with a single, unified Iris persona.
+
+### Agentic Workspace Tools
+
+Unlike standard chat interfaces that only see the currently opened document, Iris in v1.3.2 functions as an agentic assistant with autonomous tool access:
+
+- **`search_notes(query)`**: When you ask a broad question ("Where did I write down the system architecture?"), Iris automatically queries your entire notes database to find candidate notes.
+- **`get_note_content(noteId)`**: Iris inspects the full text of relevant candidate notes before synthesizing a complete, citation-backed answer.
+- **`create_note(title, content, tags)`**: Iris can generate structured study guides, project roadmaps, or research summaries and save them directly as new notes in your library.
+
+### Inline Slash AI (`/`)
+
+Type `/` on any blank line inside the editor to open the inline command menu. Choose from pre-configured actions (draft note, generate outline, explain concept, summarize) or type a custom prompt. Iris streams ghost-text directly into your note canvas, which you can accept with Tab or reject with Escape.
+
+### Interactive Mermaid Architecture Diagrams
+
+Iris natively detects architectural flows, sequence diagrams, and class charts. Instead of outputting raw text, Iris renders high-resolution, zoomable Mermaid diagrams inline in your chat conversation, complete with dark-mode styling and node interaction.
 
 ### Bubble menu (inline actions)
 
@@ -129,19 +148,45 @@ The chat panel slides in alongside the editor. Iris has full context of your act
 
 **What you can do in chat:**
 
-- Ask questions about your note content
+- Ask questions about your note content or across your entire workspace
 - Request rewrites, summaries, or expansions of entire sections
 - Attach images for visual analysis or OCR
 - Attach PDF files — Notesify parses them on the backend and injects the content into Iris's context
 - Research topics in real time — Iris can browse documentation and URLs and return clean, usable answers
 
-**Streaming:** Responses appear token by token in real time. You can see Iris's reasoning process via a live Thinking indicator before the final answer arrives.
+**Streaming:** Responses appear token by token in real time at 60 FPS. You can see Iris's reasoning process via a live Thinking indicator before the final answer arrives.
 
 **Conversation memory:** Chat history is managed through an intelligent token-budget sliding window. Active history is maintained within an 8,000-token allowance; older messages that exceed this budget are automatically consolidated via a multi-provider background summarizer into a rolling technical context snapshot, preserving continuous context without hitting token limits or clipping verbose code.
 
 ### AI suggestion caching
 
 Improve, Summarize, and Grammar actions on identical text return cached results instantly. Repeated requests on the same content never make a redundant API call.
+
+---
+
+## Active Study Tools (Quizzes & Flashcards)
+
+Notesify bridges note-taking with active recall. Transform passive notes into interactive study sessions:
+
+### Spaced-Repetition Flashcards
+- Generate flashcard decks directly from your document notes with a single click.
+- Review decks with flip animations, rating your confidence to prioritize challenging concepts.
+- Seamlessly synchronize review progress across devices.
+
+### AI-Generated MCQ Quizzes
+- Automatically extract key concepts into multiple-choice quizzes with distractor options and instant explanations.
+- Test retention after writing or studying long technical documents.
+
+---
+
+## Offline-First Architecture & Desktop App
+
+Notesify's Windows desktop application (and modern web client) is engineered with local-first reliability:
+
+- **Zero-Latency Local Workspace**: Read, edit, and organize notes completely offline. Edits persist on your machine's disk without network lag.
+- **Ordered Mutation Queue**: Offline actions (create, edit, delete, reorder) are queued in local persistent storage.
+- **Dual Reconciler**: When your internet connection returns, Notesify's background synchronizer automatically drains the mutation queue and reconciles state with the cloud.
+- **Optimistic Concurrency Control (OCC)**: Version-based hashing prevents stale updates from silently overwriting newer server changes, providing visual diff resolution if a true conflict arises.
 
 ---
 

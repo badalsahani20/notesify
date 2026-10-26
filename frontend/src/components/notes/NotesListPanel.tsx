@@ -207,24 +207,18 @@ const NotesListPanel = () => {
     return () => clearInterval(interval);
   }, []);
 
-  const [renderLimit, setRenderLimit] = useState(() =>
-    Math.max(rememberedRenderLimit, Math.min(processedNotes.length, 50))
-  );
+ const [renderLimit, setRenderLimit] = useState(rememberedRenderLimit);
+const handleNotesScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+  const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+  if (scrollHeight - scrollTop - clientHeight < 200) {
+    setRenderLimit((prev) => {
+      const next = Math.min(prev + 25, processedNotes.length);
+      rememberedRenderLimit = next;
+      return next;
+    });
+  }
+}, [processedNotes.length]);
 
-  useEffect(() => {
-    if (renderLimit < processedNotes.length) {
-      const timer = setTimeout(() => {
-        setRenderLimit((prev) => {
-          const next = Math.min(prev + 20, processedNotes.length);
-          rememberedRenderLimit = next;
-          return next;
-        });
-      }, 60);
-      return () => clearTimeout(timer);
-    } else if (processedNotes.length > 0) {
-      rememberedRenderLimit = Math.max(rememberedRenderLimit, processedNotes.length);
-    }
-  }, [renderLimit, processedNotes.length]);
 
   const handleNoteClick = useCallback((id: string) => {
     stampAccess(id);
@@ -400,7 +394,7 @@ const NotesListPanel = () => {
           </DropdownMenu>
         </div>
 
-        <div className="custom-scrollbar mobile-notes-scroll flex-1 space-y-3 overflow-y-auto px-3 pb-4">
+        <div onScroll={handleNotesScroll} className="custom-scrollbar mobile-notes-scroll flex-1 space-y-3 overflow-y-auto px-3 pb-4">
           {isInitialNotesLoad ? (
             <NotesListSkeleton />
           ) : shouldShowNotesError ? (

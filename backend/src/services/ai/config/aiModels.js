@@ -2,15 +2,15 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export const PRIMARY_MODEL = "deepseek/deepseek-v4-flash-0731";
 export const TEACHING_MODELS = [
-  "qwen/qwen3.7-flash",
+  "z-ai/glm-5.3-flash",
   "deepseek/deepseek-v4-flash-0731",
 ];
-export const DEFAULT_CHAT_MODEL = "qwen/qwen3.7-flash";
-export const QUICK_MODEL = "inclusionai/ling-3.0-flash";
+export const DEFAULT_CHAT_MODEL = "z-ai/glm-5.3-flash";
+export const QUICK_MODEL = "qwen/qwen3.7-flash";
 export const TITLE_GENERATION_MODEL = "meta-llama/llama-3.1-8b-instruct";
 export const COMPLEX_ANALYSIS_MODEL = "z-ai/glm-5.3-flash";
-export const NOTES_GENERATION_MODEL = "openai/gpt-oss-120b";
-export const GRAMMAR_MODEL = "meta-llama/llama-3.1-8b-instruct"
+export const NOTES_GENERATION_MODEL = "qwen/qwen3.7-flash";
+export const GRAMMAR_MODEL = "inclusionai/ling-3.0-flash"
 export const FALLBACK_MODEL = "openai/gpt-oss-120b";
 export const FALLBACK_MODELS = [
   "openai/gpt-oss-120b",

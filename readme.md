@@ -10,16 +10,56 @@ A production-grade, full-stack notes and intelligent thinking workspace built on
 
 ---
 
-## 🚀 What's New in v1.3.1
+## 🚀 What's New in v1.3.2
+
+- **Inline Slash AI (`/`) & Smart Boundary Palette:** Type `/` anywhere in the note editor to trigger the interactive command palette with both AI assist and block tools:
+  - **AI Generation Commands:** `/draft` (*Draft with Iris AI*), `/continue` (*Continue Writing*), `/summarize` (*Summarize Note*), and `/explain` (*Explain Note*).
+  
+- **Inline Ghost Review Bar (`<InlineAiReviewBar />`):** Generated prose and code streams directly into the active editor position wrapped in subtle ghost styling. An anchored floating review bar gives instant one-click controls: **Accept** (`⌘/Ctrl + Enter`), **Discard** (`Esc`), or **Try Again** with zero modal disruption.
+- **Iris Agentic Note Search & Cross-Document Retrieval (`search_notes` & `get_note_content`):** Iris can now autonomously search and read notes across your entire workspace:
+  - **Contextual Panel Cross-Referencing:** While working inside an active note, ask Iris to reference, compare, or synthesize insights from any other note in your collection without leaving the editor or manually copying content.
+  - **Global Chat Workspace Intelligence:** From Global Chat, Iris searches through all your notes, retrieves full content by title or ID, and answers complex queries grounded directly in your personal knowledge base.
+  - **Bounded Native Tool Execution:** Uses strict schema-driven native tool calling with HTML stripping, contextual snippet ranking, and deterministic execution bounds to prevent infinite loops.
+- **60 FPS / 120 FPS Fluid AI Streaming Pipeline:** Re-engineered the chat streaming engine from network ingestion to DOM painting, eliminating micro-stutters and dropped frames:
+  - **Velocity-Calibrated Time-Delta ($dt$) Pacing:** Dynamic reveal buffer synchronized with `performance.now()` and monitor refresh rates (16.6ms @ 60Hz, 8.3ms @ 120Hz). Absorbs bursty SSE network chunks and interpolates characters continuously with zero artificial lag or surrogate pair slicing.
+  - **Isolated Transient Store (`useStreamingTextStore`):** Decoupled high-frequency active tokens from global Zustand message arrays. Historical chat messages stay at zero re-renders while only the active message bubble repaints at 60 FPS.
+  - **Native GPU Scroll Anchoring (`[overflow-anchor:auto]`):** Replaced JavaScript `ResizeObserver` layout recalculations with hardware-composited scroll pinning, eliminating forced reflows and layout thrashing.
+- **Mermaid Diagram Streaming Interception & Resilient Compilation:**
+  - **Incomplete Diagram Interception:** Catches unclosed ```` ```mermaid ```` code blocks during active streaming, replacing partial syntax with an animated, non-flickering Iris loading card (*"Generating diagram... Please wait while the visualization compiles"*).
+  - **Single-Pass Compilation on Block Close:** Diagram compilation is held back until the closing delimiter arrives, completely eliminating midway syntax errors and broken red error banners.
+  - **Automatic Grammar Sanitization & Fallback Engine:** Auto-quotes multi-word subgraph titles (`subgraph "Input Layer"`), mathematical edge labels (`|"z = Σ(w*x) + b"|`), and node labels with parentheses. Includes a resilient fallback parser that automatically cleans conflicting style tags if an initial compile fails.
+- **Floating AI Result Inspector (`<AiResultDialog />`):** Replaced static dialog modals with a non-blocking, draggable floating inspector card:
+  - **Phone-Optimized Compact Mode:** On mobile viewports (`max-width: 640px`), locks into a streamlined draggable card with touch-safe header controls, keeping the document fully legible underneath.
+  - **Spacious Desktop Reading Drawer:** Optional desktop expand toggle opens an 820px wide reading canvas for complex Markdown tables and multi-file code blocks.
+  - **Clean Action Hierarchy:** Primary **Insert at cursor** / **Replace selection** (with signature blue/emerald styling and `↵` shortcut), **Copy**, and top-right dismissal without redundant duplicate controls.
+- **Architectural Specimen Callouts:** Replaced generic 2018 side-striped alerts with an archival specimen aesthetic for markdown directives (`:::tip`, `:::warning`, `:::note`, `:::caution`, `:::details`). Features dedicated specimen metadata header bands, tactile technical glyphs (`※ INSIGHT`, `▲ CAUTION`, `✦ METHOD`, `Δ REVISION`, `↳ TAKEAWAY`), and AST paragraph-splitting that eliminates React DOM hydration errors.
+- **Three-Tier AI Model Orchestration (Fast, Thinking, Pro):**
+  - **Fast:** Instant answers for everyday writing and quick queries powered by Qwen 3.7 Flash (`qwen/qwen3.7-flash`).
+  - **Thinking:** In-depth reasoning and multi-step deduction powered by DeepSeek v4 Flash (`deepseek/deepseek-v4-flash-0731`).
+  - **Pro:** Maximum capability for multifaceted research, vision tasks, and complex analysis powered by GLM 5.3 Flash (`z-ai/glm-5.3-flash`).
+- **Ergonomic & Container-Aware Chat Composer (`<LiquidChatCompose />`):**
+  - **Dynamic Compact Mode:** Container-aware `ResizeObserver` detects constrained horizontal widths, locking the toolbar into a tidy single-row layout when note list, editor, and contextual AI panel are co-open.
+  - **Clean Action Hierarchy:** High-contrast white typography, solid white active toggles (Web Search), and intuitive thumb-reachable voice dictation button.
+- **OpenRouter Ephemeral Prompt Caching (`cache_control`):** Split static system instructions from dynamic document context across all AI assist actions (`summarize`, `explain`, `rewrite`, `continue`, `noteCreation`, `grammar`). Static prompt prefixes are tagged with `cache_control: { type: "ephemeral" }`, leveraging OpenRouter KV prefix caching (DeepSeek, Claude, Qwen) to slash response latency and token costs on repeated note operations.
+
+---
+
+## 📜 Previous Release Highlights
+
+<details>
+<summary><b>v1.3.1 Release Notes</b></summary>
 
 - **Interactive Diff Viewer with Context Hunk Folding:** Replaces full-text conflict comparisons with a dedicated `<NoteDiffViewer />` featuring **Unified** and **Split** (side-by-side) modes. Unchanged sections collapse into expandable pills (`↕ Expand N unchanged lines`), highlighting only modified sentences.
 - **Accurate Conflict Draft Snapshotting:** Conflict resolution now freezes and restores the exact local draft captured at conflict time, preventing concurrent autosaves from contaminating the chosen resolution.
 - **Authoritative Online Reload Revalidation:** Reloading a note while online revalidates against the latest cloud version, seamlessly updating local Dexie cache without risking un-synced offline edits.
 - **Instant Cross-Tab Editor Synchronization:** When a conflict is resolved in any tab, the resolved note broadcasts live via `BroadcastChannel`, updating TipTap editor content in other open tabs without requiring a page reload.
+- **Core Web Vitals & 96+ Lighthouse Performance:** 
+  - **Sub-Second LCP (0.74s) & 0ms TBT:** Replaced artificial interval-based list batching with on-demand scroll pagination, and implemented custom-equality memoization on `<NoteCard />` to prevent redundant DOM updates across 100+ active notes.
+  - **Eliminated Layout Thrashing (Forced Reflows):** Transitioned reactive panel layout constraints in `AppLayout` to navigation-bound dependency triggers, eliminating repeated synchronous geometry recalculations.
+  - **Non-Blocking Font & Vector Asset Pipeline:** Replaced external `@import` CSS waterfalls with asynchronous font preconnections and upgraded raster brand icons to an ultra-lightweight (<1.5 KB) SVG asset pipeline.
+  - **Code-Split Auth & Heavy Dialog Footprint:** Dynamic `lazy()` code splitting removes unauthenticated payloads and heavy modal dialogs from the initial entry bundle.
 
----
-
-## 📜 Previous Release Highlights
+</details>
 
 <details>
 <summary><b>v1.3.0 Release Notes</b></summary>
@@ -72,7 +112,6 @@ A production-grade, full-stack notes and intelligent thinking workspace built on
 <summary><strong>v1.1.0 — Offline-First Desktop & DPI-Aware Installer</strong></summary>
 
 - **Offline-First Dexie Workspace:** Packaged Electron app operates completely offline via bundled assets and Dexie.js (IndexedDB) with bidirectional queue synchronization on reconnection.
-- **Per-Monitor V2 DPI Awareness:** NSIS Windows installer configured with native Per-Monitor V2 DPI scaling, preventing blurry text at 125%, 150%, and 200% display scaling.
 - **Gemini 3.5 Flash Lite:** Ultra-low-latency title synthesis and long-term conversation summarization.
 </details>
 
@@ -143,9 +182,28 @@ Rather than relying on arbitrary message turn counts that fail when conversation
 - Desktop Google OAuth triggers through the operating system's native browser with a cryptographically random, memory-resident PKCE challenge.
 - Session tokens are encrypted on Windows and macOS using Electron's `safeStorage` (Windows DPAPI / macOS Keychain) via isolated IPC channels.
 
-### 9. Self-Healing Redis Cache & Content-Hashed AI Caching
+### 9. Multi-Tier Cache, OpenRouter Prompt Caching & Deduplication
 - **Upstash Redis:** Caches note listings and folder hierarchies for sub-10ms reads. Automatic cache invalidation on mutation with self-healing re-seeds on cache drift.
-- **SHA-256 AI Deduplication:** Text transformation requests (Improve, Summarize, Fix Grammar) are hashed with SHA-256; identical prompts return instantly from MongoDB cache.
+- **OpenRouter Ephemeral KV Prefix Caching (`cache_control`):** Static system instructions for note assist operations (`summarize`, `explain`, `rewrite`, `continue`, `noteCreation`, `grammar`) leverage structured ephemeral cache control. OpenRouter models supporting KV caching (DeepSeek, Claude, Qwen) cache the prompt prefix, cutting repeat assist latency and API costs.
+- **SHA-256 AI Deduplication:** Text transformation requests are hashed with SHA-256; identical prompts return instantly from the MongoDB `AiAssistCache` without invoking downstream LLMs.
+
+### 10. Core Web Vitals & Render Pipeline Optimization
+To ensure Notesify feels as fast as a native desktop application on the web, the frontend implements rigorous performance patterns validated via Google Lighthouse:
+
+| Metric | Before Optimization | After Optimization | Status |
+|---|---|---|---|
+| **Lighthouse Performance** | 80 / 100 | **96 / 100** | 🟢 Optimal |
+| **Largest Contentful Paint (LCP)** | 2.7 s | **0.74 s – 1.0 s** | 🟢 Fast (< 2.5s) |
+| **Total Blocking Time (TBT)** | 150 ms | **0 ms** | 🟢 Zero Jank |
+| **Cumulative Layout Shift (CLS)** | 0.00 | **0.004** | 🟢 Stable |
+| **Best Practices** | 77 / 100 | **96 – 100** | 🟢 Optimal |
+| **SEO** | 92 / 100 | **100 / 100** | 🟢 Perfect |
+
+- **Zero-Thrash Layout Constraints:** Panel resizing and focus guard effects in `AppLayout` avoid unbounded execution cycles, running only on navigation state transitions rather than every render pass.
+- **On-Demand Virtualized List Growth:** Notes panel initializes a viewport-filling slice of 25 notes and dynamically loads subsequent increments only as the user approaches the scroll boundary.
+- **Strict Custom-Equality Memoization:** `<NoteCard />` utilizes granular equality comparison across note versions, pins, and selection states, preventing unnecessary regex parsing (`stripHtml`) when other list items update.
+- **HTTP Cache Invalidation & Immutable Edge Rules:** Hashed Vite production assets (`/assets/*`) leverage `Cache-Control: public, max-age=31536000, immutable` for 0 ms repeat visits, while root static icons utilize stale-while-revalidate policies.
+
 
 ---
 
@@ -155,8 +213,10 @@ Rather than relying on arbitrary message turn counts that fail when conversation
 
 <img src="./assets/ai-assistant.png" alt="Iris AI Assistant" width="100%">
 
-- **Inline Ghostwriter:** Custom TipTap extension displaying faint ghost-text suggestions inline as you type.
-- **Floating Selection Toolbar:** Bubble menu on highlighted text for instant AI operations: *Improve*, *Summarize*, *Rewrite*, *Brainstorm*.
+- **Inline Slash AI (`/`):** Trigger interactive generation directly at cursor with auto-flipping boundary detection (`Draft with Iris AI`, `Continue Writing`, `Summarize Note`, `Explain Note`).
+- **Inline Ghostwriting & Floating Review Bar:** Stream prose or code directly into the editor wrapped in subtle ghost styling with an anchored floating review bar: **Accept** (`⌘+Enter`), **Discard** (`Esc`), or **Try Again`.
+- **Floating AI Result Inspector:** Draggable, phone-responsive card with KaTeX math rendering, Markdown tables, code blocks, and non-blocking view controls.
+- **Floating Selection Toolbar:** Dynamic bubble menu on highlighted text for instant AI operations: *Explain*, *Summarize*, *Rewrite*, and *Ask Iris*.
 - **Grammar Audit Panel:** Scans notes for syntactical and stylistic improvements with one-click corrections.
 - **Multimodal Visual Analysis:** Paste or attach images to discuss diagrams, math problems, or screenshots.
 - **Speech-to-Text Voice Dictation:** Compose prompts hands-free using Whisper Large V3 Turbo with automatic language detection.
@@ -177,7 +237,7 @@ Rather than relying on arbitrary message turn counts that fail when conversation
 
 - **Markdown Shortcuts:** Full Markdown syntax support for headers, blockquotes, bold, italic, and lists.
 - **Tables & Tasks:** Resizable interactive tables, checklist task items, and indented bullet hierarchies.
-- **Code Highlighting:** Lowlight auto-detected syntax highlighting across 40+ programming languages.
+- **Interactive Code Blocks & Mermaid Diagrams:** Syntax-highlighted code blocks with one-click copy and live interactive Mermaid architecture preview.
 - **Cloudinary Image Uploads:** Drag-and-drop or clipboard paste with automated image compression and Cloudinary CDN hosting.
 
 ### Organization & Search
@@ -260,20 +320,24 @@ fullstack-notes/
 ├── frontend/
 │   ├── src/
 │   │   ├── components/
-│   │   │   ├── ai/                 # Telemetry & AI message UI
+│   │   │   ├── ai/                 # Telemetry & draggable AiResultDialog
 │   │   │   ├── chat/               # Global AI chat, compose bar & modals
 │   │   │   │   ├── AiUsageContextIndicator.tsx # Quota & token counter
 │   │   │   │   ├── InteractivePromptDialog.tsx # ask_question tool modal
 │   │   │   │   ├── SelectionToolbar.tsx        # Floating editor toolbar
 │   │   │   │   └── VoiceDictationButton.tsx    # Whisper STT button
-│   │   │   ├── editor/             # TipTap wrappers, bubble bar & toolbar
+│   │   │   ├── editor/             # TipTap wrappers, slash menu & review bar
+│   │   │   │   ├── InlineCommandMenu.tsx       # Smart boundary-aware slash menu (/)
+│   │   │   │   ├── InlineAiReviewBar.tsx       # Accept/Discard floating review bar
+│   │   │   │   ├── EditorBubbleMenu.tsx        # Selection AI actions toolbar
+│   │   │   │   └── TableBubbleMenu.tsx         # Contextual table tools
 │   │   │   ├── notes/              # Note cards, conflict banner & modal
 │   │   │   ├── folders/            # Nested notebook folder hierarchy
 │   │   │   ├── search/             # Global command palette
 │   │   │   └── ui/                 # KaTeX, reasoning collapsible & shadcn
 │   │   ├── database/               # Dexie.js offline IndexedDB schemas
 │   │   ├── extensions/             # Custom TipTap extensions (Ghostwriter)
-│   │   ├── hooks/                  # TanStack Query & domain hooks
+│   │   ├── hooks/                  # TanStack Query, domain & useInlineSlashAi hooks
 │   │   ├── services/               # SyncService & ConflictResolutionService
 │   │   ├── store/                  # Zustand global state
 │   │   └── utils/                  # Share link resolver & string helpers

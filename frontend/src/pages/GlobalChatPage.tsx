@@ -40,12 +40,15 @@ const GlobalChatPage = () => {
     setAttachedImage,
     setAttachedDoc,
     uploadDoc,
+    modelTier,
+    setModelTier,
     useReasoning,
     setUseReasoning,
     useWebSearch,
     setUseWebSearch,
     activeArtifact,
     setActiveArtifact,
+    regenerateResponse,
   } = useGlobalChatStore();
 
   const [input, setInput] = useState("");
@@ -260,14 +263,7 @@ const GlobalChatPage = () => {
 
       {/* ── Main chat area ── */}
       <div className="gc-main relative flex-1 flex flex-col h-full min-h-0 min-w-0 overflow-hidden">
-        {/* Soft ambient background glow — 0 composite overhead, smooth native scrolling */}
-        <div
-          className="absolute inset-0 pointer-events-none z-0"
-          style={{
-            background:
-              "radial-gradient(circle at 18% 12%, rgba(124, 58, 237, 0.07), transparent 42%), radial-gradient(circle at 82% 40%, rgba(192, 38, 211, 0.05), transparent 36%), radial-gradient(circle at 45% 85%, rgba(99, 102, 241, 0.06), transparent 48%)",
-          }}
-        />
+
 
         {/* Floating Sidebar Toggle — visible only when sidebar is collapsed */}
         {!sidebarOpen && (
@@ -300,6 +296,7 @@ const GlobalChatPage = () => {
                 bottomRef={bottomRef}
                 fullWidthAssistant={!!activeArtifact}
                 hasActivePrompt={hasActivePrompt}
+                onRegenerate={() => void regenerateResponse()}
               />
 
               {/* Active interactive prompt (Claude-style docked dialog above input box) */}
@@ -317,6 +314,8 @@ const GlobalChatPage = () => {
                 onStop={stopGeneration}
                 textareaRef={textareaRef}
                 fileRef={fileRef}
+                modelTier={modelTier}
+                setModelTier={setModelTier}
                 useReasoning={useReasoning}
                 setUseReasoning={setUseReasoning}
                 useWebSearch={useWebSearch}
@@ -325,7 +324,6 @@ const GlobalChatPage = () => {
                   hasActivePrompt && activeQuestions ? (
                     <InteractivePromptDialog
                       questions={activeQuestions}
-                      title={activePromptToolCall?.title ?? pendingInteraction?.title ?? undefined}
                       purpose={activePromptToolCall?.purpose ?? pendingInteraction?.purpose ?? undefined}
                       onSubmit={handlePromptSubmit}
                       onDismiss={handlePromptDismiss}

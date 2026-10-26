@@ -36,7 +36,7 @@ export const AiUsageContextIndicator: React.FC<AiUsageContextIndicatorProps> = (
   const getStatusColor = (percentage: number) => {
     if (percentage >= 90) return { stroke: "#f43f5e", text: "text-rose-400", bg: "bg-rose-500/10", border: "border-rose-500/30" };
     if (percentage >= 70) return { stroke: "#f59e0b", text: "text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/30" };
-    return { stroke: "#10b981", text: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/30" };
+    return { stroke: "#10b981", text: "text-muted-foreground", bg: "bg-transparent", border: "border-black/[0.06] dark:border-white/[0.06]" };
   };
 
   const status = getStatusColor(pct);

@@ -93,31 +93,57 @@ export const consumeAiChatStream = async (
     });
   };
 
+  let fractionalReveal = 0;
+  let lastFrameTime = 0;
+
   const scheduleFrameUpdate = () => {
     if (pendingFrame !== null) return;
-    pendingFrame = scheduleFrame(() => {
+    if (!lastFrameTime) {
+      lastFrameTime = performance.now();
+    }
+    pendingFrame = scheduleFrame((timestamp) => {
       pendingFrame = null;
+
+      const now = typeof timestamp === "number" ? timestamp : performance.now();
+      const deltaMs = lastFrameTime ? Math.min(Math.max(now - lastFrameTime, 1), 50) : 16.67;
+      lastFrameTime = now;
 
       const pendingCharacters = fullText.length - revealedTextLength;
       if (pendingCharacters > 0) {
-        // Honor reduced-motion preferences by displaying received text without
-        // the additional reveal pacing. Otherwise, small bursts follow the
-        // model's cadence and large bursts catch up over a few frames.
-        const charactersToReveal = prefersReducedMotion
-          ? pendingCharacters
-          : Math.min(
-              pendingCharacters,
-              Math.min(64, Math.max(8, Math.ceil(pendingCharacters / 3))),
-            );
-        revealedTextLength += charactersToReveal;
+        if (prefersReducedMotion) {
+          revealedTextLength = fullText.length;
+        } else {
+          // Dynamic velocity interpolation curve:
+          // Smoothly ramps up speed when backlog increases so there is no artificial lag,
+          // while preserving a silky smooth typewriter flow during steady streaming.
+          let charsPerSecond = 48; // Baseline readable speed (~0.8 chars/frame @ 60fps)
+          if (pendingCharacters > 300) {
+            charsPerSecond = Math.max(600, pendingCharacters * 4);
+          } else if (pendingCharacters > 120) {
+            charsPerSecond = 320;
+          } else if (pendingCharacters > 40) {
+            charsPerSecond = 160;
+          } else if (pendingCharacters > 15) {
+            charsPerSecond = 90;
+          }
 
-        // Avoid exposing half of a UTF-16 surrogate pair (for example, emoji).
-        if (
-          revealedTextLength < fullText.length &&
-          fullText.charCodeAt(revealedTextLength - 1) >= 0xd800 &&
-          fullText.charCodeAt(revealedTextLength - 1) <= 0xdbff
-        ) {
-          revealedTextLength += 1;
+          const charsToAdd = (charsPerSecond * deltaMs) / 1000;
+          fractionalReveal += charsToAdd;
+          const wholeChars = Math.min(
+            pendingCharacters,
+            Math.max(1, Math.floor(fractionalReveal)),
+          );
+          fractionalReveal -= wholeChars;
+          revealedTextLength += wholeChars;
+
+          // Prevent slicing UTF-16 surrogate pairs (such as emojis)
+          if (
+            revealedTextLength < fullText.length &&
+            fullText.charCodeAt(revealedTextLength - 1) >= 0xd800 &&
+            fullText.charCodeAt(revealedTextLength - 1) <= 0xdbff
+          ) {
+            revealedTextLength += 1;
+          }
         }
       }
 
@@ -125,6 +151,9 @@ export const consumeAiChatStream = async (
 
       if (revealedTextLength < fullText.length) {
         scheduleFrameUpdate();
+      } else {
+        lastFrameTime = 0;
+        fractionalReveal = 0;
       }
     });
   };
@@ -134,6 +163,8 @@ export const consumeAiChatStream = async (
       cancelFrame(pendingFrame);
       pendingFrame = null;
     }
+    lastFrameTime = 0;
+    fractionalReveal = 0;
     revealedTextLength = fullText.length;
     emitUpdate();
   };

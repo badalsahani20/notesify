@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { WifiOff, Wifi, HardDrive, RefreshCw, ChevronRight, CheckCircle2, Laptop } from 'lucide-react';
+import { WifiOff, Wifi, HardDrive, RefreshCw, ChevronRight, CheckCircle2, Laptop, PenLine, Layers } from 'lucide-react';
 import { FadeIn } from '../ui/FadeIn';
 
 export const OfflineShowcase = () => {
@@ -47,10 +47,6 @@ export const OfflineShowcase = () => {
 
   return (
     <section id="offline" className="relative py-28 bg-[#050505] border-t border-white/5 overflow-hidden">
-      {/* Subtle Glows */}
-      <div className="absolute top-1/2 left-1/4 -translate-y-1/2 w-96 h-96 bg-indigo-500/10 blur-[120px] pointer-events-none rounded-full" />
-      <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-500/10 blur-[140px] pointer-events-none rounded-full" />
-
       <div className="container mx-auto px-6 max-w-6xl relative z-10">
         <FadeIn>
           <div className="text-center max-w-3xl mx-auto mb-16">
@@ -165,7 +161,7 @@ export const OfflineShowcase = () => {
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2.5">
-                        <span className="text-sm">✍️</span>
+                        <PenLine className="size-4 text-indigo-400" />
                         <span className="font-semibold text-white">1. You Edit Note</span>
                       </div>
                       <span className="text-[10px] text-stone-400">Zero Network Lag</span>
@@ -184,7 +180,7 @@ export const OfflineShowcase = () => {
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2.5">
-                        <span className="text-sm">💻</span>
+                        <HardDrive className="size-4 text-blue-400" />
                         <span className="font-semibold text-white">2. Local Workspace (Offline)</span>
                       </div>
                       <span className="text-[10px] text-blue-300">Disk Persistence</span>
@@ -203,7 +199,7 @@ export const OfflineShowcase = () => {
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2.5">
-                        <span className="text-sm">📋</span>
+                        <Layers className="size-4 text-amber-400" />
                         <span className="font-semibold text-white">3. Local Mutation Queue</span>
                       </div>
                       <span className="text-[10px] text-amber-300">Ordered & Persistent</span>
@@ -222,7 +218,7 @@ export const OfflineShowcase = () => {
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2.5">
-                        <span className="text-sm">☁️</span>
+                        <RefreshCw className="size-4 text-emerald-400" />
                         <span className="font-semibold text-white">4. Cloud Synchronization</span>
                       </div>
                       <span className="text-[10px] text-emerald-300">Conflict-Aware Merge</span>

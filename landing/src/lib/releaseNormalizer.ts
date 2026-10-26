@@ -132,6 +132,64 @@ export function normalizeGitHubRelease(raw: any): NormalizedRelease {
 // Built-in fallback snapshot if offline or GitHub API is unavailable
 export const FALLBACK_RELEASES: NormalizedRelease[] = [
   {
+    id: 393700000,
+    version: 'v1.3.2',
+    tagName: 'v1.3.2',
+    name: '⚡ Notesify v1.3.2 — Inline Slash AI, Agentic Note Retrieval & 60 FPS Streaming',
+    publishedAt: '2026-10-26T00:00:00Z',
+    publishedDateFormatted: 'Oct 26, 2026',
+    htmlUrl: 'https://github.com/badalsahani20/notesify/releases/tag/v1.3.2',
+    body: `## ⚡ Notesify v1.3.2 — Inline Slash AI, Agentic Note Retrieval & 60 FPS Streaming\\n\\nThis release brings an instant, keyboard-first AI experience into the editor with Inline Slash commands, autonomous cross-note discovery via Iris, a velvety 60/120 FPS streaming engine, and an archival specimen callout design system.\\n\\n### ✨ What's New\\n\\n- **Inline Slash AI (\`/\`) & Palette** — Draft notes, continue writing, summarize, explain, or insert structural blocks directly at your cursor without leaving your keyboard.\\n- **Iris Agentic Note Search & Deep Retrieval (\`search_notes\` & \`get_note_content\`)** — Iris autonomously discovers, searches, and reads other notes directly from within the contextual panel or Global Chat for true cross-document intelligence.\\n- **Inline Ghost Review Bar** — Real-time in-document AI generation previews with immediate Accept (\`⌘/Ctrl + Enter\`), Discard (\`Esc\`), or Try Again controls.\\n- **60 FPS / 120 FPS Fluid Streaming Pipeline** — Velocity-timed reveal buffer completely eliminates token stutter and dropped frames while keeping historical chat at zero re-renders.\\n- **Streaming Mermaid Diagram Interception** — Intercepts midway diagram generation with an animated placeholder, compiling cleanly only upon block completion with resilient auto-repair parsing.\\n- **Archival Specimen Callouts** — Replaced generic side-striped alerts with archival specimen metadata bands and technical glyphs (\`※\`, \`▲\`, \`✦\`, \`Δ\`, \`↳\`).\\n- **Three-Tier AI Router** — Seamless selection across Fast (Qwen 3.7 Flash), Thinking (DeepSeek v4 Flash), and Pro (GLM 5.3 Flash) models with OpenRouter ephemeral prompt caching.`,
+    highlights: [
+      {
+        title: 'Inline Slash AI (/)',
+        tag: 'Editor AI',
+        description: 'Instant command palette for AI drafting, summarizing, and structural block insertion right at the cursor.',
+      },
+      {
+        title: 'Agentic Note Retrieval',
+        tag: 'Workspace Intelligence',
+        description: 'Iris searches and reads other workspace notes directly from the editor panel or Global Chat.',
+      },
+      {
+        title: '60 FPS Streaming Engine',
+        tag: 'Performance',
+        description: 'Velocity-calibrated time-delta reveal buffer eliminates token jitter and dropped frames.',
+      },
+      {
+        title: 'Streaming Mermaid Interception',
+        tag: 'Visualization',
+        description: 'Eliminates mid-stream compilation errors with an interactive card and resilient syntax auto-repair.',
+      },
+      {
+        title: 'Specimen Callout System',
+        tag: 'Design & Taste',
+        description: 'Editorial workbench callouts with dedicated metadata header bands and technical specimen glyphs.',
+      },
+      {
+        title: 'Three-Tier Model Router',
+        tag: 'AI Orchestration',
+        description: 'Fast (Qwen 3.7 Flash), Thinking (DeepSeek v4 Flash), and Pro (GLM 5.3 Flash) tiers with OpenRouter prompt caching.',
+      },
+    ],
+    technicalNotes: [
+      'Engineered search_notes and get_note_content agent tools with bounded multi-round execution and HTML sanitization.',
+      'Engineered useStreamingTextStore to isolate active streaming tokens from global state arrays.',
+      'Replaced ResizeObserver layout thrashing with native hardware-composited GPU scroll anchoring.',
+      'Integrated velocity-calibrated time-delta pacing buffer to absorb bursty SSE chunks.',
+      'Implemented custom markdown directive parser with AST block sanitization preventing HTML hydration errors.',
+      'Container-aware compact mode in LiquidChatCompose automatically adjusts toolbar layout on narrow panels.',
+    ],
+    assets: [
+      {
+        name: 'Notesify.Setup.1.3.2.exe',
+        size: 104200000,
+        sizeFormatted: '99.4 MB',
+        downloadUrl: 'https://github.com/badalsahani20/notesify/releases/download/v1.3.2/Notesify.Setup.1.3.2.exe',
+      },
+    ],
+  },
+  {
     id: 393600000,
     version: 'v1.3.1',
     tagName: 'v1.3.1',

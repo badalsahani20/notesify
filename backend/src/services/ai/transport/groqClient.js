@@ -14,14 +14,28 @@ export const executeGroq = async (
 ) => {
   if (groqNativeClient?.chat?.completions) {
     try {
+      // Normalize any cache_control array content to standard strings for Groq
+      const normalizedMessages = messages.map((m) => {
+        if (Array.isArray(m.content)) {
+          const textOnly = m.content
+            .map((part) => (typeof part === "string" ? part : part?.text || ""))
+            .join("\n");
+          return { ...m, content: textOnly };
+        }
+        return m;
+      });
+
       // Only keep standard function tools (exclude provider-specific tools like openrouter:web_search)
+      // and strip any cache_control properties not supported by Groq's SDK
       const validTools = Array.isArray(tools)
-        ? tools.filter((t) => t.type === "function" || !t.type)
+        ? tools
+            .filter((t) => t.type === "function" || !t.type)
+            .map(({ cache_control, ...t }) => t)
         : null;
 
       const payload = {
         model: modelId,
-        messages,
+        messages: normalizedMessages,
         stream,
         ...(validTools && validTools.length > 0 ? { tools: validTools } : {}),
       };

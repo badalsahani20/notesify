@@ -10,17 +10,13 @@ export const Header = () => {
           <FadeIn delay={100}>
             <Link to="/" className="group flex items-center outline-none gap-3">
               <div className="relative size-8 sm:size-9 flex items-center justify-center">
-                {/* Subtle Glow Backdrop */}
-                <div className="absolute inset-0 bg-indigo-500/20 blur-xl rounded-full opacity-0 group-hover:opacity-100 group-hover:scale-150 transition-all duration-700"></div>
-                
-                {/* Native Logo with Spring Scale */}
                 <img 
                   src="/favicon.png" 
                   alt="Notesify" 
-                  className="relative z-10 size-full object-contain transition-transform duration-500 ease-out group-hover:scale-125" 
+                  className="relative z-10 size-full object-contain transition-transform duration-300 group-hover:scale-105" 
                 />
               </div>
-              <span className="text-xl sm:text-2xl font-bold tracking-tight text-white transition-colors duration-300 group-hover:text-indigo-400">Notesify</span>
+              <span className="text-xl sm:text-2xl font-bold tracking-tight text-white transition-colors duration-300 group-hover:text-stone-300">Notesify</span>
             </Link>
           </FadeIn>
           

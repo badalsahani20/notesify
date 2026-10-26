@@ -46,10 +46,13 @@ const ContextualAiPanel = ({
     streamingMessageId,
     streamedMessageText,
     isStreaming,
+    modelTier,
+    setModelTier,
     useReasoning,
     setUseReasoning,
     useWebSearch,
     setUseWebSearch,
+    regenerateResponse,
   } = aiChat;
 
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -104,40 +107,32 @@ const ContextualAiPanel = ({
       initial={mobileMode ? { x: "100%" } : { opacity: 0 }}
       animate={mobileMode ? { x: 0 } : { opacity: 1 }}
       transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-      className={`assistant-rail relative overflow-hidden ${mobileMode ? "assistant-rail-mobile" : "flex"}`}
+      className={`assistant-rail relative overflow-hidden bg-[var(--window-bg)] ${mobileMode ? "assistant-rail-mobile" : "flex"}`}
     >
       <SelectionToolbar onAskIris={handleAskIris} />
-      {/* Decorative blur layers are intentionally desktop-only. They are expensive
-          to composite while a full-screen mobile sheet is opening. */}
-      {!mobileMode && (
-        <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-          <div className="absolute top-[10%] left-[10%] w-[200px] h-[200px] rounded-full bg-violet-600/10 blur-[60px]" />
-          <div className="absolute top-[40%] right-[10%] w-[180px] h-[180px] rounded-full bg-fuchsia-600/10 blur-[60px]" />
-          <div className="absolute bottom-[10%] left-[30%] w-[220px] h-[220px] rounded-full bg-indigo-600/10 blur-[60px]" />
-        </div>
-      )}
+      {/* Clean background without color tint blur layers */}
       <div 
-        className={`relative z-10 flex items-center justify-between px-4 py-2 border-b border-white/5 shrink-0 ${mobileMode ? "bg-background/95" : "bg-background/80 backdrop-blur-md"}`}
+        className={`relative z-10 flex items-center justify-between px-4 py-2.5 border-b border-[var(--divider)] shrink-0 ${mobileMode ? "bg-[var(--window-bg)]" : "bg-[var(--window-bg)]/90 backdrop-blur-md"}`}
         style={needsDesktopTitlebarPadding ? { paddingRight: "clamp(140px, 9.5rem, 160px)" } : undefined}
       >
         <div className="flex items-center gap-2 overflow-hidden">
           {isNewNote ? (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] uppercase tracking-wider font-semibold bg-amber-500/10 text-amber-500 border border-amber-500/20 whitespace-nowrap">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] uppercase tracking-wider font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 whitespace-nowrap">
               <Pencil size={10} />
               General chat
             </span>
           ) : selectionRange ? (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] uppercase tracking-wider font-semibold bg-primary/10 text-primary border border-primary/20 whitespace-nowrap">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] uppercase tracking-wider font-semibold bg-[var(--active-surface)] text-[var(--accent-strong)] border border-[var(--accent-strong)]/30 whitespace-nowrap">
               <Type size={10} />
               Selection
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] uppercase tracking-wider font-semibold bg-white/5 text-white/60 border border-white/10 whitespace-nowrap">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] uppercase tracking-wider font-medium bg-[var(--surface-ghost)] text-[var(--muted-text)] border border-[var(--divider)] whitespace-nowrap">
               <FileText size={10} />
               Note
             </span>
           )}
-          {!isNewNote && noteTitle ? <span className="text-xs font-medium text-white/80 truncate">{noteTitle}</span> : null}
+          {!isNewNote && noteTitle ? <span className="text-xs font-medium text-[var(--text-strong)] truncate">{noteTitle}</span> : null}
         </div>
         <div className="flex items-center gap-1 shrink-0" style={{ WebkitAppRegion: "no-drag" } as any}>
           <button
@@ -190,6 +185,7 @@ const ContextualAiPanel = ({
         bottomRef={bottomRef}
         fullWidthAssistant
         hasActivePrompt={Boolean(activeQuestions && activeQuestions.length > 0)}
+        onRegenerate={() => void regenerateResponse()}
       />
 
       <div className="relative">
@@ -208,15 +204,17 @@ const ContextualAiPanel = ({
           fileRef={fileRef}
           placeholder="Ask about this note or anything..."
           onStop={stopRequest}
+          modelTier={modelTier}
+          setModelTier={setModelTier}
           useReasoning={useReasoning}
           setUseReasoning={setUseReasoning}
           useWebSearch={useWebSearch}
           setUseWebSearch={setUseWebSearch}
+          compact
           topSlot={
             activeQuestions && activeQuestions.length > 0 ? (
               <InteractivePromptDialog
                 questions={activeQuestions}
-                title={activePromptToolCall?.title}
                 purpose={activePromptToolCall?.purpose}
                 onSubmit={(formatted) => {
                   if (lastAssistantMsg) setDismissedPromptId(lastAssistantMsg.id);

@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { FileText, Shield, ChevronRight, RefreshCw, CheckCircle2, Download } from "lucide-react";
 import { SectionLabel } from "./SettingsShared";
-import notesifyLogo from "@/assets/notesify-favicon.png";
+import notesifyLogo from "@/assets/notesify-favicon.svg";
 import { CURRENT_VERSION } from "@/hooks/user/useWhatsNew";
 import { useDesktopUpdateStore } from "@/store/useDesktopUpdateStore";
 
@@ -25,10 +25,10 @@ export const AboutTab = () => {
         </div>
         <div className="flex flex-col items-center gap-2 mt-2">
           <div className="flex items-center gap-2">
-            <span className="px-2.5 py-1 rounded-full bg-indigo-500/10 text-indigo-400 text-xs font-semibold border border-indigo-500/20">
-              Version {displayVersion}
+            <span className="px-2.5 py-0.5 rounded-full bg-white/[0.06] text-white/80 text-xs font-mono font-medium border border-white/[0.08]">
+              v{displayVersion}
             </span>
-            <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-semibold border border-emerald-500/20">
+            <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-[11px] font-medium border border-emerald-500/20">
               Release
             </span>
           </div>
@@ -36,14 +36,14 @@ export const AboutTab = () => {
           <div className="mt-2">
             {status === "checking" ? (
               <div className="inline-flex items-center gap-2 text-xs text-zinc-400">
-                <RefreshCw size={13} className="animate-spin text-indigo-400" />
-                <span>Checking GitHub for updates...</span>
+                <RefreshCw size={13} className="animate-spin text-zinc-400" />
+                <span>Checking for updates...</span>
               </div>
             ) : status === "available" && latestRelease ? (
               <button
                 type="button"
                 onClick={openDownload}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] transition shadow-md"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-950 bg-white hover:bg-zinc-200 active:scale-[0.98] transition-colors shadow-sm cursor-pointer"
               >
                 <Download size={13} />
                 <span>Update to v{latestRelease.version}</span>

@@ -55,6 +55,9 @@ const NoteCard = ({
     if (queryClient.getQueryData(["note", noteId])) return;
 
     hoverTimeoutRef.current = setTimeout(() => {
+      // Pre-warm NoteEditor bundle on hover
+      void import("@/pages/NoteEditor");
+
       queryClient.prefetchQuery({
         queryKey: ["note", noteId],
         queryFn: () => fetchNote(noteId),
@@ -199,4 +202,19 @@ const NoteCard = ({
   );
 };
 
-export default React.memo(NoteCard);
+
+export default React.memo(NoteCard, (prev, next) => {
+  return (
+    prev.isActive === next.isActive &&
+    prev.isTrashView === next.isTrashView &&
+    prev.isArchiveView === next.isArchiveView &&
+    prev.stableNow === next.stableNow &&
+    prev.note._id === next.note._id &&
+    prev.note.version === next.note.version &&
+    prev.note.title === next.note.title &&
+    prev.note.content === next.note.content &&
+    prev.note.pinned === next.note.pinned &&
+    prev.note.updatedAt === next.note.updatedAt
+  );
+});
+

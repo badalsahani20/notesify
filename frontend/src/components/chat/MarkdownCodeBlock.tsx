@@ -146,6 +146,7 @@ const MarkdownCodeBlock = ({ code, language, isStreaming: _isStreaming }: Markdo
   const renderedCode = highlighted || escapeHtml(code);
 
   if (normalizedLanguage === "mermaid") {
+    const isDiagramStreaming = code.includes("%%iris-streaming-diagram");
     return (
       <IrisVisualBlock
         visualization={{
@@ -153,6 +154,7 @@ const MarkdownCodeBlock = ({ code, language, isStreaming: _isStreaming }: Markdo
           type: "mermaid",
           title: "Diagram",
           data: code,
+          isStreaming: isDiagramStreaming,
         }}
       />
     );

@@ -1,4 +1,4 @@
-import { executeOpenRouter, PRIMARY_MODEL } from "./ai.service.js";
+import { executeOpenRouter, PRIMARY_MODEL, QUICK_MODEL } from "./ai.service.js";
 
 // ─── MODEL PERSONALITIES ──────────────────────────────────────────────────────
 // Each model has a distinct quiz personality — a different style of questioning.
@@ -47,7 +47,7 @@ const executeStudyGeneration = async (systemPrompt, userPrompt) => {
   } catch (err) {
     console.warn("⚠️ Primary model failed, falling back to Qwen:", err.message);
     const raw = await executeOpenRouter(
-      "qwen/qwen3.5-flash-02-23",
+      QUICK_MODEL,
       messages,
       false,
       false,
@@ -83,7 +83,7 @@ const validateStudyContent = async (noteContent) => {
   try {
     // Use the faster model for this simple check
     const raw = await executeOpenRouter(
-      "qwen/qwen3.5-flash-02-23",
+      QUICK_MODEL,
       [
         { role: "system", content: systemPrompt },
         { role: "user", content: `Audit this text:\n\n${noteContent.slice(0, 1000)}` },

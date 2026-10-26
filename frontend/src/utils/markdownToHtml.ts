@@ -97,25 +97,38 @@ export const markdownToHtml = (md: string): string => {
     if (
       i + 1 < lines.length &&
       line.includes("|") &&
-      /^\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?$/.test(lines[i + 1].trim())
+      lines[i + 1].includes("|") &&
+      /^\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)+\|?$/.test(lines[i + 1].trim())
     ) {
-      const tableHtml: string[] = ["<table>"];
       const headers = parseTableRow(line);
-      tableHtml.push("<tr>");
-      headers.forEach((header) => tableHtml.push(`<th>${inlineFormat(header)}</th>`));
-      tableHtml.push("</tr>");
+      const rows: string[][] = [];
       i += 2;
 
       while (i < lines.length && lines[i].includes("|") && lines[i].trim() !== "") {
         const cells = parseTableRow(lines[i]);
-        tableHtml.push("<tr>");
-        cells.forEach((cell) => tableHtml.push(`<td>${inlineFormat(cell)}</td>`));
-        tableHtml.push("</tr>");
+        rows.push(cells);
         i++;
       }
 
-      tableHtml.push("</table>");
-      out.push(tableHtml.join(""));
+      // Guard: Discard completely empty tables (e.g. placeholder | | rows with no text)
+      const hasHeaderContent = headers.some((h) => h.trim().length > 0);
+      const hasRowContent = rows.some((row) => row.some((c) => c.trim().length > 0));
+
+      if (hasHeaderContent || hasRowContent) {
+        const tableHtml: string[] = ["<table>"];
+        tableHtml.push("<tr>");
+        headers.forEach((header) => tableHtml.push(`<th>${inlineFormat(header)}</th>`));
+        tableHtml.push("</tr>");
+
+        rows.forEach((row) => {
+          tableHtml.push("<tr>");
+          row.forEach((cell) => tableHtml.push(`<td>${inlineFormat(cell)}</td>`));
+          tableHtml.push("</tr>");
+        });
+
+        tableHtml.push("</table>");
+        out.push(tableHtml.join(""));
+      }
       continue;
     }
 

@@ -36,21 +36,16 @@ export const HeroScreenshot = ({ appScreenshot, onExpand }: HeroScreenshotProps)
         }}
         className="container mx-auto px-6 max-w-5xl origin-top"
       >
-        <div className="relative group rounded-2xl border border-white/10 bg-white/[0.02] p-2 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.8)] overflow-hidden transition-all duration-700 hover:border-indigo-500/30 hover:shadow-[0_0_60px_rgba(99,102,241,0.15)]">
-          {/* Glow overlay */}
-          <div className="absolute -inset-x-20 -top-40 h-[300px] bg-indigo-500/10 blur-[120px] pointer-events-none rounded-full transition-opacity duration-700 opacity-60 group-hover:opacity-100" />
-          
-          {/* Window Controls (Mac style) */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-[#0a0a0a]/50">
-            <div className="flex items-center gap-1.5">
-              <div className="size-2 rounded-full bg-rose-500/80" />
-              <div className="size-2 rounded-full bg-amber-500/80" />
-              <div className="size-2 rounded-full bg-emerald-500/80" />
+        <div className="relative group rounded-2xl border border-white/10 bg-white/[0.02] p-2 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.8)] overflow-hidden transition-all duration-700 hover:border-white/20">
+          {/* Typographic Frame Header */}
+          <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/5 bg-[#0a0a0a]/70">
+            <div className="flex items-center gap-2">
+              <span className="size-2 rounded-full bg-emerald-400" />
+              <span className="text-[11px] font-mono text-stone-300 font-medium">Iris Workspace Interface</span>
             </div>
             <div className="text-[10px] text-stone-500 font-mono tracking-wider">
-              app.notesify.in/notes/roadmaps
+              Offline-Ready · Synchronized
             </div>
-            <div className="w-12" /> {/* spacer */}
           </div>
 
           {/* Image itself */}
@@ -62,7 +57,7 @@ export const HeroScreenshot = ({ appScreenshot, onExpand }: HeroScreenshotProps)
               src={appScreenshot} 
               alt="Notesify Workspace and Iris AI Assistant Interface" 
               className="w-full h-full object-cover transition-transform duration-700 group-hover/img:scale-[1.008]"
-              loading="lazy"
+              loading="eager"
             />
             {/* Zoom overlay on Hover */}
             <div className="absolute inset-0 bg-black/20 opacity-0 group-hover/img:opacity-100 transition-opacity duration-300 flex items-center justify-center">

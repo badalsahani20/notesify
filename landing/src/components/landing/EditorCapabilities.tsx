@@ -127,7 +127,7 @@ export const EditorCapabilities = () => {
               </span>
               <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-white mb-6">
                 A precision tool for <br />
-                <span className="gradient-text">focused writing.</span>
+                <span className="text-indigo-300">focused writing.</span>
               </h2>
               <p className="text-stone-400 text-base sm:text-lg mb-10 max-w-xl">
                 Built for precision — fast, predictable, and designed to stay out of your way.
@@ -152,24 +152,17 @@ export const EditorCapabilities = () => {
           <div className="w-full lg:w-1/2 relative">
             <FadeIn delay={200} className="relative">
               {/* Premium Screenshot Frame */}
-              <div className="relative rounded-2xl border border-white/10 bg-white/5 p-1 shadow-2xl shadow-indigo-500/10 backdrop-blur-3xl group transition-all duration-500 ease-out hover:-translate-y-2 will-change-transform">
-                {/* Optimized Glow: Static blur, animate opacity */}
-                <div className="absolute -inset-2 bg-gradient-to-br from-indigo-500/20 to-purple-500/20 rounded-3xl blur-2xl opacity-40 group-hover:opacity-100 transition-opacity duration-500"></div>
-                
+              <div className="relative rounded-2xl border border-white/10 bg-white/5 p-1 shadow-2xl shadow-black/80 backdrop-blur-3xl group transition-all duration-500 ease-out hover:-translate-y-1">
                 <div className="relative rounded-xl overflow-hidden aspect-[16/10] bg-[#0a0a0a] border border-white/5">
                   <img 
                     src={editorPreview} 
                     alt="Notesify Editor Preview" 
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.01] will-change-transform"
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.01]"
                   />
                   
                   {/* Static reflection */}
-                  <div className="absolute inset-0 bg-gradient-to-tr from-white/5 via-transparent to-transparent opacity-30"></div>
+                  <div className="absolute inset-0 bg-gradient-to-tr from-white/5 via-transparent to-transparent opacity-20 pointer-events-none"></div>
                 </div>
-                
-                {/* Decorative floating bits - Static animations to save CPU */}
-                <div className="absolute -top-6 -right-6 h-24 w-24 bg-indigo-500/10 blur-3xl rounded-full"></div>
-                <div className="absolute -bottom-10 -left-10 h-32 w-32 bg-purple-500/10 blur-3xl rounded-full"></div>
               </div>
             </FadeIn>
           </div>

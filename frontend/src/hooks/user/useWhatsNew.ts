@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-export const CURRENT_VERSION = "1.3.1";
+export const CURRENT_VERSION = "1.3.2";
 const LS_KEY = "notesify_last_seen_version";
 
 export const useWhatsNew = () => {

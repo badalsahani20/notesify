@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import mongoose from "mongoose";
 import User from "../models/user.model.js";
 import Notes from "../models/notes.model.js";
@@ -7,7 +8,6 @@ import { generateConversationTitle } from "../services/title.service.js";
 import {
   checkGrammar,
   runAiAssist,
-  getDynamicPrompts,
   irisAgent,
   irisStreamHandler,
   resolveChatContext,
@@ -27,6 +27,7 @@ import {
   createChatAttachmentBundle,
   getChatAttachmentBundleForUser,
 } from "../services/chatAttachment.service.js";
+import { SseStreamParser } from "../utils/sseParser.js";
 
 
 export const checkGrammarController = catchAsync(async (req, res) => {
@@ -72,9 +73,9 @@ export const aiAssistController = catchAsync(async (req, res) => {
   const hasSelection = Boolean(selectedText && selectedText.trim());
   const sourceType = hasSelection ? "selection" : "note";
   const sourceText =
-    (selectedText && selectedText.trim()) ||
     (noteText && noteText.trim()) ||
-    (note ? stripHtml(note.content) : "");
+    (selectedText && selectedText.trim()) ||
+    (note ? note.content : "");
 
   if (!sourceText || !sourceText.trim()) {
     return res
@@ -84,14 +85,17 @@ export const aiAssistController = catchAsync(async (req, res) => {
 
   const inputHash = hashText(sourceText);
 
-  // 2. Check Cache First
-  const cached = await AiAssistCache.findOne({
-    user: req.user._id,
-    note: note?._id || null,
-    action,
-    sourceType,
-    inputHash,
-  }).lean();
+  // 2. Check Cache First (skip non-cacheable actions like "continue")
+  const isCacheableAction = action !== "continue";
+  const cached = isCacheableAction
+    ? await AiAssistCache.findOne({
+        user: req.user._id,
+        note: note?._id || null,
+        action,
+        sourceType,
+        inputHash,
+      }).lean()
+    : null;
 
   if (cached?.response) {
     return res.status(200).json({
@@ -168,31 +172,33 @@ export const aiAssistController = catchAsync(async (req, res) => {
         throw new Error("AI model returned an empty response");
       }
 
-      // Save the streamed result to cache after completion
-      await AiAssistCache.findOneAndUpdate(
-        {
-          user: req.user._id,
-          note: note?._id || null,
-          action,
-          sourceType,
-          inputHash,
-        },
-        {
-          user: req.user._id,
-          note: note?._id || null,
-          action,
-          sourceType,
-          inputHash,
-          noteUpdatedAt: note?.updatedAt || new Date(),
-          response: {
+      // Save the streamed result to cache after completion (skip non-cacheable actions)
+      if (isCacheableAction) {
+        await AiAssistCache.findOneAndUpdate(
+          {
+            user: req.user._id,
+            note: note?._id || null,
             action,
-            suggestion: finalSuggestion,
-            original: sourceText,
-            errors: [],
+            sourceType,
+            inputHash,
           },
-        },
-        { upsert: true, new: true, setDefaultsOnInsert: true },
-      );
+          {
+            user: req.user._id,
+            note: note?._id || null,
+            action,
+            sourceType,
+            inputHash,
+            noteUpdatedAt: note?.updatedAt || new Date(),
+            response: {
+              action,
+              suggestion: finalSuggestion,
+              original: sourceText,
+              errors: [],
+            },
+          },
+          { upsert: true, new: true, setDefaultsOnInsert: true },
+        );
+      }
 
       // Record token usage on successful completion
       const promptTokens = Math.ceil((sourceText?.length || 0) / 3.8);
@@ -221,30 +227,32 @@ export const aiAssistController = catchAsync(async (req, res) => {
       await note.save();
     }
 
-    await AiAssistCache.findOneAndUpdate(
-      {
-        user: req.user._id,
-        note: note?._id || null,
-        action,
-        sourceType,
-        inputHash,
-      },
-      {
-        user: req.user._id,
-        note: note?._id || null,
-        action,
-        sourceType,
-        inputHash,
-        noteUpdatedAt: note?.updatedAt || new Date(),
-        response: {
-          action: result.action,
-          suggestion: result.suggestion,
-          errors: result.errors || [],
-          original: result.original || "",
+    if (isCacheableAction) {
+      await AiAssistCache.findOneAndUpdate(
+        {
+          user: req.user._id,
+          note: note?._id || null,
+          action,
+          sourceType,
+          inputHash,
         },
-      },
-      { upsert: true, new: true, setDefaultsOnInsert: true },
-    );
+        {
+          user: req.user._id,
+          note: note?._id || null,
+          action,
+          sourceType,
+          inputHash,
+          noteUpdatedAt: note?.updatedAt || new Date(),
+          response: {
+            action: result.action,
+            suggestion: result.suggestion,
+            errors: result.errors || [],
+            original: result.original || "",
+          },
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true },
+      );
+    }
 
     // Record token usage on successful static generation
     const promptTokens = Math.ceil((sourceText?.length || 0) / 3.8);
@@ -294,11 +302,29 @@ const resolveSession = async (req) => {
       });
     }
     if (session) {
-      history = session.messages.map((m) => ({
-        role: m.role,
-        content: m.content,
-        toolCalls: m.toolCalls,
-      }));
+      let needsSave = false;
+      let currentMaxSeq = 0;
+      history = session.messages.map((m) => {
+        if (!m.id) {
+          m.id = crypto.randomUUID();
+          needsSave = true;
+        }
+        if (typeof m.seq !== "number" || m.seq <= currentMaxSeq) {
+          m.seq = currentMaxSeq + 1;
+          needsSave = true;
+        }
+        currentMaxSeq = m.seq;
+        return {
+          id: m.id,
+          seq: m.seq,
+          role: m.role,
+          content: m.content,
+          toolCalls: m.toolCalls,
+        };
+      });
+      if (needsSave) {
+        session.save().catch((err) => console.warn("Failed to persist legacy message IDs/seq:", err.message));
+      }
       summary = session.summary || "";
       activeAttachmentBundle = session.activeAttachmentBundle || null;
     }
@@ -416,16 +442,29 @@ const persistToDb = async (
     activeSession || (await GlobalChatSession.findById(activeSessionId));
   if (!sessionToUpdate) return;
 
-  if (!finalReply?.trim() && toolCalls.length === 0) {
+  const safeAssistantContent =
+    finalReply?.trim() ||
+    (toolCalls.some((t) => t.tool === "ask_question")
+      ? "I asked a clarifying question to help proceed."
+      : toolCalls.length > 0
+        ? "Action completed."
+        : "");
+
+  if (!safeAssistantContent && toolCalls.length === 0) {
     console.warn(
       "Skipping chat persistence because assistant reply and tool calls were both empty.",
     );
     return;
   }
 
+  const lastSeq =
+    sessionToUpdate.messages.length > 0
+      ? sessionToUpdate.messages[sessionToUpdate.messages.length - 1].seq || sessionToUpdate.messages.length
+      : 0;
+
   sessionToUpdate.messages.push(
-    { role: "user", content: safeUserContent },
-    { role: "assistant", content: finalReply || "", toolCalls },
+    { id: crypto.randomUUID(), seq: lastSeq + 1, role: "user", content: safeUserContent },
+    { id: crypto.randomUUID(), seq: lastSeq + 2, role: "assistant", content: safeAssistantContent, toolCalls },
   );
   if (summary) sessionToUpdate.summary = summary;
   if (attachmentBundleId) sessionToUpdate.activeAttachmentBundle = attachmentBundleId;
@@ -474,6 +513,7 @@ export const chatWithAiController = catchAsync(async (req, res) => {
     pdfContext,
     chatAttachmentId,
     stream,
+    modelTier,
     useReasoning,
     enableWeb,
     chatMode,
@@ -507,6 +547,24 @@ export const chatWithAiController = catchAsync(async (req, res) => {
     activeSessionId,
     activeSession,
   } = sessionData;
+
+  // If the user sends a new message while an interaction was pending,
+  // treat the previous interaction as skipped/abandoned and clear it.
+  if (activeSession && activeSession.pendingInteraction) {
+    const abandonedRunId = activeSession.pendingInteraction.runId;
+    if (abandonedRunId) {
+      void agentRunService.cancelRun({
+        runId: abandonedRunId,
+        userId: req.user._id,
+      }).catch((cancelErr) => {
+        console.warn("⚠️ [IrisRun] Failed to cancel abandoned run:", cancelErr.message);
+      });
+    }
+    activeSession.pendingInteraction = null;
+    void GlobalChatSession.findByIdAndUpdate(activeSession._id, {
+      $set: { pendingInteraction: null },
+    }).catch(() => {});
+  }
 
   const activeAttachmentBundleId =
     chatAttachmentId || sessionData.activeAttachmentBundle || null;
@@ -658,6 +716,7 @@ export const chatWithAiController = catchAsync(async (req, res) => {
       pdfContext: modelPdfContext,
       imageBase64,
       stream: isStreaming,
+      modelTier,
       useReasoning: effectiveReasoning,
       enableWeb: shouldSearchWeb,
       chatMode: currentMode,
@@ -706,7 +765,6 @@ export const chatWithAiController = catchAsync(async (req, res) => {
         toolName: "ask_question",
         toolArguments: {
           purpose: interaction.purpose,
-          title: interaction.title,
           questions: interaction.questions,
         },
         assistantReply: agentResult.finalReply,
@@ -830,7 +888,7 @@ export const chatWithAiController = catchAsync(async (req, res) => {
       ],
       sessionId: activeSessionId,
       pdfContext: pdfContextToEmit,
-      chatMode: activeSession?.chatMode || chatMode || "study",
+      chatMode: activeSession?.chatMode || chatMode || "casual",
     },
   });
 });
@@ -954,11 +1012,50 @@ export const getAllSessionsController = catchAsync(async (req, res) => {
 
 // GET /api/public/prompts — dynamic quick prompts for the chat empty state
 export const getDynamicPromptsController = catchAsync(async (req, res) => {
-  const prompts = await getDynamicPrompts();
+  const studentPrompts = [
+    "Explain any concept in simple terms",
+    "Give me a quick crash course on any subject",
+    "Simplify something that feels confusing",
+    "Teach me a topic from scratch",
+    "Summarize a complex topic quickly",
+    "Generate ideas for a project or topic",
+    "Turn rough thoughts into structured notes",
+    "Help me improve my writing clarity",
+    "Give me a structured learning path",
+    "Help me plan something from start to finish",
+    "Translate complex ideas into plain English",
+  ];
+
+  const devPrompts = [
+    "Explain how a system works",
+    "Break down a complex concept",
+    "Teach me a new backend concept",
+    "How do modern web apps scale?",
+    "Explain how APIs work in real-world apps",
+    "What happens behind the scenes in a request?",
+    "How does authentication actually work?",
+    "Explain caching in simple terms",
+    "How do databases handle large data?",
+    "Compare different backend architectures",
+    "How does Docker fit into development?",
+    "Explain how frontend and backend connect",
+    "What are common system design patterns?",
+    "How do real-time systems work?",
+    "Explain trade-offs in system design",
+    "Help me choose the right tech stack",
+    "Optimize frontend performance",
+    "Structure a scalable project",
+    "Guide me step-by-step to build a feature",
+    "Design a backend or system architecture",
+    "Help me think through a problem logically",
+  ];
 
   res.status(200).json({
     success: true,
-    data: prompts,
+    data: {
+      studentPrompts,
+      devPrompts,
+    },
   });
 });
 

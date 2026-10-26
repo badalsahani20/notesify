@@ -55,7 +55,6 @@ const SignupForm = () => {
       authUrl.searchParams.set("clientId", "notesify-desktop");
       authUrl.searchParams.set("clientType", "desktop");
       
-      // Open in system browser, via IPC
       (window as any).electronAPI.auth.openExternal(authUrl.toString());
     } else {
       window.location.href = `${API_BASE_URL}/users/google`;
@@ -69,7 +68,7 @@ const SignupForm = () => {
           <div className="relative">
             <div className="absolute inset-0 rounded-2xl bg-white/10 blur-[30px] scale-110" />
             <img
-              src="/notesify-favicon.png"
+              src="/notesify-favicon.svg"
               alt="Notesify"
               width={56}
               height={56}

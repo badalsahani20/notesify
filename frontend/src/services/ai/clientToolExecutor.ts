@@ -35,27 +35,217 @@ export function ensureBlockHtml(content: string): string {
 }
 
 /**
+ * Decodes standard HTML entities into plain characters for matching
+ */
+function decodeHtmlEntities(str: string): string {
+  return str
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">");
+}
+
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Builds a regex that matches target text tokens across HTML tags, entities, and whitespace.
+ */
+function buildHtmlFlexibleRegex(target: string, maxWords?: number): RegExp | null {
+  const clean = target
+    .replace(/^[#*`_~\s>0-9.)-]+/u, "")
+    .replace(/[#*`_~\s]+$/u, "")
+    .trim();
+
+  let words = clean.split(/\s+/).filter((w) => w.length > 0);
+  if (words.length === 0) return null;
+
+  if (maxWords && words.length > maxWords) {
+    words = words.slice(0, maxWords);
+  }
+
+  const escapedWords = words.map((w) => escapeRegex(decodeHtmlEntities(w)));
+  const separator = "(?:\\s|<[^>]+>|&(?:nbsp|amp|quot|#39|lt|gt);)+";
+  const pattern = escapedWords.join(separator);
+
+  try {
+    return new RegExp(pattern, "i");
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Attempts to locate and replace targetText inside HTML existingContent using
+ * multiple strategies: literal match, markdown match, HTML-tag agnostic regex, and anchor match.
+ */
+export function replaceTargetInHtml(
+  existingContent: string,
+  targetText: string,
+  replacementHtml: string
+): string | null {
+  if (!targetText || !targetText.trim() || !existingContent) return null;
+  const target = targetText.trim();
+
+  // 1. Literal match in raw HTML
+  if (existingContent.includes(target)) {
+    return existingContent.replace(target, replacementHtml);
+  }
+
+  // 2. Markdown-to-HTML target match
+  try {
+    const mdHtml = markdownToHtml(target).trim();
+    if (mdHtml && existingContent.includes(mdHtml)) {
+      return existingContent.replace(mdHtml, replacementHtml);
+    }
+  } catch {
+    // Ignore markdown parse error
+  }
+
+  // 3. Full HTML-agnostic token regex match (handles tags like </h3><p>, <strong>, &nbsp; between words)
+  const fullRegex = buildHtmlFlexibleRegex(target);
+  if (fullRegex) {
+    const match = fullRegex.exec(existingContent);
+    if (match && typeof match.index === "number") {
+      let startIndex = match.index;
+      let endIndex = match.index + match[0].length;
+
+      // Expand to enclosing block boundary if target started/ended at block boundaries
+      const before = existingContent.slice(0, startIndex);
+      const openTagMatch = before.match(/<([a-z0-9]+)[^>]*>\s*$/i);
+      const closedTagMatch = existingContent.slice(endIndex).match(/^\s*<\/([a-z0-9]+)>/i);
+
+      if (openTagMatch && closedTagMatch) {
+        startIndex = before.length - openTagMatch[0].length;
+        endIndex = endIndex + closedTagMatch[0].length;
+      }
+
+      return existingContent.slice(0, startIndex) + replacementHtml + existingContent.slice(endIndex);
+    }
+  }
+
+  // 4. Section Anchor match: if target is long (e.g. heading + paragraph), match by first 8-10 words
+  const anchorRegex = buildHtmlFlexibleRegex(target, 8);
+  if (anchorRegex) {
+    const anchorMatch = anchorRegex.exec(existingContent);
+    if (anchorMatch && typeof anchorMatch.index === "number") {
+      let startIndex = anchorMatch.index;
+      const before = existingContent.slice(0, startIndex);
+      const openTagMatch = before.match(/<([a-z0-9]+)[^>]*>\s*$/i);
+      if (openTagMatch) {
+        startIndex = before.length - openTagMatch[0].length;
+      }
+
+      // Find the end of the block or section following the anchor
+      const afterSlice = existingContent.slice(startIndex);
+      const blockEndMatch = afterSlice.match(/<\/(p|div|section|blockquote|li|h[1-6])>/i);
+      if (blockEndMatch && typeof blockEndMatch.index === "number") {
+        const endIndex = startIndex + blockEndMatch.index + blockEndMatch[0].length;
+        return existingContent.slice(0, startIndex) + replacementHtml + existingContent.slice(endIndex);
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Surgically replaces a block in note HTML using its persistent data-block-id attribute.
+ * Uses native DOMParser in browser environments and clean tag regex in node/test environments.
+ */
+export function replaceBlockById(
+  existingContent: string,
+  blockId: string,
+  replacementHtml: string
+): string | null {
+  if (!blockId || !existingContent) return null;
+  const cleanId = blockId.trim();
+
+  // Browser / DOM environment
+  if (typeof DOMParser !== "undefined") {
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(existingContent, "text/html");
+      const targetElement = doc.querySelector(`[data-block-id="${cleanId}"]`);
+      if (targetElement) {
+        const temp = doc.createElement("div");
+        temp.innerHTML = replacementHtml;
+        targetElement.replaceWith(...Array.from(temp.childNodes));
+        return doc.body.innerHTML;
+      }
+    } catch (e) {
+      console.warn("[LOCAL EXECUTOR] DOMParser replaceBlockById failed:", e);
+    }
+  }
+
+  // Regex fallback (Node test environment or where DOMParser is unavailable)
+  const escapedId = escapeRegex(cleanId);
+  const blockRegex = new RegExp(
+    `<([a-z0-9]+)[^>]*data-block-id=["']${escapedId}["'][^>]*>[\\s\\S]*?<\\/\\1>`,
+    "i"
+  );
+  if (blockRegex.test(existingContent)) {
+    return existingContent.replace(blockRegex, replacementHtml);
+  }
+
+  return null;
+}
+
+/**
  * Combines existing note HTML and new raw content with a clean block-level boundary.
  * Never glues blocks or inline text together.
  */
 export function combineNoteContent(
   existingContent: string,
   newRawContent: string,
-  mode: "append" | "replace" = "append"
+  mode: "append" | "prepend" | "replace_target" | "full_replace" | "replace" = "append",
+  targetContent?: string,
+  replacementContent?: string,
+  blockId?: string
 ): string {
-  const newBlockHtml = ensureBlockHtml(newRawContent);
+  const replacementHtml = ensureBlockHtml(replacementContent || newRawContent);
 
-  if (mode === "replace" || !existingContent || !existingContent.trim()) {
-    return newBlockHtml;
+  if (mode === "full_replace" || mode === "replace" || !existingContent || !existingContent.trim()) {
+    return replacementHtml;
   }
 
   const existingBlockHtml = ensureBlockHtml(existingContent);
-  if (!newBlockHtml) {
+  if (!replacementHtml) {
     return existingBlockHtml;
   }
 
-  // Clean block boundary: ensure both existing and new blocks sit on separate lines
-  return `${existingBlockHtml}\n${newBlockHtml}`;
+  // Prepend to top
+  if (mode === "prepend") {
+    return `${replacementHtml}\n${existingBlockHtml}`;
+  }
+
+  // 1. PRIMARY TARGETING: Direct Block ID Replacement (Option 2 - Gold Standard)
+  const cleanBlockId = (blockId || "").trim();
+  if (cleanBlockId) {
+    const replaced = replaceBlockById(existingContent, cleanBlockId, replacementHtml);
+    if (replaced !== null) {
+      return replaced;
+    }
+    console.warn(`[LOCAL EXECUTOR] Block ID "${cleanBlockId}" not located in note content. Checking targetContent fallback.`);
+  }
+
+  // 2. SECONDARY TARGETING: HTML-Aware Target Replacement
+  const target = (targetContent || "").trim();
+  if (mode === "replace_target" || target) {
+    if (target) {
+      const replaced = replaceTargetInHtml(existingContent, target, replacementHtml);
+      if (replaced !== null) {
+        return replaced;
+      }
+      console.warn(`[LOCAL EXECUTOR] Target content "${target.slice(0, 60)}" not located in note. Appending replacement instead.`);
+    }
+  }
+
+  // Default: Append with clean block boundary
+  return `${existingBlockHtml}\n${replacementHtml}`;
 }
 
 // Executes a tool locally in the browser/desktop workspace 
@@ -117,13 +307,17 @@ async function executeUpdateNote(args: Record<string, any>): Promise<ToolExecuti
       throw new Error(`Note not found with id: ${noteId}`);
     }
 
-    const mode = args.mode === "replace" ? "replace" : "append";
+    const blockId = typeof args.blockId === "string" ? args.blockId.trim() : "";
+    const targetContent = typeof args.targetContent === "string" ? args.targetContent : "";
+    const replacementContent = typeof args.replacementContent === "string" ? args.replacementContent : "";
     const rawContent = typeof args.content === "string" ? args.content : "";
+    const mode = args.mode || (blockId || targetContent ? "replace_target" : "append");
     
     let updatedContent = existingNote.content;
+    const hasContentChange = Boolean(rawContent.trim() || replacementContent.trim() || targetContent.trim() || blockId);
 
-    if (rawContent && rawContent.trim()) {
-      updatedContent = combineNoteContent(existingNote.content, rawContent, mode);
+    if (hasContentChange) {
+      updatedContent = combineNoteContent(existingNote.content, rawContent, mode, targetContent, replacementContent, blockId);
     }
 
     const updates: Partial<Note> = {};
@@ -131,7 +325,7 @@ async function executeUpdateNote(args: Record<string, any>): Promise<ToolExecuti
       updates.title = args.title.trim();
     }
 
-    if (rawContent && rawContent.trim()) {
+    if (hasContentChange) {
       updates.content = updatedContent;
     }
 
@@ -141,11 +335,25 @@ async function executeUpdateNote(args: Record<string, any>): Promise<ToolExecuti
     queryClient.setQueryData<Note[]>(["notes"], (old = []) =>
       old.map((n) => (n._id === noteId ? { ...n, ...updatedNote } : n))
     );
+
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("notesify:conflict-resolved", {
+          detail: { entityId: noteId, note: updatedNote },
+        })
+      );
+    }
     
     return {
       success: true,
       tool: "update_note",
-      data: updatedNote,
+      data: {
+        _id: updatedNote._id,
+        noteId: updatedNote._id,
+        title: updatedNote.title,
+        content: updatedContent,
+        updatedContentSnippet: updatedContent.slice(0, 150),
+      },
     };
   } catch (err: any) {
     console.error("❌ [LOCAL EXECUTOR] update_note failed:", err);

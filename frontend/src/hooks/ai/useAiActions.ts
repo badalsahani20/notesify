@@ -7,6 +7,7 @@ import { getSelection } from "@/utils/ai/aiContext";
 import { consumeAiChatStream } from "@/utils/consumeAiChatStream";
 import { postAiAssistStream, postAiAssistBlocking } from "@/services/ai/aiAssistApi";
 import { queryClient } from "@/lib/queryClient";
+import { buildNoteContext } from "@/utils/ai/noteContextBuilder";
 
 interface UseAiActionsOptions {
   editor: Editor | null;
@@ -34,9 +35,21 @@ export const useAiActions = ({
 
   const runAction = async (action: AiAction, customPrompt?: string) => {
     const { text: selectedText, range } = getSelection(editor);
-    const sourceText = customPrompt || selectedText || editor?.getText() || plainNoteText;
+    const structuredContext = editor ? buildNoteContext(editor, effectiveNoteId || "new", 1) : null;
+    const headingBreadcrumbs = structuredContext?.headingPath?.length
+      ? `[Document Section Hierarchy: ${structuredContext.headingPath.join(" > ")}]\n\n`
+      : "";
 
-    if (!sourceText) {
+    // Retain rich HTML so headers, tables, code blocks, lists, and quotes are 100% preserved
+    const documentBody = editor ? editor.getHTML() : plainNoteText;
+
+    const sourceText = customPrompt
+      ? (headingBreadcrumbs + customPrompt)
+      : selectedText
+        ? (headingBreadcrumbs + `[Selected Excerpt]:\n${selectedText}`)
+        : (headingBreadcrumbs + documentBody);
+
+    if (!sourceText || !sourceText.trim()) {
       toast.error("No text found to process. Add content or select text first.");
       return;
     }

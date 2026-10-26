@@ -1,13 +1,19 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FileText, ArrowRight, Sparkles, ExternalLink } from "lucide-react";
+import { FileText, FileEdit, ArrowRight, ExternalLink, Loader2, AlertCircle, Trash2 } from "lucide-react";
 import { useGlobalChatStore } from "@/store/useGlobalChatStore";
+import { noteRepository } from "@/repositories";
+import { queryClient } from "@/lib/queryClient";
+import { toast } from "sonner";
+import type { Note } from "@/store/useNoteStore";
 
 interface IrisNoteCreatedCardProps {
   noteId?: string;
   title?: string;
   content?: string;
   variant?: "created" | "updated";
+  state?: "pending" | "running" | "completed" | "error";
+  error?: string;
 }
 
 export const IrisNoteCreatedCard: React.FC<IrisNoteCreatedCardProps> = ({
@@ -15,9 +21,15 @@ export const IrisNoteCreatedCard: React.FC<IrisNoteCreatedCardProps> = ({
   title = "Untitled Note",
   content = "",
   variant = "created",
+  state = "completed",
+  error,
 }) => {
   const navigate = useNavigate();
   const { setActiveArtifact, activeArtifact } = useGlobalChatStore();
+  const [isDiscarded, setIsDiscarded] = useState(false);
+  const [isDiscarding, setIsDiscarding] = useState(false);
+
+  const isUpdate = variant === "updated";
 
   // Strip HTML or Markdown tags for clean preview snippet
   const previewText = useMemo(() => {
@@ -40,7 +52,7 @@ export const IrisNoteCreatedCard: React.FC<IrisNoteCreatedCardProps> = ({
       plain = plain.slice(title.length).replace(/^[^\w]+/, "").trim();
     }
 
-    return plain.length > 150 ? plain.slice(0, 150) + "..." : plain;
+    return plain.length > 140 ? plain.slice(0, 140) + "..." : plain;
   }, [content, title]);
 
   const handleOpenSidePanel = () => {
@@ -59,71 +71,140 @@ export const IrisNoteCreatedCard: React.FC<IrisNoteCreatedCardProps> = ({
     }
   };
 
+  const handleDiscard = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!noteId || isDiscarding) return;
+    setIsDiscarding(true);
+    try {
+      const cachedNote = queryClient.getQueryData<Note>(["note", noteId]);
+      await noteRepository.deleteNote(noteId, cachedNote?.version ?? 1);
+
+      queryClient.removeQueries({ queryKey: ["note", noteId] });
+      queryClient.setQueryData<Note[]>(["notes"], (old = []) =>
+        old.filter((n) => n._id !== noteId)
+      );
+
+      if (activeArtifact?.id === noteId) {
+        setActiveArtifact(null);
+      }
+
+      setIsDiscarded(true);
+      toast.success("Note discarded and moved to trash");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to discard note");
+    } finally {
+      setIsDiscarding(false);
+    }
+  };
+
   const isOpenInPanel =
     activeArtifact?.type === "note" &&
     ((noteId && activeArtifact.id === noteId) ||
       (!noteId && activeArtifact.title === title));
 
+  // Discarded state
+  if (isDiscarded) {
+    return (
+      <div className="my-2 px-3 py-2 rounded-lg border border-[var(--divider)] bg-[var(--surface-muted)]/30 text-xs text-[var(--muted-text)] flex items-center justify-between gap-2 max-w-md animate-in fade-in duration-150">
+        <span className="line-through opacity-70 truncate">&quot;{title}&quot; was discarded</span>
+        <span className="text-[10px] text-[var(--muted-text)] opacity-60 shrink-0">Moved to trash</span>
+      </div>
+    );
+  }
+
+  // 1. Loading / Executing state
+  if (state === "running" || state === "pending") {
+    return (
+      <div className="my-2 px-3 py-2 rounded-lg border border-[var(--divider)] bg-[var(--surface-muted)]/50 text-xs text-[var(--muted-text)] flex items-center gap-2.5 max-w-md animate-in fade-in duration-150">
+        <Loader2 size={13} className="animate-spin text-[var(--accent-strong)] shrink-0" />
+        <span className="truncate">
+          {isUpdate ? `Updating "${title}"...` : `Creating "${title}"...`}
+        </span>
+      </div>
+    );
+  }
+
+  // 2. Error state
+  if (state === "error") {
+    return (
+      <div className="my-2 px-3 py-2 rounded-lg border border-rose-500/30 bg-rose-500/10 text-xs text-rose-600 dark:text-rose-400 flex items-center gap-2 max-w-md">
+        <AlertCircle size={13} className="shrink-0" />
+        <span className="truncate">
+          Failed to {isUpdate ? "update" : "create"} &quot;{title}&quot;{error ? `: ${error}` : ""}
+        </span>
+      </div>
+    );
+  }
+
+  // 3. Completed State: Tactile, clean document tile
   return (
     <div
       onClick={handleOpenSidePanel}
-      className={`my-2.5 p-3.5 rounded-xl border transition-all backdrop-blur-md cursor-pointer group select-none max-w-lg ${
+      className={`my-2 p-3 rounded-lg border transition-all cursor-pointer group select-none max-w-md ${
         isOpenInPanel
-          ? "border-slate-700 bg-slate-850/80 shadow-[0_4px_20px_rgba(0,0,0,0.3)] ring-1 ring-slate-700/60"
-          : "border-slate-800/80 bg-slate-900/40 hover:bg-slate-800/40 hover:border-slate-700/80 hover:shadow-[0_4px_16px_rgba(0,0,0,0.2)]"
+          ? "border-[var(--accent-strong)]/50 bg-[var(--active-surface)] shadow-2xs"
+          : "border-[var(--divider)] bg-[var(--surface-muted)]/50 hover:bg-[var(--surface-ghost)]/60 hover:border-[var(--text-strong)]/20 shadow-2xs"
       }`}
     >
-      {/* Tangible Artifact Card Header */}
-      <div className="flex items-center justify-between gap-2 mb-2.5">
-        <div className="flex items-center gap-1.5 text-[10px] font-semibold tracking-wider uppercase text-slate-400">
-          <Sparkles size={11} className="text-slate-400" />
-          <span>{variant === "updated" ? "Updated Note" : "Generated Artifact"}</span>
+      {/* Top Header Row */}
+      <div className="flex items-center justify-between gap-2 mb-1.5">
+        <div className="flex items-center gap-1.5 text-[11px] font-medium text-[var(--muted-text)]">
+          {isUpdate ? (
+            <FileEdit size={12} className="opacity-70" />
+          ) : (
+            <FileText size={12} className="opacity-70" />
+          )}
+          <span>{isUpdate ? "Note updated" : "Note created"}</span>
         </div>
 
-        {noteId && (
-          <button
-            onClick={handleOpenFullEditor}
-            className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-white transition-colors cursor-pointer px-1.5 py-0.5 rounded hover:bg-slate-800"
-            title="Open in full TipTap editor"
-          >
-            <span>Full Editor</span>
-            <ExternalLink size={11} />
-          </button>
-        )}
+        <div className="flex items-center gap-1">
+          {!isUpdate && noteId && (
+            <button
+              type="button"
+              onClick={handleDiscard}
+              disabled={isDiscarding}
+              className="flex items-center gap-1 text-[11px] text-[var(--muted-text)] hover:text-rose-500 transition-colors px-1.5 py-0.5 rounded hover:bg-rose-500/10"
+              title="Discard note and move to trash"
+            >
+              <Trash2 size={10} className="opacity-70" />
+              <span>{isDiscarding ? "Discarding..." : "Discard"}</span>
+            </button>
+          )}
+
+          {noteId && (
+            <button
+              type="button"
+              onClick={handleOpenFullEditor}
+              className="flex items-center gap-1 text-[11px] text-[var(--muted-text)] hover:text-[var(--text-strong)] transition-colors px-1.5 py-0.5 rounded hover:bg-[var(--surface-ghost)]"
+              title="Open in full editor"
+            >
+              <span>Editor</span>
+              <ExternalLink size={10} className="opacity-70" />
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Artifact Title & Icon Row */}
-      <div className="flex items-start gap-3 mb-2">
-        <div className="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700/80 flex items-center justify-center text-slate-300 shrink-0 mt-0.5 group-hover:text-white transition-colors">
-          <FileText size={16} />
-        </div>
-        <div className="min-w-0 flex-1">
-          <h4 className="text-sm font-medium text-white/90 group-hover:text-white transition-colors line-clamp-1">
-            {title}
-          </h4>
-          <p className="text-[11px] text-slate-400 mt-0.5">
-            Notesify Workspace Note
-          </p>
-        </div>
-      </div>
+      {/* Note Title */}
+      <h4 className="text-xs font-semibold text-[var(--text-strong)] group-hover:text-[var(--accent-strong)] transition-colors line-clamp-1">
+        {title}
+      </h4>
 
-      {/* Preview Snippet */}
+      {/* Content Preview Snippet */}
       {previewText && (
-        <p className="text-xs text-slate-300/80 line-clamp-2 leading-relaxed pl-11 mb-2.5">
+        <p className="text-[11px] text-[var(--muted-text)] line-clamp-2 leading-relaxed mt-1">
           {previewText}
         </p>
       )}
 
-      {/* Bottom CTA Bar */}
-      <div className="pt-2 border-t border-slate-800/70 flex items-center justify-between text-xs">
-        <span className="text-[11px] text-slate-400">
-          {isOpenInPanel ? "Viewing in Side Panel" : "Click to view document"}
-        </span>
-        <div className="flex items-center gap-1 font-medium text-slate-300 group-hover:text-white transition-colors">
-          <span>{isOpenInPanel ? "Active" : "Open Artifact"}</span>
+      {/* Footer Afordance */}
+      <div className="mt-2.5 pt-2 border-t border-[var(--divider)]/50 flex items-center justify-between text-[11px] text-[var(--muted-text)]">
+        <span>{isOpenInPanel ? "Viewing in side panel" : "Click to view preview"}</span>
+        <div className="flex items-center gap-1 font-medium group-hover:text-[var(--text-strong)] transition-colors">
+          <span>{isOpenInPanel ? "Active" : "Open"}</span>
           <ArrowRight
-            size={12}
-            className={`transition-transform duration-200 ${
+            size={11}
+            className={`transition-transform duration-150 ${
               isOpenInPanel ? "" : "group-hover:translate-x-0.5"
             }`}
           />
@@ -134,3 +215,4 @@ export const IrisNoteCreatedCard: React.FC<IrisNoteCreatedCardProps> = ({
 };
 
 export default IrisNoteCreatedCard;
+

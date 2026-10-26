@@ -5,9 +5,8 @@ const FeatureIcon = ({ title }: { title: string }) => {
   if (title === "An Assistant That Researches") {
     return (
       <div className="relative mb-5 group h-12 w-12 shrink-0 perspective-1000">
-        <div className="absolute inset-0 bg-indigo-500/20 rounded-xl blur-md transition-all duration-500 group-hover:bg-indigo-500/40 group-hover:blur-xl" />
-        <div className="relative h-full w-full rounded-xl bg-white/[0.02] backdrop-blur-sm border border-white/10 flex items-center justify-center overflow-hidden transition-transform duration-500 group-hover:scale-105">
-           <div className="iris-shape scale-75 origin-center group-hover:scale-90 transition-all duration-500 shadow-glow" />
+        <div className="relative h-full w-full rounded-xl bg-white/[0.03] border border-white/10 flex items-center justify-center overflow-hidden transition-colors group-hover:border-white/20">
+           <div className="iris-shape scale-75 origin-center group-hover:scale-90 transition-all duration-500" />
         </div>
       </div>
     );
@@ -16,8 +15,7 @@ const FeatureIcon = ({ title }: { title: string }) => {
   if (title === "The Right Tool For The Job") {
     return (
       <div className="relative mb-5 group h-12 w-12 shrink-0 perspective-1000">
-        <div className="absolute inset-0 bg-purple-500/20 rounded-xl blur-md transition-all duration-500 group-hover:bg-purple-500/40 group-hover:blur-xl" />
-        <div className="relative h-full w-full rounded-xl bg-white/[0.02] backdrop-blur-sm border border-white/10 flex items-center justify-center overflow-hidden transition-transform duration-500 group-hover:scale-105">
+        <div className="relative h-full w-full rounded-xl bg-white/[0.03] border border-white/10 flex items-center justify-center overflow-hidden transition-colors group-hover:border-white/20">
           {/* Paths */}
           <div className="absolute left-2 top-1/2 w-3 h-[1.5px] bg-white/20 -translate-y-1/2" />
           <div className="absolute left-5 top-3 w-[1.5px] h-3 bg-white/20 rotate-45 origin-bottom-left" />
@@ -26,10 +24,10 @@ const FeatureIcon = ({ title }: { title: string }) => {
           {/* Destination Nodes */}
           <div className="absolute right-2 top-2.5 w-2 h-2 rounded-full border border-white/20 transition-all duration-300" />
           <div className="absolute right-2 bottom-2.5 w-2 h-2 rounded-full border border-white/20 transition-all duration-300" />
-          <div className="absolute right-2 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full border border-white/20 transition-all duration-300 group-hover:border-purple-400 group-hover:bg-purple-500/50 group-hover:shadow-[0_0_10px_rgba(168,85,247,0.8)]" />
+          <div className="absolute right-2 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full border border-white/20 transition-all duration-300 group-hover:border-purple-400 group-hover:bg-purple-500/50" />
 
-          {/* Active Path glowing line */}
-          <div className="absolute left-2 top-1/2 w-6 h-[1.5px] bg-purple-400 -translate-y-1/2 shadow-[0_0_5px_rgba(168,85,247,0.8)] opacity-0 group-hover:opacity-100 transition-all duration-500 translate-x-[-100%] group-hover:translate-x-0" />
+          {/* Active Path line */}
+          <div className="absolute left-2 top-1/2 w-6 h-[1.5px] bg-purple-400 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-all duration-500 translate-x-[-100%] group-hover:translate-x-0" />
         </div>
       </div>
     );
@@ -38,8 +36,7 @@ const FeatureIcon = ({ title }: { title: string }) => {
   if (title === "Never Leave Your Editor") {
     return (
       <div className="relative mb-5 group h-12 w-12 shrink-0 perspective-1000">
-        <div className="absolute inset-0 bg-blue-500/20 rounded-xl blur-md transition-all duration-500 group-hover:bg-blue-500/40 group-hover:blur-xl" />
-        <div className="relative h-full w-full rounded-xl bg-white/[0.02] backdrop-blur-sm border border-white/10 flex items-center justify-center overflow-hidden transition-transform duration-500 group-hover:scale-105">
+        <div className="relative h-full w-full rounded-xl bg-white/[0.03] border border-white/10 flex items-center justify-center overflow-hidden transition-colors group-hover:border-white/20">
           {/* Main Editor window */}
           <div className="absolute inset-2 border border-white/10 rounded overflow-hidden transition-all duration-500 group-hover:pr-3">
              <div className="w-full h-1 bg-white/5 border-b border-white/10" />
@@ -49,7 +46,7 @@ const FeatureIcon = ({ title }: { title: string }) => {
              </div>
              {/* Slide-out side panel (Iris) */}
              <div className="absolute right-0 top-1 bottom-0 w-3 bg-blue-500/10 border-l border-blue-500/30 translate-x-full group-hover:translate-x-0 transition-transform duration-500 ease-out flex items-center justify-center">
-               <div className="w-1 h-1 bg-blue-400 rounded-full shadow-[0_0_4px_rgba(96,165,250,0.8)] animate-pulse" />
+               <div className="w-1 h-1 bg-blue-400 rounded-full animate-pulse" />
              </div>
           </div>
         </div>
@@ -60,8 +57,7 @@ const FeatureIcon = ({ title }: { title: string }) => {
   if (title === "Write Together, Not Alone") {
     return (
       <div className="relative mb-5 group h-12 w-12 shrink-0 perspective-1000">
-        <div className="absolute inset-0 bg-indigo-500/20 rounded-xl blur-md transition-all duration-500 group-hover:bg-indigo-500/40 group-hover:blur-xl" />
-        <div className="relative h-full w-full rounded-xl bg-white/[0.02] backdrop-blur-sm border border-white/10 flex items-center justify-center overflow-hidden transition-transform duration-500 group-hover:scale-105">
+        <div className="relative h-full w-full rounded-xl bg-white/[0.03] border border-white/10 flex items-center justify-center overflow-hidden transition-colors group-hover:border-white/20">
           {/* Magic Wand / Sparkle */}
           <svg className="absolute w-4 h-4 text-indigo-400 opacity-0 scale-50 group-hover:opacity-100 group-hover:scale-100 transition-all duration-500 -translate-y-1 group-hover:-translate-y-2 group-hover:translate-x-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
              <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" className="origin-center animate-[spin_3s_linear_infinite]" />
@@ -69,9 +65,9 @@ const FeatureIcon = ({ title }: { title: string }) => {
           
           {/* Paragraph Lines changing color */}
           <div className="flex flex-col gap-1 w-6 transition-all duration-500 group-hover:translate-y-1 group-hover:-translate-x-1">
-            <div className="h-[2px] w-full bg-white/30 rounded-full transition-colors duration-500 group-hover:bg-indigo-400/80 group-hover:shadow-[0_0_5px_rgba(129,140,248,0.5)]" />
-            <div className="h-[2px] w-5/6 bg-white/30 rounded-full transition-colors duration-500 delay-75 group-hover:bg-indigo-400/80 group-hover:shadow-[0_0_5px_rgba(129,140,248,0.5)]" />
-            <div className="h-[2px] w-4/6 bg-white/30 rounded-full transition-colors duration-500 delay-150 group-hover:bg-indigo-400/80 group-hover:shadow-[0_0_5px_rgba(129,140,248,0.5)]" />
+            <div className="h-[2px] w-full bg-white/30 rounded-full transition-colors duration-500 group-hover:bg-indigo-400/80" />
+            <div className="h-[2px] w-5/6 bg-white/30 rounded-full transition-colors duration-500 delay-75 group-hover:bg-indigo-400/80" />
+            <div className="h-[2px] w-4/6 bg-white/30 rounded-full transition-colors duration-500 delay-150 group-hover:bg-indigo-400/80" />
           </div>
         </div>
       </div>
@@ -81,35 +77,12 @@ const FeatureIcon = ({ title }: { title: string }) => {
   if (title === "AI Learning Tools") {
     return (
       <div className="relative mb-5 group h-12 w-12 shrink-0 perspective-1000">
-        <div className="absolute inset-0 bg-emerald-500/20 rounded-xl blur-md transition-all duration-500 group-hover:bg-emerald-500/40 group-hover:blur-xl" />
-        <div className="relative h-full w-full rounded-xl bg-white/[0.02] backdrop-blur-sm border border-white/10 flex items-center justify-center overflow-hidden transition-transform duration-500 group-hover:scale-105">
+        <div className="relative h-full w-full rounded-xl bg-white/[0.03] border border-white/10 flex items-center justify-center overflow-hidden transition-colors group-hover:border-white/20">
            <svg className="w-5 h-5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
              <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-1.54-2.44 2.5 2.5 0 0 1 2-2.45V4.5A2.5 2.5 0 0 1 9.5 2z" />
              <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 1.54-2.44 2.5 2.5 0 0 0-2-2.45V4.5A2.5 2.5 0 0 0 14.5 2z" />
            </svg>
-           <div className="absolute inset-0 bg-emerald-400/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 animate-pulse" />
-        </div>
-      </div>
-    );
-  }
-
-  if (title === "Share With Confidence") {
-    return (
-      <div className="relative mb-5 group h-12 w-12 shrink-0 perspective-1000">
-        <div className="absolute inset-0 bg-rose-500/20 rounded-xl blur-md transition-all duration-500 group-hover:bg-rose-500/40 group-hover:blur-xl" />
-        <div className="relative h-full w-full rounded-xl bg-white/[0.02] backdrop-blur-sm border border-white/10 flex items-center justify-center overflow-hidden transition-transform duration-500 group-hover:scale-105">
-           {/* Link Base */}
-           <svg className="w-5 h-5 text-white/40 transition-all duration-500 group-hover:-translate-x-1 group-hover:opacity-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-             <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-             <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-           </svg>
-           {/* Lock snaps into place */}
-           <svg className="absolute w-5 h-5 text-rose-400 scale-50 opacity-0 transition-all duration-500 group-hover:scale-100 group-hover:opacity-100 group-hover:shadow-[0_0_10px_rgba(244,63,94,0.5)] rounded-full" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-             <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-             <path d="M7 11V7a5 5 0 0 1 10 0v4" className="group-hover:stroke-rose-300" />
-           </svg>
-           {/* Ripple wave */}
-           <div className="absolute inset-0 rounded-full border border-rose-400/50 scale-0 opacity-0 group-hover:animate-[ping_1.5s_cubic-bezier(0,0,0.2,1)_infinite]" />
+           <div className="absolute inset-0 bg-emerald-400/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
         </div>
       </div>
     );
@@ -118,8 +91,7 @@ const FeatureIcon = ({ title }: { title: string }) => {
   if (title === "Offline-First Reliability") {
     return (
       <div className="relative mb-5 group h-12 w-12 shrink-0 perspective-1000">
-        <div className="absolute inset-0 bg-emerald-500/20 rounded-xl blur-md transition-all duration-500 group-hover:bg-emerald-500/40 group-hover:blur-xl" />
-        <div className="relative h-full w-full rounded-xl bg-white/[0.02] backdrop-blur-sm border border-white/10 flex items-center justify-center overflow-hidden transition-transform duration-500 group-hover:scale-105">
+        <div className="relative h-full w-full rounded-xl bg-white/[0.03] border border-white/10 flex items-center justify-center overflow-hidden transition-colors group-hover:border-white/20">
           <svg className="w-5 h-5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M1 1l22 22M16.72 11.06A10.94 10.94 0 0 1 19 12.55M5 12.55a10.94 10.94 0 0 1 5.17-2.39M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01" />
           </svg>
@@ -128,13 +100,11 @@ const FeatureIcon = ({ title }: { title: string }) => {
     );
   }
 
-  // Grows With Your Thoughts
+  // Default
   return (
     <div className="relative mb-5 group h-12 w-12 shrink-0 perspective-1000">
-      <div className="absolute inset-0 bg-indigo-500/20 rounded-xl blur-md transition-all duration-500 group-hover:bg-indigo-500/40 group-hover:blur-xl" />
-      <div className="relative h-full w-full rounded-xl bg-white/[0.02] backdrop-blur-sm border border-white/10 flex items-center justify-center overflow-hidden transition-transform duration-500 group-hover:scale-105">
-        {/* Iso Stack Layers */}
-        <div className="absolute w-6 h-6 border border-indigo-400/20 rounded bg-indigo-500/5 transition-all duration-500 group-hover:translate-y-[-6px] group-hover:-translate-x-1 group-hover:rotate-12 group-hover:border-indigo-400/80 group-hover:shadow-[0_0_10px_rgba(129,140,248,0.5)] z-30" />
+      <div className="relative h-full w-full rounded-xl bg-white/[0.03] border border-white/10 flex items-center justify-center overflow-hidden transition-colors group-hover:border-white/20">
+        <div className="absolute w-6 h-6 border border-indigo-400/20 rounded bg-indigo-500/5 transition-all duration-500 group-hover:translate-y-[-6px] group-hover:-translate-x-1 group-hover:rotate-12 group-hover:border-indigo-400/80 z-30" />
         <div className="absolute w-6 h-6 border border-indigo-400/20 rounded bg-indigo-500/5 transition-all duration-500 group-hover:translate-y-[0px] group-hover:rotate-6 group-hover:border-indigo-400/50 z-20" />
         <div className="absolute w-6 h-6 border border-indigo-400/20 rounded bg-indigo-500/5 transition-all duration-500 group-hover:translate-y-[6px] group-hover:translate-x-1 group-hover:border-indigo-400/30 z-10" />
       </div>
@@ -154,7 +124,7 @@ export const Features = () => {
     },
     {
       title: "AI Learning Tools",
-      desc: "Turn any note into an interactive quiz or a deck of spaced-repetition flashcards instantly. Learn faster, not longer. (New!)",
+      desc: "Turn any note into an interactive quiz or a deck of spaced-repetition flashcards instantly. Learn faster, not longer.",
     },
     {
       title: "The Right Tool For The Job",
@@ -179,7 +149,7 @@ export const Features = () => {
               Core Features
             </span>
             <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-white">
-              Where writing meets <span className="gradient-text">real-time intelligence</span>
+              Where writing meets <span className="text-indigo-300">active intelligence</span>
             </h2>
             <p className="mt-4 text-stone-400 text-base sm:text-lg">
               A focused set of tools that get out of the way — so writing feels effortless.

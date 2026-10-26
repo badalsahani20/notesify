@@ -13,6 +13,10 @@ import { ImageUploadExtension } from "../../extensions/imageUploadExtension";
 import { MarkerHighlightExtension } from "../../extensions/markerHighlightExtension";
 import { AiGhostExtension } from "../../extensions/aiGhostExtension";
 import { AiInlineMenu } from "./AiInlineMenu";
+import { InlineCommandMenu } from "./InlineCommandMenu";
+import { InlineAiReviewBar } from "./InlineAiReviewBar";
+import { TableBubbleMenu } from "./TableBubbleMenu";
+import { useInlineSlashAi } from "@/hooks/ai/useInlineSlashAi";
 import { TipTapCodeBlock } from "./TipTapCodeBlock";
 import Link from "@tiptap/extension-link";
 
@@ -326,6 +330,10 @@ const TipTap = ({ noteId, content, onChange, onEditorReady, aiChat, editable = t
   const handleEditorKeyDown = (event: ReactKeyboardEvent) => {
     if (!editor || !editable) return;
 
+    if (inlineSlashAi.handleEditorKeyDown(event)) {
+      return;
+    }
+
     const mod = event.ctrlKey || event.metaKey;
 
     // Ctrl/⌘ + Alt + F → auto-format markdown
@@ -420,6 +428,8 @@ const TipTap = ({ noteId, content, onChange, onEditorReady, aiChat, editable = t
     if (event.key === "Escape") {
       const next = new URLSearchParams(location.search);
       if (next.has("focus")) {
+        event.preventDefault();
+        event.stopPropagation();
         next.delete("focus");
         navigate(`${location.pathname}${next.toString() ? `?${next.toString()}` : ""}`, { replace: true });
       }
@@ -462,10 +472,11 @@ const TipTap = ({ noteId, content, onChange, onEditorReady, aiChat, editable = t
       lastNoteIdRef.current = noteId;
 
       if (isInitialMount || isSwitching) {
-        editor.commands.setContent(content, { emitUpdate: false });
+        editor.commands.setContent(content || "", { emitUpdate: false });
+        editor.commands.setTextSelection(0);
       }
     }
-  }, [noteId, editor]);
+  }, [noteId, content, editor]);
 
   // Synchronize editor content immediately when a conflict is resolved (locally or in another tab)
   useEffect(() => {
@@ -503,6 +514,13 @@ const TipTap = ({ noteId, content, onChange, onEditorReady, aiChat, editable = t
     };
   }, [editor, noteId]);
 
+  const inlineSlashAi = useInlineSlashAi({
+    editor,
+    noteId,
+    editable,
+    aiChat,
+  });
+
   if (!editor) return <div>Loading editor...</div>;
 
   return (
@@ -517,6 +535,7 @@ const TipTap = ({ noteId, content, onChange, onEditorReady, aiChat, editable = t
       {editable && aiChat && (
         <EditorBubbleMenu
           editor={editor}
+          aiChat={aiChat}
           onAskAi={(selectedText, startLine, endLine) => {
             const lineRange = startLine === endLine ? `line ${startLine}` : `lines ${startLine}-${endLine}`;
             aiChat.setChatInput(`explain this part (${lineRange}):\n"${selectedText}"`);
@@ -537,7 +556,30 @@ const TipTap = ({ noteId, content, onChange, onEditorReady, aiChat, editable = t
           }}
         />
       )}
-      {editable && <AiInlineMenu editor={editor} />}
+      {editable && (
+        <>
+          <AiInlineMenu editor={editor} isReviewOpen={inlineSlashAi.isReviewOpen} />
+          <TableBubbleMenu editor={editor} />
+          <InlineCommandMenu
+            editor={editor}
+            isOpen={inlineSlashAi.isMenuOpen}
+            coords={inlineSlashAi.menuCoords}
+            onClose={inlineSlashAi.closeMenu}
+            initialMode={inlineSlashAi.menuMode}
+            onSelectAiPrompt={inlineSlashAi.executeInlineAi}
+          />
+          {inlineSlashAi.isReviewOpen && (
+            <InlineAiReviewBar
+              isGenerating={inlineSlashAi.isGenerating}
+              coords={inlineSlashAi.reviewCoords}
+              onAccept={inlineSlashAi.handleAccept}
+              onDiscard={inlineSlashAi.handleDiscard}
+              onRegenerate={inlineSlashAi.handleRegenerate}
+              onStop={inlineSlashAi.handleStop}
+            />
+          )}
+        </>
+      )}
 
       <div className="overflow-x-auto">
         <EditorContent className="editor-content-shell" editor={editor} spellCheck={spellCheck && editable} onKeyDown={handleEditorKeyDown} />

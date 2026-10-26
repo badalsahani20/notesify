@@ -3,22 +3,25 @@ import { Routes, Route } from "react-router-dom";
 import MainLayout from "./components/MainLayout";
 import { Toaster } from "sonner";
 import PrivateRoute from "./components/PrivateRoute";
-import AuthLayout from "./components/AuthLayout";
-import Login from "./pages/Login";
-import Register from "./pages/Register";
-import ForgotPasswordPage from "./pages/ForgotPasswordPage";
-import ResetPasswordPage from "./pages/ResetPasswordPage";
-import VerifyEmailPage from "./pages/VerifyEmailPage";
 import { WebSyncTriggers } from "./services/WebSyncTriggers";
 import { ElectronSyncTriggers } from "./services/ElectronSyncTriggers";
 import { useAuthStore } from "./store/useAuthStore";
+
+// Lazy-load auth pages to reduce initial bundle size
+const AuthLayout = lazy(() => import("./components/AuthLayout"));
+const Login = lazy(() => import("./pages/Login"));
+const Register = lazy(() => import("./pages/Register"));
+const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
+const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
+const VerifyEmailPage = lazy(() => import("./pages/VerifyEmailPage"));
 
 // Core layout components imported directly so offline navigation never fails on dynamic chunk fetching
 import NotesListPanel from "./components/notes/NotesListPanel";
 import FolderWorkspace from "./components/folders/FolderWorkspace";
 
-// Lazy-loaded routes
-const NoteEditor = lazy(() => import("./pages/NoteEditor"));
+// Lazy-loaded routes with speculative preloading
+const preloadNoteEditor = () => import("./pages/NoteEditor");
+const NoteEditor = lazy(preloadNoteEditor);
 const EmptyState = lazy(() => import("./components/editor/EmptyEditorState"));
 const OAuthSuccess = lazy(() => import("./pages/OAuthSuccess"));
 const SearchPage = lazy(() => import("./pages/SearchPage"));
@@ -40,7 +43,27 @@ function App() {
     const isElectron = window.location.protocol === "file:";
     const triggers = isElectron ? ElectronSyncTriggers : WebSyncTriggers;
     triggers.start();
-    return () => triggers.stop();
+
+    // Preload heavy NoteEditor and TipTap bundle during browser idle time
+    let cleanupIdle: (() => void) | undefined;
+    if (typeof window !== "undefined" && !(navigator as any).connection?.saveData) {
+      if ("requestIdleCallback" in window) {
+        const idleId = window.requestIdleCallback(() => {
+          void preloadNoteEditor();
+        }, { timeout: 2500 });
+        cleanupIdle = () => window.cancelIdleCallback(idleId);
+      } else {
+        const timer = setTimeout(() => {
+          void preloadNoteEditor();
+        }, 1200);
+        cleanupIdle = () => clearTimeout(timer);
+      }
+    }
+
+    return () => {
+      triggers.stop();
+      cleanupIdle?.();
+    };
   }, [isAuthenticated]);
 
   return (

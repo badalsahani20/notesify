@@ -7,6 +7,7 @@ import { consumeAiChatStream } from "@/utils/consumeAiChatStream";
 import { startGlobalChatRequest } from "@/services/ai/chatRequest";
 import { createChatToolHandler } from "@/services/ai/chatToolHandler";
 import { queryClient } from "@/lib/queryClient";
+import { useStreamingTextStore } from "@/store/useStreamingTextStore";
 
 import type {
   IrisSegment,
@@ -90,6 +91,7 @@ type GlobalChatStore = {
   attachedImage: string | null;
   attachedDoc: ChatAttachmentBundle | null;
   imageDisabled: boolean;
+  modelTier: "fast" | "thinking" | "pro";
   useReasoning: boolean;
   useWebSearch: boolean;
   chatMode: "study" | "casual";
@@ -105,11 +107,13 @@ type GlobalChatStore = {
   loadSession: (sessionId: string, options?: { background?: boolean }) => Promise<void>;
   startNewChat: () => void;
   sendMessage: (text: string, image?: string | null, chatAttachmentId?: string | null) => Promise<void>;
+  regenerateResponse: () => Promise<void>;
   answerInteraction: (answer: string) => Promise<void>;
   stopGeneration: () => void;
   setAttachedImage: (img: string | null) => void;
   setAttachedDoc: (folder: ChatAttachmentBundle | null) => void;
   uploadDoc: (files: File[]) => Promise<void>;
+  setModelTier: (tier: "fast" | "thinking" | "pro") => void;
   setUseReasoning: (val: boolean) => void;
   setUseWebSearch: (val: boolean) => void;
   setChatMode: (mode: "study" | "casual") => void;
@@ -131,7 +135,8 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
   attachedImage: null,
   attachedDoc: null,
   imageDisabled: false,
-  useReasoning: false, 
+  modelTier: "fast",
+  useReasoning: false,
   useWebSearch: false,
   chatMode: "casual",
   activeArtifact: null,
@@ -314,6 +319,7 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
     if (!activeChatAbortController) return;
     console.info("[IrisChat] generation stopped by user");
     activeChatAbortController.abort();
+    useStreamingTextStore.getState().resetStream();
   },
 
   answerInteraction: async (answer: string) => {
@@ -410,15 +416,17 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
             }));
           },
           onUpdate: ({ fullText: text, fullThought, isThinking, thinkingTime }) => {
-            set((state) => ({
-              messages: state.messages.map((message) =>
-                message.id === aiMsgId
-                  ? { ...message, text, thought: fullThought, isThinking, thinkingTime }
-                  : message,
-              ),
-            }));
+            useStreamingTextStore.getState().setStreamUpdate({
+              streamingMessageId: aiMsgId,
+              streamedMessageText: text,
+              streamedThought: fullThought,
+              isThinking,
+              thinkingTime,
+            });
           },
         });
+
+      useStreamingTextStore.getState().resetStream();
 
       set((state) => ({
         isSending: false,
@@ -467,6 +475,7 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
       }
       set({ isSending: false });
     } finally {
+      useStreamingTextStore.getState().resetStream();
       if (activeChatAbortController === abortController) {
         activeChatAbortController = null;
       }
@@ -505,6 +514,14 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
       attachedDoc: null,
     });
 
+    useStreamingTextStore.getState().setStreamUpdate({
+      streamingMessageId: aiMsgId,
+      streamedMessageText: "",
+      streamedThought: "",
+      isThinking: true,
+      thinkingTime: 0,
+    });
+
     const abortController = new AbortController();
     activeChatAbortController = abortController;
     let effectiveSessionId = requestSessionId;
@@ -517,6 +534,7 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
         chatAttachmentId: attachmentId || undefined,
         activeArtifact: get().activeArtifact,
         messages,
+        modelTier: get().modelTier,
         useReasoning: get().useReasoning,
         enableWeb: get().useWebSearch,
         chatMode: get().chatMode,
@@ -572,17 +590,19 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
             updateAssistantMessage,
           }),
           onUpdate: ({ fullText, fullThought, isThinking, thinkingTime }) => {
-            updateAssistantMessage((message) => ({
-              ...message,
-              text: fullText,
-              thought: fullThought,
+            useStreamingTextStore.getState().setStreamUpdate({
+              streamingMessageId: aiMsgId,
+              streamedMessageText: fullText,
+              streamedThought: fullThought,
               isThinking,
               thinkingTime,
-            }));
+            });
           },
         });
 
       const segments = parseIrisResponse(fullText);
+
+      useStreamingTextStore.getState().resetStream();
 
       set((state) => ({
         isSending: false,
@@ -617,12 +637,15 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
       }
 
     } catch (err: any) {
+      const partialText = useStreamingTextStore.getState().streamedMessageText;
+      useStreamingTextStore.getState().resetStream();
+
       if (abortController.signal.aborted) {
         console.info("[IrisRun] chat request stopped by user");
         set((state) => ({
           isSending: false,
           messages: state.messages.map((m) =>
-            m.id === aiMsgId ? { ...m, isThinking: false, skipAnimation: true } : m
+            m.id === aiMsgId ? { ...m, text: partialText || m.text, isThinking: false, skipAnimation: true } : m
           ),
         }));
       } else {
@@ -631,7 +654,7 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
           code: err?.code,
           message: err?.message,
         });
-        const hasStreamedContent = Boolean(get().messages.find((m) => m.id === aiMsgId)?.text);
+        const hasStreamedContent = Boolean(partialText || get().messages.find((m) => m.id === aiMsgId)?.text);
         
         let userFriendlyError = "⚠️ Something went wrong. Please try again.";
         if (err?.code === "AI_BURST_LIMIT_EXCEEDED") {
@@ -670,6 +693,35 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
     }
   },
 
+  regenerateResponse: async () => {
+    const { messages, isSending, sendMessage } = get();
+    if (isSending || messages.length === 0) return;
+
+    let lastAssistantIdx = -1;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === "assistant") {
+        lastAssistantIdx = i;
+        break;
+      }
+    }
+    if (lastAssistantIdx === -1) return;
+
+    let precedingUserMsg: ChatMessage | null = null;
+    let precedingUserIdx = -1;
+    for (let i = lastAssistantIdx - 1; i >= 0; i--) {
+      if (messages[i].role === "user") {
+        precedingUserMsg = messages[i];
+        precedingUserIdx = i;
+        break;
+      }
+    }
+    if (!precedingUserMsg) return;
+
+    const trimmed = messages.slice(0, precedingUserIdx);
+    set({ messages: trimmed });
+    await sendMessage(precedingUserMsg.text, precedingUserMsg.imageUrl);
+  },
+
   setAttachedImage: (img) => set({ attachedImage: img }),
   setAttachedDoc: (doc) => set({ attachedDoc: doc }),
   uploadDoc: async (files) => {
@@ -677,6 +729,11 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
     const doc = await uploadChatAttachment(files);
     set({ attachedDoc: doc });
   },
+  setModelTier: (tier) =>
+    set({
+      modelTier: tier,
+      useReasoning: tier !== "fast",
+    }),
   setUseReasoning: (val) => set({ useReasoning: val }),
   setUseWebSearch: (val) => set({ useWebSearch: val }),
   setChatMode: (mode) => set({ chatMode: mode }),

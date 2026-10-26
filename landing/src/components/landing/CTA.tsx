@@ -6,11 +6,8 @@ export const CTA = () => {
     <section className="relative py-24 md:py-32 z-20 overflow-hidden">
       <div className="container mx-auto px-6">
         <FadeIn className="relative max-w-3xl mx-auto text-center">
-          <div className="absolute inset-0 -z-10 bg-gradient-to-b from-indigo-500/5 to-transparent rounded-full blur-[100px]" />
-          <div className="absolute -top-10 left-1/2 -translate-x-1/2 h-60 w-[600px] bg-indigo-600/20 blur-[120px] rounded-full -z-10" />
-
           <h2 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight text-white">
-            Stop losing your <span className="gradient-text">half-thoughts.</span>
+            Stop losing your <span className="text-indigo-300">half-thoughts.</span>
           </h2>
           <p className="mt-5 text-stone-400 text-base sm:text-lg max-w-xl mx-auto">
             Transform your scattered thoughts into structured knowledge. Master any topic with AI-powered active learning tools.
@@ -18,7 +15,7 @@ export const CTA = () => {
           <div className="mt-10 flex flex-col items-center justify-center gap-4">
             <a 
               href="https://app.notesify.in"
-              className="group relative flex items-center justify-center bg-white text-black hover:bg-stone-200 px-10 py-5 rounded-2xl text-base sm:text-lg font-bold transition-all duration-300 w-full sm:w-auto active:scale-95 shadow-2xl shadow-white/10 overflow-hidden"
+              className="group relative flex items-center justify-center bg-white text-black hover:bg-stone-200 px-10 py-5 rounded-2xl text-base sm:text-lg font-bold transition-all duration-300 w-full sm:w-auto shadow-2xl shadow-white/10 overflow-hidden"
             >
               <span className="relative z-10 flex items-center">
                 <span className="transition-transform duration-300 group-hover:-translate-x-1">Start writing free</span>

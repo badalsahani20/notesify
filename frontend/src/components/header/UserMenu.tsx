@@ -40,6 +40,7 @@ const UserMenu = () => {
       <DropdownMenuTrigger asChild>
         <button
           type="button"
+          aria-label="User account and settings menu"
           className="flex items-center justify-center cursor-pointer transition-all duration-300 hover:scale-105 rounded-full ring-2 ring-transparent hover:ring-zinc-700/50 p-0 outline-none focus-visible:ring-zinc-500"
         >
           <Avatar className="h-9 w-9 border border-zinc-700/60 shadow-[0_4px_14px_rgba(0,0,0,0.5)]">

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { AlertTriangle, ArrowRightLeft, Check, Cloud } from "lucide-react";
+import { ArrowRightLeft, Check, Cloud, GitFork } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNoteConflict } from "@/hooks/notes/useNoteConflict";
 import { NoteConflictModal } from "./NoteConflictModal";
@@ -17,32 +17,42 @@ export const NoteConflictBanner: React.FC<NoteConflictBannerProps> = ({ noteId }
 
   return (
     <>
-      <div className="mx-8 mt-3 mb-1 p-3 rounded-xl border border-amber-500/30 bg-amber-950/20 backdrop-blur-md flex flex-wrap items-center justify-between gap-3 text-amber-200 text-xs shadow-lg animate-in fade-in slide-in-from-top-2 duration-200">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="h-7 w-7 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
-            <AlertTriangle size={15} />
+      <aside
+        aria-label="Version conflict status"
+        className="mx-8 mt-2.5 mb-1 px-4 py-2.5 rounded-lg border border-[var(--divider)] bg-[var(--surface-muted)]/90 backdrop-blur-xs flex flex-wrap items-center justify-between gap-3 text-[var(--text-strong)] text-xs shadow-xs transition-all duration-200"
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center justify-center w-6 h-6 rounded-md bg-[var(--accent-soft)] text-[var(--accent-strong)] shrink-0">
+            <GitFork size={13} className="shrink-0" />
           </div>
-          <div className="truncate">
-            <p className="font-semibold text-white truncate">
-              Version conflict detected
-            </p>
-            <p className="text-[11px] text-amber-300/80 truncate">
-              Server has version {serverVersion ?? "?"}, your local draft is version {localVersion ?? "?"}. Local edits are preserved.
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-[var(--text-strong)] truncate">
+                Simultaneous edits detected
+              </span>
+              <span className="inline-flex items-center gap-1 text-[11px] font-mono [font-variant-numeric:tabular-nums] text-[var(--muted-text)]">
+                <span>local v{localVersion ?? "?"}</span>
+                <span className="text-[var(--divider)]">/</span>
+                <span>server v{serverVersion ?? "?"}</span>
+              </span>
+            </div>
+            <p className="text-[11px] text-[var(--muted-text)] truncate mt-0.5">
+              Changes were made elsewhere. Your local edits remain intact until resolved.
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0 ml-auto">
           <Button
             type="button"
             variant="ghost"
             size="sm"
             onClick={() => resolveKeepServer()}
             disabled={isResolving}
-            className="h-7 px-2.5 text-xs text-amber-300 hover:text-white hover:bg-white/10"
+            className="h-7 px-2.5 text-xs text-[var(--muted-text)] hover:text-[var(--text-strong)] hover:bg-[var(--surface-ghost)]"
             title="Discard local changes and load server copy"
           >
-            <Cloud size={12} className="mr-1" />
+            <Cloud size={12} className="mr-1.5 opacity-70" />
             Keep Server
           </Button>
           <Button
@@ -51,24 +61,24 @@ export const NoteConflictBanner: React.FC<NoteConflictBannerProps> = ({ noteId }
             size="sm"
             onClick={() => resolveKeepMine()}
             disabled={isResolving}
-            className="h-7 px-2.5 text-xs border-amber-500/40 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20 hover:text-white"
-            title="Rebase local draft onto server version"
+            className="h-7 px-2.5 text-xs border-[var(--divider)] bg-[var(--window-bg)] hover:bg-[var(--surface-ghost)] text-[var(--text-strong)] shadow-2xs"
+            title="Overwrite server with your local draft"
           >
-            <Check size={12} className="mr-1" />
-            Keep Mine
+            <Check size={12} className="mr-1.5 opacity-70" />
+            Keep Local
           </Button>
           <Button
             type="button"
             size="sm"
             onClick={() => setIsModalOpen(true)}
             disabled={isResolving}
-            className="h-7 px-3 text-xs bg-amber-500 hover:bg-amber-400 text-black font-semibold shadow-sm"
+            className="h-7 px-3 text-xs bg-[var(--text-strong)] text-[var(--window-bg)] hover:opacity-90 font-medium rounded-md shadow-2xs flex items-center gap-1.5 transition-opacity"
           >
-            <ArrowRightLeft size={12} className="mr-1" />
-            Review & Diff
+            <ArrowRightLeft size={12} />
+            Review &amp; Diff
           </Button>
         </div>
-      </div>
+      </aside>
 
       <NoteConflictModal
         noteId={noteId}

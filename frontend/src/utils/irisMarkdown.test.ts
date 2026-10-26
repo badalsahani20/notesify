@@ -26,3 +26,30 @@ describe("normalizeIrisDirectives", () => {
     expect(result).toBe(":::warning\nStill arriving");
   });
 });
+
+describe("createIrisMarkdownComponents", () => {
+  it("renders a div instead of a p when children contain block directives", async () => {
+    const { createIrisMarkdownComponents } = await import("../components/chat/IrisMarkdownRenderer");
+    const components = createIrisMarkdownComponents();
+
+    const pWithCallout = components.p({
+      children: "callout inside",
+      node: {
+        children: [{ type: "element", tagName: "iris-callout" }],
+      },
+    });
+
+    // Should render a div, NOT a p
+    expect(pWithCallout.type).toBe("div");
+
+    const normalP = components.p({
+      children: "normal text",
+      node: {
+        children: [{ type: "text", value: "normal text" }],
+      },
+    });
+
+    // Normal text should remain a p
+    expect(normalP.type).toBe("p");
+  });
+});

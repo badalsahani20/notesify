@@ -1,10 +1,20 @@
+import crypto from "crypto";
 import mongoose from "mongoose";
 
 const MESSAGE_CAP = 100;
 
-// Typed subdocument — each message has a strict shape
+// Typed subdocument — each message has a strict shape with stable id and monotonic sequence
 const chatMessageSchema = new mongoose.Schema(
   {
+    id: {
+      type: String,
+      default: () => crypto.randomUUID(),
+    },
+    seq: {
+      type: Number,
+      required: true,
+      default: 1,
+    },
     role: {
       type: String,
       enum: ["user", "assistant"],
@@ -81,6 +91,14 @@ const globalChatSessionSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    lastSummarizedMessageId: {
+      type: String,
+      default: null,
+    },
+    lastSummarizedSeq: {
+      type: Number,
+      default: 0,
+    },
     chatMode: {
       type: String,
       enum: ["study", "casual"],
@@ -109,8 +127,20 @@ const globalChatSessionSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Rolling cap: before every save, trim to the last MESSAGE_CAP entries
+// Sequence enforcement & rolling cap: ensure every message has an id & monotonic seq, then trim if needed
 globalChatSessionSchema.pre("save", function (next) {
+  let currentMaxSeq = 0;
+  for (let i = 0; i < this.messages.length; i++) {
+    const msg = this.messages[i];
+    if (!msg.id) {
+      msg.id = crypto.randomUUID();
+    }
+    if (typeof msg.seq !== "number" || msg.seq <= currentMaxSeq) {
+      msg.seq = currentMaxSeq + 1;
+    }
+    currentMaxSeq = msg.seq;
+  }
+
   if (this.messages.length > MESSAGE_CAP) {
     this.messages = this.messages.slice(-MESSAGE_CAP);
   }

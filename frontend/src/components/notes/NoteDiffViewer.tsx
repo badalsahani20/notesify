@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { diffLines, type Change } from "diff";
-import { Columns2, Rows, ChevronDown, ChevronRight, Plus, Minus, Layers } from "lucide-react";
+import { Columns2, Rows, ChevronDown, ChevronRight, Layers } from "lucide-react";
 import { stripHtml } from "@/utils/stripHtml";
 
 interface NoteDiffViewerProps {
@@ -52,9 +52,7 @@ export const NoteDiffViewer: React.FC<NoteDiffViewerProps> = ({
     let deletions = 0;
 
     for (const chunk of rawDiff) {
-      // Split chunk into individual lines
       const chunkLines = chunk.value.replace(/\r\n/g, "\n").split("\n");
-      // If trailing line is empty due to split at end of string
       if (chunkLines[chunkLines.length - 1] === "" && chunkLines.length > 1) {
         chunkLines.pop();
       }
@@ -92,7 +90,6 @@ export const NoteDiffViewer: React.FC<NoteDiffViewerProps> = ({
   const hunks = useMemo(() => {
     if (allLines.length === 0) return [];
 
-    // Find indices of all changed lines
     const changedIndices = new Set<number>();
     allLines.forEach((l, idx) => {
       if (l.type !== "unchanged") {
@@ -100,12 +97,10 @@ export const NoteDiffViewer: React.FC<NoteDiffViewerProps> = ({
       }
     });
 
-    // If everything is unchanged or empty
     if (changedIndices.size === 0) {
       return [{ type: "hunk", lines: allLines }] as HunkBlock[];
     }
 
-    // Determine which unchanged lines are within CONTEXT_SIZE distance from a change
     const visibleIndices = new Set<number>();
     changedIndices.forEach((changeIdx) => {
       const start = Math.max(0, changeIdx - CONTEXT_SIZE);
@@ -172,30 +167,30 @@ export const NoteDiffViewer: React.FC<NoteDiffViewerProps> = ({
     setExpandedHunks(nextState);
   };
 
-  // Inline word diff helper for modified lines
   const renderWordDiff = (line: DiffLine) => {
     return (
-      <span className="font-mono text-xs whitespace-pre-wrap break-all">
+      <span className="font-mono text-xs leading-relaxed whitespace-pre-wrap break-all">
         {line.text || " "}
       </span>
     );
   };
 
   return (
-    <div className="flex flex-col h-full rounded-xl border border-white/10 bg-neutral-950/80 overflow-hidden text-neutral-200">
+    <div className="flex flex-col h-full rounded-lg border border-[var(--divider)] bg-[var(--window-bg)] overflow-hidden text-[var(--text-strong)] text-xs">
       {/* Diff Controls Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-neutral-900/90 border-b border-white/10">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-3.5 py-2 bg-[var(--surface-muted)]/70 border-b border-[var(--divider)] select-none">
         <div className="flex items-center gap-3">
-          <span className="text-xs font-semibold text-neutral-300 flex items-center gap-1.5">
-            <Layers size={14} className="text-indigo-400" />
-            Changes Overview
+          <span className="font-medium text-[var(--text-strong)] flex items-center gap-1.5 text-xs">
+            <Layers size={13} className="text-[var(--accent-strong)]" />
+            Comparison
           </span>
-          <div className="flex items-center gap-1.5 text-[11px] font-mono">
-            <span className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center gap-0.5">
-              <Plus size={10} /> {stats.additions} added
+          <div className="flex items-center gap-2 text-[11px] font-mono [font-variant-numeric:tabular-nums]">
+            <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+              +{stats.additions}
             </span>
-            <span className="px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-400 border border-rose-500/30 flex items-center gap-0.5">
-              <Minus size={10} /> {stats.deletions} removed
+            <span className="text-[var(--divider)]">/</span>
+            <span className="text-rose-600 dark:text-rose-400 font-medium">
+              -{stats.deletions}
             </span>
           </div>
         </div>
@@ -205,34 +200,34 @@ export const NoteDiffViewer: React.FC<NoteDiffViewerProps> = ({
             <button
               type="button"
               onClick={toggleAllFolds}
-              className="px-2.5 py-1 rounded text-[11px] font-medium bg-white/5 hover:bg-white/10 text-neutral-400 hover:text-white transition-colors"
+              className="px-2 py-1 rounded text-[11px] font-medium text-[var(--muted-text)] hover:text-[var(--text-strong)] hover:bg-[var(--surface-ghost)] transition-colors"
             >
-              Toggle Unchanged Lines
+              Toggle unchanged
             </button>
           )}
 
-          <div className="flex items-center p-0.5 rounded-lg bg-black/40 border border-white/10 text-xs">
+          <div className="flex items-center p-0.5 rounded-md bg-[var(--surface-ghost)] border border-[var(--divider)] text-xs">
             <button
               type="button"
               onClick={() => setViewMode("unified")}
-              className={`px-2.5 py-1 rounded-md flex items-center gap-1.5 transition-all ${
+              className={`px-2 py-0.5 rounded-sm flex items-center gap-1.5 text-[11px] transition-all ${
                 viewMode === "unified"
-                  ? "bg-white/15 text-white font-medium shadow-sm"
-                  : "text-neutral-400 hover:text-neutral-200"
+                  ? "bg-[var(--window-bg)] text-[var(--text-strong)] font-medium shadow-2xs"
+                  : "text-[var(--muted-text)] hover:text-[var(--text-strong)]"
               }`}
             >
-              <Rows size={12} /> Unified
+              <Rows size={11} /> Unified
             </button>
             <button
               type="button"
               onClick={() => setViewMode("split")}
-              className={`px-2.5 py-1 rounded-md flex items-center gap-1.5 transition-all ${
+              className={`px-2 py-0.5 rounded-sm flex items-center gap-1.5 text-[11px] transition-all ${
                 viewMode === "split"
-                  ? "bg-white/15 text-white font-medium shadow-sm"
-                  : "text-neutral-400 hover:text-neutral-200"
+                  ? "bg-[var(--window-bg)] text-[var(--text-strong)] font-medium shadow-2xs"
+                  : "text-[var(--muted-text)] hover:text-[var(--text-strong)]"
               }`}
             >
-              <Columns2 size={12} /> Split
+              <Columns2 size={11} /> Split
             </button>
           </div>
         </div>
@@ -240,31 +235,29 @@ export const NoteDiffViewer: React.FC<NoteDiffViewerProps> = ({
 
       {/* Title Diff (if title changed) */}
       {hasTitleChange && (
-        <div className="px-4 py-2 bg-neutral-900/40 border-b border-white/5 text-xs flex flex-col gap-1">
-          <div className="text-[10px] font-medium uppercase tracking-wider text-neutral-500">
-            Note Title Changed
-          </div>
-          <div className="flex items-center gap-2 font-mono">
-            <span className="px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-400 border border-rose-500/25 line-through">
-              - {serverTitle || "<Empty>"} (Server v{serverVersion ?? "?"})
-            </span>
-            <span className="text-neutral-500">→</span>
-            <span className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
-              + {localTitle || "<Empty>"} (Your draft v{localVersion ?? "?"})
-            </span>
-          </div>
+        <div className="px-3.5 py-2 bg-[var(--surface-muted)]/30 border-b border-[var(--divider)] text-xs flex items-center gap-2 flex-wrap">
+          <span className="text-[11px] font-medium text-[var(--muted-text)] uppercase tracking-wider">
+            Title
+          </span>
+          <span className="font-mono text-rose-600 dark:text-rose-400 line-through opacity-80">
+            {serverTitle || "<Empty>"}
+          </span>
+          <span className="text-[var(--muted-text)] text-[11px]">→</span>
+          <span className="font-mono text-emerald-600 dark:text-emerald-400 font-medium">
+            {localTitle || "<Empty>"}
+          </span>
         </div>
       )}
 
       {/* Main Diff Content */}
-      <div className="flex-1 overflow-y-auto max-h-[380px] font-mono text-xs select-text">
+      <div className="flex-1 overflow-y-auto min-h-0 font-mono text-xs select-text">
         {allLines.length === 0 ? (
-          <div className="p-8 text-center text-neutral-500">
-            No text differences detected.
+          <div className="p-8 text-center text-[var(--muted-text)] font-sans">
+            No textual differences found between versions.
           </div>
         ) : viewMode === "unified" ? (
           /* UNIFIED DIFF VIEW */
-          <div className="divide-y divide-white/5">
+          <div className="divide-y divide-[var(--divider)]/40">
             {hunks.map((block, bIdx) => {
               if (block.type === "folded") {
                 const isExpanded = expandedHunks[block.id];
@@ -273,28 +266,28 @@ export const NoteDiffViewer: React.FC<NoteDiffViewerProps> = ({
                     <button
                       type="button"
                       onClick={() => toggleFold(block.id)}
-                      className="w-full flex items-center justify-center gap-2 py-1.5 px-4 bg-neutral-900/60 hover:bg-neutral-800/80 text-[11px] text-neutral-400 hover:text-neutral-200 transition-colors border-y border-white/5"
+                      className="w-full flex items-center justify-center gap-2 py-1 px-4 bg-[var(--surface-muted)]/40 hover:bg-[var(--surface-muted)] text-[11px] text-[var(--muted-text)] hover:text-[var(--text-strong)] transition-colors border-y border-[var(--divider)]/60 select-none font-sans"
                     >
-                      {isExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                      {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                       <span>
                         {isExpanded
                           ? `Collapse ${block.count} unchanged lines`
-                          : `↕ Expand ${block.count} unchanged lines`}
+                          : `Expand ${block.count} unchanged lines`}
                       </span>
                     </button>
                     {isExpanded &&
                       block.lines.map((line, lIdx) => (
                         <div
                           key={`fold-${bIdx}-${lIdx}`}
-                          className="flex items-start px-2 py-0.5 bg-black/20 text-neutral-500 hover:bg-white/5"
+                          className="flex items-start px-2 py-0.5 text-[var(--muted-text)] opacity-70 hover:opacity-100 hover:bg-[var(--surface-ghost)]/40"
                         >
-                          <span className="w-10 text-right pr-3 select-none text-neutral-600 shrink-0">
+                          <span className="w-8 text-right pr-2.5 select-none text-[var(--muted-text)]/60 shrink-0 [font-variant-numeric:tabular-nums]">
                             {line.oldLineNumber}
                           </span>
-                          <span className="w-10 text-right pr-3 select-none text-neutral-600 shrink-0">
+                          <span className="w-8 text-right pr-2.5 select-none text-[var(--muted-text)]/60 shrink-0 [font-variant-numeric:tabular-nums]">
                             {line.newLineNumber}
                           </span>
-                          <span className="w-5 text-center select-none text-neutral-600 shrink-0"> </span>
+                          <span className="w-4 text-center select-none text-transparent shrink-0">·</span>
                           <div className="flex-1 min-w-0">{renderWordDiff(line)}</div>
                         </div>
                       ))}
@@ -313,25 +306,25 @@ export const NoteDiffViewer: React.FC<NoteDiffViewerProps> = ({
                         key={`line-${bIdx}-${lIdx}`}
                         className={`flex items-start px-2 py-0.5 transition-colors ${
                           isAdded
-                            ? "bg-emerald-950/40 text-emerald-300 border-l-2 border-emerald-500"
+                            ? "bg-emerald-500/10 text-emerald-800 dark:text-emerald-200 border-l-2 border-emerald-500"
                             : isRemoved
-                            ? "bg-rose-950/40 text-rose-300 border-l-2 border-rose-500"
-                            : "bg-transparent text-neutral-400 hover:bg-white/5"
+                            ? "bg-rose-500/10 text-rose-800 dark:text-rose-200 border-l-2 border-rose-500"
+                            : "bg-transparent text-[var(--text-strong)]/85 hover:bg-[var(--surface-ghost)]/30"
                         }`}
                       >
-                        <span className="w-10 text-right pr-3 select-none text-neutral-600 shrink-0">
+                        <span className="w-8 text-right pr-2.5 select-none text-[var(--muted-text)]/60 shrink-0 [font-variant-numeric:tabular-nums]">
                           {line.oldLineNumber ?? ""}
                         </span>
-                        <span className="w-10 text-right pr-3 select-none text-neutral-600 shrink-0">
+                        <span className="w-8 text-right pr-2.5 select-none text-[var(--muted-text)]/60 shrink-0 [font-variant-numeric:tabular-nums]">
                           {line.newLineNumber ?? ""}
                         </span>
                         <span
-                          className={`w-5 text-center select-none font-bold shrink-0 ${
+                          className={`w-4 text-center select-none font-bold shrink-0 ${
                             isAdded
-                              ? "text-emerald-400"
+                              ? "text-emerald-600 dark:text-emerald-400"
                               : isRemoved
-                              ? "text-rose-400"
-                              : "text-neutral-600"
+                              ? "text-rose-600 dark:text-rose-400"
+                              : "text-transparent"
                           }`}
                         >
                           {isAdded ? "+" : isRemoved ? "-" : " "}
@@ -346,16 +339,16 @@ export const NoteDiffViewer: React.FC<NoteDiffViewerProps> = ({
           </div>
         ) : (
           /* SPLIT (SIDE-BY-SIDE) VIEW */
-          <div className="grid grid-cols-2 divide-x divide-white/10 min-w-[600px]">
+          <div className="grid grid-cols-2 divide-x divide-[var(--divider)] min-w-[600px]">
             {/* Server Column Header */}
-            <div className="sticky top-0 z-10 px-3 py-1.5 bg-neutral-900 border-b border-white/10 text-[11px] font-medium text-rose-400 flex items-center justify-between">
-              <span>Server Version (v{serverVersion ?? "?"})</span>
-              <span className="text-[10px] text-neutral-500">Deleted / Prior text</span>
+            <div className="sticky top-0 z-10 px-3 py-1.5 bg-[var(--surface-muted)]/90 backdrop-blur-xs border-b border-[var(--divider)] text-[11px] font-medium text-rose-600 dark:text-rose-400 flex items-center justify-between select-none">
+              <span>Server version (v{serverVersion ?? "?"})</span>
+              <span className="text-[10px] text-[var(--muted-text)] font-sans">Remote copy</span>
             </div>
             {/* Local Column Header */}
-            <div className="sticky top-0 z-10 px-3 py-1.5 bg-neutral-900 border-b border-white/10 text-[11px] font-medium text-emerald-400 flex items-center justify-between">
-              <span>Your Local Draft (v{localVersion ?? "?"})</span>
-              <span className="text-[10px] text-neutral-500">Added / New text</span>
+            <div className="sticky top-0 z-10 px-3 py-1.5 bg-[var(--surface-muted)]/90 backdrop-blur-xs border-b border-[var(--divider)] text-[11px] font-medium text-emerald-600 dark:text-emerald-400 flex items-center justify-between select-none">
+              <span>Your local draft (v{localVersion ?? "?"})</span>
+              <span className="text-[10px] text-[var(--muted-text)] font-sans">Current unsaved</span>
             </div>
 
             {/* Split Content Rows */}
@@ -367,29 +360,29 @@ export const NoteDiffViewer: React.FC<NoteDiffViewerProps> = ({
                     <button
                       type="button"
                       onClick={() => toggleFold(block.id)}
-                      className="w-full flex items-center justify-center gap-2 py-1.5 px-4 bg-neutral-900/60 hover:bg-neutral-800/80 text-[11px] text-neutral-400 hover:text-neutral-200 transition-colors border-y border-white/5"
+                      className="w-full flex items-center justify-center gap-2 py-1 px-4 bg-[var(--surface-muted)]/40 hover:bg-[var(--surface-muted)] text-[11px] text-[var(--muted-text)] hover:text-[var(--text-strong)] transition-colors border-y border-[var(--divider)]/60 select-none font-sans"
                     >
-                      {isExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                      {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                       <span>
                         {isExpanded
                           ? `Collapse ${block.count} unchanged lines`
-                          : `↕ Expand ${block.count} unchanged lines`}
+                          : `Expand ${block.count} unchanged lines`}
                       </span>
                     </button>
                     {isExpanded &&
                       block.lines.map((line, lIdx) => (
                         <div
                           key={`split-fold-${bIdx}-${lIdx}`}
-                          className="grid grid-cols-2 divide-x divide-white/10 bg-black/20 text-neutral-500"
+                          className="grid grid-cols-2 divide-x divide-[var(--divider)] text-[var(--muted-text)] opacity-70 hover:opacity-100"
                         >
                           <div className="flex items-start px-2 py-0.5">
-                            <span className="w-8 text-right pr-2 text-neutral-600 select-none shrink-0">
+                            <span className="w-8 text-right pr-2 text-[var(--muted-text)]/60 select-none shrink-0 [font-variant-numeric:tabular-nums]">
                               {line.oldLineNumber}
                             </span>
                             <div className="flex-1 min-w-0">{renderWordDiff(line)}</div>
                           </div>
                           <div className="flex items-start px-2 py-0.5">
-                            <span className="w-8 text-right pr-2 text-neutral-600 select-none shrink-0">
+                            <span className="w-8 text-right pr-2 text-[var(--muted-text)]/60 select-none shrink-0 [font-variant-numeric:tabular-nums]">
                               {line.newLineNumber}
                             </span>
                             <div className="flex-1 min-w-0">{renderWordDiff(line)}</div>
@@ -412,16 +405,16 @@ export const NoteDiffViewer: React.FC<NoteDiffViewerProps> = ({
                         <div
                           className={`flex items-start px-2 py-0.5 min-h-[22px] ${
                             isRemoved
-                              ? "bg-rose-950/40 text-rose-300 border-l-2 border-rose-500"
+                              ? "bg-rose-500/10 text-rose-800 dark:text-rose-200 border-l-2 border-rose-500"
                               : isAdded
-                              ? "bg-neutral-950/30 text-transparent select-none"
-                              : "bg-transparent text-neutral-400 hover:bg-white/5"
+                              ? "bg-[var(--surface-muted)]/20 text-transparent select-none"
+                              : "bg-transparent text-[var(--text-strong)]/85 hover:bg-[var(--surface-ghost)]/30"
                           }`}
                         >
-                          <span className="w-8 text-right pr-2 text-neutral-600 select-none shrink-0">
+                          <span className="w-8 text-right pr-2 text-[var(--muted-text)]/60 select-none shrink-0 [font-variant-numeric:tabular-nums]">
                             {line.oldLineNumber ?? ""}
                           </span>
-                          <span className="w-4 select-none font-bold text-rose-400 shrink-0">
+                          <span className="w-4 select-none font-bold text-rose-600 dark:text-rose-400 shrink-0">
                             {isRemoved ? "-" : " "}
                           </span>
                           <div className="flex-1 min-w-0">
@@ -433,16 +426,16 @@ export const NoteDiffViewer: React.FC<NoteDiffViewerProps> = ({
                         <div
                           className={`flex items-start px-2 py-0.5 min-h-[22px] ${
                             isAdded
-                              ? "bg-emerald-950/40 text-emerald-300 border-l-2 border-emerald-500"
+                              ? "bg-emerald-500/10 text-emerald-800 dark:text-emerald-200 border-l-2 border-emerald-500"
                               : isRemoved
-                              ? "bg-neutral-950/30 text-transparent select-none"
-                              : "bg-transparent text-neutral-400 hover:bg-white/5"
+                              ? "bg-[var(--surface-muted)]/20 text-transparent select-none"
+                              : "bg-transparent text-[var(--text-strong)]/85 hover:bg-[var(--surface-ghost)]/30"
                           }`}
                         >
-                          <span className="w-8 text-right pr-2 text-neutral-600 select-none shrink-0">
+                          <span className="w-8 text-right pr-2 text-[var(--muted-text)]/60 select-none shrink-0 [font-variant-numeric:tabular-nums]">
                             {line.newLineNumber ?? ""}
                           </span>
-                          <span className="w-4 select-none font-bold text-emerald-400 shrink-0">
+                          <span className="w-4 select-none font-bold text-emerald-600 dark:text-emerald-400 shrink-0">
                             {isAdded ? "+" : " "}
                           </span>
                           <div className="flex-1 min-w-0">

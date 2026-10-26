@@ -96,7 +96,7 @@ function ReasoningTrigger({
     <button
       type="button"
       className={cn(
-        "flex cursor-pointer items-center gap-1.5 text-xs font-medium text-white/90 hover:text-white transition-colors py-1 select-none",
+        "flex cursor-pointer items-center gap-1.5 text-[13.5px] font-medium text-white/90 hover:text-white transition-colors py-1 select-none",
         className
       )}
       onClick={() => onOpenChange(!isOpen)}
@@ -156,7 +156,7 @@ function ReasoningContent({
       <div className="overflow-hidden">
         <div
           className={cn(
-            "text-white/90 text-xs leading-relaxed py-1.5 whitespace-pre-wrap font-sans [&>p]:my-1 [&>p:first-child]:mt-0 [&>p:last-child]:mb-0",
+            "text-white/90 text-[13.5px] leading-[1.65] py-1.5 whitespace-pre-wrap font-sans [&>p]:my-1.5 [&>p:first-child]:mt-0 [&>p:last-child]:mb-0",
             contentClassName
           )}
         >

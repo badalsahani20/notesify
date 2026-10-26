@@ -1,28 +1,41 @@
-/**
- * Chat Tool Definitions
- * Defines schema for autonomous tools available to the LLM during chat sessions.
- */
-
 export const saveMemoryTool = {
   type: "function",
   function: {
     name: "save_memory",
     description:
-      "Save an important personal fact, preference, goal, or detail explicitly shared by the user about themselves into long-term memory.",
+      "Save lasting user facts, preferences, goals, or projects. Never invent details.",
     parameters: {
       type: "object",
       properties: {
         category: {
           type: "string",
           enum: ["PROFILE", "PREFERENCE", "GOAL", "PROJECT", "SKILL", "OTHER"],
-          description: "Category of the memory",
         },
         content: {
           type: "string",
-          description: "The concise factual detail to remember about the user",
+          description: "Concise fact about the user.",
         },
       },
       required: ["category", "content"],
+    },
+  },
+};
+
+export const recallMemoryTool = {
+  type: "function",
+  function: {
+    name: "recall_memory",
+    description:
+      "Retrieve relevant long-term user memories when personal context would improve the answer.",
+    parameters: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description: "Memory search query.",
+        },
+      },
+      required: ["query"],
     },
   },
 };
@@ -32,50 +45,36 @@ export const askQuestionTool = {
   function: {
     name: "ask_question",
     description:
-      "Present an interactive question, quiz, topic selection, or preference dialog directly in the Notesify chat UI. ALWAYS call this tool when: (1) Suggesting options, topics, or learning paths (e.g. user says 'teach me something', 'help me learn', 'what should I study?'); (2) Clarifying ambiguous or broad requests with structured selectable choices; (3) Testing the user's knowledge with a quick quiz; (4) Letting the user prioritize or pick their next direction. Do not just list options in raw text when you can give them clickable options through this tool.",
+      "Present interactive choices for quizzes, clarification, preferences, or prioritization. Avoid unnecessary questions.",
     parameters: {
       type: "object",
       properties: {
         purpose: {
           type: "string",
           enum: ["quiz", "clarification", "preference", "ranking"],
-          description:
-            "Purpose of the question set: 'preference' or 'clarification' for topic suggestions and choosing options; 'quiz' for testing knowledge; 'ranking' for prioritizing.",
-        },
-        title: {
-          type: "string",
-          description: "Short label for this question set (2-4 words, e.g. 'Choose a Topic', 'Select Track', 'Quick Quiz').",
         },
         questions: {
           type: "array",
-          description: "List of questions or choices to present to the user.",
           minItems: 1,
-          maxItems: 15,
+          maxItems: 5,
           items: {
             type: "object",
             properties: {
-              id: {
-                type: "string",
-                description: "Unique identifier for this question (e.g. 'q1', 'topic_choice').",
-              },
-              question: {
-                type: "string",
-                description: "The prompt or question shown above the options (e.g. 'What would you like to explore today?').",
-              },
+              id: { type: "string" },
+              question: { type: "string" },
               type: {
                 type: "string",
                 enum: ["single_select", "multi_select", "rank_priority"],
-                description: "Interaction type (single_select for one choice, multi_select for multiple, rank_priority for ordering).",
               },
               allowOther: {
                 type: "boolean",
-                description: "Whether the user may write in a custom option.",
                 default: true,
               },
               options: {
                 type: "array",
                 items: { type: "string" },
-                description: "List of 2 to 5 curated selectable options for the user.",
+                minItems: 2,
+                maxItems: 5,
               },
             },
             required: ["id", "question", "type", "options"],
@@ -87,23 +86,19 @@ export const askQuestionTool = {
   },
 };
 
-
 export const createNoteTool = {
   type: "function",
   function: {
     name: "create_note",
     description:
-      "Create a new note in Notesify with title and Markdown content when explicitly requested.",
+      "Create a new Markdown note only when explicitly requested.",
     parameters: {
       type: "object",
       properties: {
-        title: {
-          type: "string",
-          description: "The title of the note.",
-        },
+        title: { type: "string" },
         content: {
           type: "string",
-          description: "The body content in rich Markdown.",
+          description: "Markdown note content.",
         },
       },
       required: ["title", "content"],
@@ -117,14 +112,11 @@ export const getNoteContentTool = {
   function: {
     name: "get_note_content",
     description:
-      "Retrieve the complete current content of an active note by noteId.",
+      "Fetch complete note content when provided editor context is insufficient.",
     parameters: {
       type: "object",
       properties: {
-        noteId: {
-          type: "string",
-          description: "The unique ID of the active note to retrieve.",
-        },
+        noteId: { type: "string" },
       },
       required: ["noteId"],
       additionalProperties: false,
@@ -132,31 +124,41 @@ export const getNoteContentTool = {
   },
 };
 
+/*
 export const updateNoteTool = {
   type: "function",
   function: {
     name: "update_note",
     description:
-      "Update an existing note in Notesify. Use mode='append' to add new material, or mode='replace' to overwrite when requested.",
+      "Edit an existing note. Supply 'blockId' (e.g. 'b_xxx') to surgically replace a specific block from editor context with 100% precision, or use 'targetContent' as fallback. Use mode: 'append' to add to the bottom, or 'full_replace' only with explicit authorization.",
     parameters: {
       type: "object",
       properties: {
-        noteId: {
-          type: "string",
-          description: "The unique ID of the existing note to update.",
-        },
+        noteId: { type: "string", description: "ID of the note to update." },
         title: {
           type: "string",
-          description: "New title for the note (if renaming).",
+          description: "Optional new title.",
+        },
+        blockId: {
+          type: "string",
+          description: "Persistent block ID to replace from editor context (e.g. 'b_k7d2m9'). Provides exact block targeting.",
+        },
+        targetContent: {
+          type: "string",
+          description: "Content or text snippet to replace if blockId is not known.",
+        },
+        replacementContent: {
+          type: "string",
+          description: "New content to replace the target block or content with.",
         },
         content: {
           type: "string",
-          description: "Content to append, or full replacement content.",
+          description: "Content to append or replace.",
         },
         mode: {
           type: "string",
-          enum: ["append", "replace"],
-          description: "Default 'append' adds to end; 'replace' overwrites.",
+          enum: ["replace_target", "append", "prepend", "full_replace", "replace"],
+          description: "Defaults to 'replace_target' if blockId or targetContent is provided, otherwise 'append'.",
         },
       },
       required: ["noteId"],
@@ -164,38 +166,35 @@ export const updateNoteTool = {
     },
   },
 };
+*/
 
-
-/**
- * Returns available tools for the current chat mode.
- * @param {string} chatMode - "casual" | "study"
- * @param {object} [options]
- * @param {boolean} [options.isNoteScoped=false] - If true (note editor drawer), only get_note_content and update_note are available (no create_note).
- * @returns {Array<object>}
- */
-export const getChatTools = (chatMode = "casual", options = {}) => {
-  const { isNoteScoped = false } = options;
-
-  const baseTools = isNoteScoped
-    ? [
-        saveMemoryTool,
-        getNoteContentTool,
-        updateNoteTool,
-        askQuestionTool,
-      ]
-    : [
-        saveMemoryTool,
-        getNoteContentTool,
-        createNoteTool,
-        updateNoteTool,
-        askQuestionTool,
-      ];
-
-  if (chatMode === "study") {
-    return [
-      ...baseTools,
-    ];
-  }
-
-  return baseTools;
+export const searchNotesTool = {
+  type: "function",
+  function: {
+    name: "search_notes",
+    description: "Search across the user's notes by keyword or topic. Returns matching note titles, IDs, and snippets.",
+    parameters: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description: "Search keywords or topic to find relevant notes."
+        }
+      },
+      required: ["query"],
+      additionalProperties: false,
+    },
+  },
 };
+
+export const CHAT_TOOLS = [
+  saveMemoryTool,
+  recallMemoryTool,
+  searchNotesTool,
+  getNoteContentTool,
+  createNoteTool,
+  // updateNoteTool, // Temporarily commented out to avoid simultaneous edit conflict issues
+  askQuestionTool,
+];
+
+export const getChatTools = () => CHAT_TOOLS;

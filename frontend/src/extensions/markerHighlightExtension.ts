@@ -53,7 +53,7 @@ export const MarkerHighlightExtension = Mark.create({
         ({ commands }) =>
           commands.setMark(this.name, {
             color: color || this.options.defaultColor,
-          }),
+        }),
     };
   },
 });

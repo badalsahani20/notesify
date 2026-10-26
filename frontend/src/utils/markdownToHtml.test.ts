@@ -63,6 +63,19 @@ describe("markdownToHtml", () => {
     expect(html).toBe("<table><tr><th>Col1</th><th>Col2</th></tr><tr><td>Val1</td><td>Val2</td></tr></table>");
   });
 
+  it("should discard empty placeholder tables", () => {
+    const md = "|   |   |\n| --- | --- |\n|   |   |";
+    const html = markdownToHtml(md);
+    expect(html).not.toContain("<table>");
+  });
+
+  it("should not treat a horizontal rule following a pipe character as a table", () => {
+    const md = "Option A | Option B\n---";
+    const html = markdownToHtml(md);
+    expect(html).not.toContain("<table>");
+    expect(html).toContain("<hr>");
+  });
+
   it("should parse links", () => {
     const md = "Check [Google](https://google.com)";
     const html = markdownToHtml(md);

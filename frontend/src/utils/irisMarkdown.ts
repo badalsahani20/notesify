@@ -1,9 +1,9 @@
 export const irisTypography = {
-  body: "text-[15px] leading-7",
-  heading: "text-[18px] font-semibold leading-6",
-  subheading: "text-[15px] font-semibold leading-6",
-  code: "font-mono text-[13px]",
-  caption: "text-[12px] leading-5",
+  body: "text-[16px] leading-[1.75]",
+  heading: "text-[20px] font-semibold leading-7",
+  subheading: "text-[16.5px] font-semibold leading-6",
+  code: "font-mono text-[13.5px]",
+  caption: "text-[13px] leading-5",
 } as const;
 
 export const irisSpacing = {
@@ -38,6 +38,9 @@ const escapeDirectiveBody = (value: string) =>
  * blocks, so examples and pasted code remain ordinary Markdown.
  */
 export const normalizeIrisDirectives = (markdown: string): string => {
+  if (!markdown || !markdown.includes(":::")) {
+    return markdown;
+  }
   const lines = markdown.split("\n");
   const output: string[] = [];
   let fence: string | null = null;
@@ -92,6 +95,7 @@ export const normalizeIrisDirectives = (markdown: string): string => {
 
     const title = (opening[2] ?? "").trim();
     const bodyText = body.join("\n").trim();
+    output.push("");
     if (kind === "comparison") {
       output.push(
         `<iris-comparison>${escapeDirectiveBody(bodyText)}</iris-comparison>`,
@@ -105,6 +109,7 @@ export const normalizeIrisDirectives = (markdown: string): string => {
         `<iris-callout data-variant="${kind}"${title ? ` data-title="${escapeAttribute(title)}"` : ""}>${escapeDirectiveBody(bodyText)}</iris-callout>`,
       );
     }
+    output.push("");
 
     index = closingIndex;
   }

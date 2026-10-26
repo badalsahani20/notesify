@@ -93,17 +93,14 @@ export const IrisLiveDemo = () => {
   return (
     <SpotlightCard className="overflow-hidden shadow-2xl shadow-indigo-900/10 text-left flex flex-col h-[600px]">
       <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-white/5 shrink-0">
-        <div className="flex items-center gap-1.5">
-          <span className="h-3 w-3 rounded-full bg-red-500/70" />
-          <span className="h-3 w-3 rounded-full bg-yellow-500/70" />
-          <span className="h-3 w-3 rounded-full bg-green-500/70" />
+        <div className="flex items-center gap-2 text-xs text-stone-300">
+          <span className="size-2 rounded-full bg-emerald-400" />
+          <FileText className="h-3.5 w-3.5 text-stone-400" />
+          <span className="font-mono text-stone-300">iris-query-router.ts</span>
         </div>
-        <div className="flex items-center gap-2 text-xs text-stone-400">
-          <FileText className="h-3.5 w-3.5" />
-          <span className="font-mono">iris-preview.md</span>
-        </div>
-        <div className="inline-flex items-center gap-1.5 rounded-md bg-indigo-500/10 border border-indigo-500/30 px-2 py-1 text-[11px] text-indigo-400 font-medium">
-          <Sparkles className="h-3 w-3" /> Iris · Ready
+        <div className="inline-flex items-center gap-1.5 rounded-md bg-white/5 border border-white/10 px-2.5 py-1 text-[11px] text-stone-300 font-mono">
+          <Sparkles className="h-3 w-3 text-indigo-400" />
+          <span>Multi-Tier Router</span>
         </div>
       </div>
 
@@ -173,8 +170,8 @@ export const IrisLiveDemo = () => {
           {(response || isStreaming) && (
             <div className="rounded-xl border border-indigo-500/30 bg-indigo-500/5 p-5 space-y-3 animate-fade-in-up">
               <div className="flex items-center gap-2 text-[11px] font-medium text-indigo-400 uppercase tracking-wider">
-                <span className="flex h-5 w-5 items-center justify-center rounded-md bg-gradient-primary">
-                  <Sparkles className="h-3 w-3 text-white" />
+                <span className="flex h-5 w-5 items-center justify-center rounded-md bg-neutral-900 border border-white/10">
+                  <Sparkles className="h-3 w-3 text-indigo-400" />
                 </span>
                 Iris
                 {isStreaming && !response && (

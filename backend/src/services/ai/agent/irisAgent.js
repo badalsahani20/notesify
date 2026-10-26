@@ -1,6 +1,6 @@
 import { chatWithAi } from "../chatService.js";
 
-const DEFAULT_MAX_TOOL_ROUNDS = 6;
+const DEFAULT_MAX_TOOL_ROUNDS = 20;
 
 export class IrisAgent {
   constructor({ maxToolRounds = DEFAULT_MAX_TOOL_ROUNDS } = {}) {
@@ -18,6 +18,7 @@ export class IrisAgent {
     pdfContext = "",
     imageBase64 = null,
     stream = false,
+    modelTier = null,
     useReasoning = false,
     enableWeb = false,
     chatMode = "casual",
@@ -38,7 +39,7 @@ export class IrisAgent {
     const extraMessages = [...initialExtraMessages];
     let pdfContextToEmit = pdfContext || "";
     let currentRound = startRound;
-    let totalUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+    let totalUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0, cachedTokens: 0 };
     let lastModel = null;
 
     while (currentRound < this.maxToolRounds) {
@@ -62,11 +63,11 @@ export class IrisAgent {
           pdfContext,
           imageBase64,
           stream,
+          modelTier,
           useReasoning,
           enableWeb,
           chatMode,
           tools,
-          isNoteScoped,
           extraMessages,
           includeCurrentMessage,
         });
@@ -76,11 +77,11 @@ export class IrisAgent {
           aiError.message,
         );
 
-        if (currentRound === 1 && stream) {
+        if (stream && res && !res.writableEnded) {
           res.write(
             `data: ${JSON.stringify({
               type: "error",
-              message: "AI service unavailable",
+              message: aiError.message || "AI service unavailable",
             })}\n\n`,
           );
         }
@@ -93,9 +94,9 @@ export class IrisAgent {
       }
 
       if (!stream) {
-        finalReply = roundResult.reply;
+        finalReply = roundResult.reply || "";
         const estimatedPrompt = Math.ceil((message?.length || 500) / 3.8);
-        const estimatedCompletion = Math.ceil((roundResult.reply?.length || 0) / 3.8);
+        const estimatedCompletion = Math.ceil(finalReply.length / 3.8);
         totalUsage.promptTokens += estimatedPrompt;
         totalUsage.completionTokens += estimatedCompletion;
         totalUsage.totalTokens += estimatedPrompt + estimatedCompletion;
@@ -114,6 +115,7 @@ export class IrisAgent {
           totalUsage.promptTokens += responseObj.tokenUsage.promptTokens || 0;
           totalUsage.completionTokens += responseObj.tokenUsage.completionTokens || 0;
           totalUsage.totalTokens += responseObj.tokenUsage.totalTokens || 0;
+          totalUsage.cachedTokens += responseObj.tokenUsage.cachedTokens || 0;
         }
 
         if (responseObj.finalReply) {
@@ -208,6 +210,19 @@ export class IrisAgent {
           continue;
         }
 
+        if (serverToolsToRun.length > 0 && currentRound >= this.maxToolRounds) {
+          console.warn(
+            `⚠️ [AgenticLoop] Reached maximum tool rounds (${this.maxToolRounds}). Stopping loop.`,
+          );
+          if (!finalReply.trim() && stream && res && !res.writableEnded) {
+            const limitNotice = "*(Reached maximum tool search limit)*";
+            finalReply = finalReply ? `${finalReply}\n\n${limitNotice}` : limitNotice;
+            res.write(
+              `data: ${JSON.stringify({ choices: [{ delta: { content: limitNotice } }] })}\n\n`,
+            );
+          }
+        }
+
         // No server-side continuation.
         // Client tools such as create_note/update_note terminate the loop.
         break;
@@ -217,18 +232,19 @@ export class IrisAgent {
           streamError.message,
         );
 
+        if (stream && res && !res.writableEnded) {
+          res.write(
+            `data: ${JSON.stringify({
+              type: "error",
+              message: streamError.message || "Streaming failed",
+            })}\n\n`,
+          );
+        }
         break;
       }
     }
 
-    if (!finalReply?.trim() && toolCalls.length > 0) {
-      const hasTaskTool = toolCalls.some(
-        (tc) => tc.tool === "update_task_status" || tc.tool === "create_learning_tasks"
-      );
-      if (hasTaskTool) {
-        finalReply = "I've updated your learning tasks in the queue above.";
-      }
-    }
+
 
     return {
       status: "completed",

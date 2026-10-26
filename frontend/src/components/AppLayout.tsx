@@ -108,7 +108,7 @@ const AppLayout = ({
 
   // Guard: if URL says panel should be visible but user dragged it to 0,
   // re-expand on next render (catches navigation after manual collapse)
-  useEffect(() => {
+useEffect(() => {
     if (isMobile) return;
     const np = notesPanelRef.current;
     if (np && showNotesPanel && np.isCollapsed()) {
@@ -119,7 +119,7 @@ const AppLayout = ({
     }
     const fp = foldersPanelRef.current;
     if (fp && showFoldersPanel && fp.isCollapsed()) fp.expand();
-  }); // no deps — intentional
+  }, [location.pathname, location.search, showNotesPanel, showFoldersPanel, isMobile]);
 
   useEffect(() => {
     if (isMobile || !showFoldersPanel) return;

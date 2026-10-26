@@ -4,7 +4,6 @@ import { GlobalChatEmptyState } from "@/components/chat/GlobalChatEmptyState";
 import type { Message } from "@/components/ai/types";
 import IrisMessageBody from "./IrisMessageBody";
 import { IrisNoteCreatedCard } from "./IrisNoteCreatedCard";
-import { Tool, ToolCall, ToolStatus } from "@/components/ai/tool";
 import { parseIrisResponse } from "@/utils/parseIrisResponse";
 import { useEffect, useState, useRef, memo, useCallback, useMemo } from "react";
 import { TextShimmer } from "@/components/ui/text-shimmer";
@@ -12,6 +11,8 @@ import { Source, SourceTrigger, SourceContent } from "@/components/ui/source";
 import { Reasoning, ReasoningTrigger, ReasoningContent } from "@/components/ui/reasoning";
 import { MessageScroller } from "@/components/agents/message-scroller";
 import { StreamingResponse } from "@/components/agents/streaming-response";
+
+import { useStreamingTextStore } from "@/store/useStreamingTextStore";
 
 // --- Thinking Widget ---
 interface ThinkingWidgetProps {
@@ -41,7 +42,7 @@ const ThinkingWidget = ({ isThinking, thinkingTime, thought }: ThinkingWidgetPro
   // Pure waiting state (no thoughts yet): show animated shimmer indicator
   if (isThinking) {
     return (
-      <div className="flex items-center gap-1.5 text-xs font-medium py-1 select-none">
+      <div className="flex items-center gap-1.5 text-[13px] font-medium py-1 select-none">
         <TextShimmer duration={2}>Thinking...</TextShimmer>
       </div>
     );
@@ -50,7 +51,7 @@ const ThinkingWidget = ({ isThinking, thinkingTime, thought }: ThinkingWidgetPro
   // Done: closed time badge — no content, nothing to expand
   if (thinkingTime && thinkingTime > 0) {
     return (
-      <div className="flex items-center gap-1.5 text-xs font-medium text-white/70 py-0.5 select-none">
+      <div className="flex items-center gap-1.5 text-[13px] font-medium text-white/70 py-0.5 select-none">
         <span>Thought for {thinkingTime}s</span>
       </div>
     );
@@ -101,6 +102,8 @@ interface ChatMessageRowProps {
   onToggleExpand: (id: string) => void;
   expandedHeight?: number;
   registerUserRef: (id: string, el: HTMLDivElement | null) => void;
+  isLastAssistantMessage?: boolean;
+  onRegenerate?: () => void;
 }
 
 const ChatMessageRow = memo(({
@@ -117,11 +120,32 @@ const ChatMessageRow = memo(({
   onToggleExpand,
   expandedHeight,
   registerUserRef,
+  isLastAssistantMessage = false,
+  onRegenerate,
 }: ChatMessageRowProps) => {
+  const streamedText = useStreamingTextStore((s) =>
+    isActiveStream && s.streamingMessageId === msg.id ? s.streamedMessageText : ""
+  );
+  const streamedThought = useStreamingTextStore((s) =>
+    isActiveStream && s.streamingMessageId === msg.id ? s.streamedThought : ""
+  );
+  const isStreamThinking = useStreamingTextStore((s) =>
+    isActiveStream && s.streamingMessageId === msg.id ? s.isThinking : undefined
+  );
+  const streamThinkingTime = useStreamingTextStore((s) =>
+    isActiveStream && s.streamingMessageId === msg.id ? s.thinkingTime : undefined
+  );
+
   if (msg.role === "assistant") {
     const isThinking = (msg as any).isThinking ?? false;
     const thinkingTime = (msg as any).thinkingTime as number | undefined;
     const thought = (msg as any).thought as string | undefined;
+
+    const effectiveDisplayText = (isActiveStream ? (streamedText || displayText) : displayText) || "";
+    const effectiveThought = (isActiveStream ? (streamedThought || thought) : thought) || "";
+    const effectiveIsThinking = isActiveStream && isStreamThinking !== undefined ? isStreamThinking : isThinking;
+    const effectiveThinkingTime = isActiveStream && streamThinkingTime !== undefined ? streamThinkingTime : thinkingTime;
+
     const toolCalls = (msg as any).toolCalls as Array<{
       id?: string;
       tool: string;
@@ -134,21 +158,23 @@ const ChatMessageRow = memo(({
       status?: "pending" | "executing" | "success" | "error";
       data?: any;
       args?: any;
+      error?: string;
     }> | undefined;
 
-    const isWorking = (isActiveStream && (isStreaming || isSending)) || isThinking;
+    const isWorking = (isActiveStream && (isStreaming || isSending)) || effectiveIsThinking;
 
     // Identify active agentic tasks for streaming indicators
     const noteReadActivity = (toolCalls ?? []).find((tc) => tc.tool === "get_note_content");
+    const noteSearchActivity = (toolCalls ?? []).find((tc) => tc.tool === "search_notes");
     const searchActivity = (toolCalls ?? []).find((tc) => tc.tool === "search_web");
     const crawlActivity = (toolCalls ?? []).find((tc) => tc.tool === "crawl_url");
     const memoryActivity = (toolCalls ?? []).find((tc) => tc.tool === "save_memory");
+    const recallMemoryActivity = (toolCalls ?? []).find((tc) => tc.tool === "recall_memory");
     const askQuestionActivity = (toolCalls ?? []).find(
       (tc) => tc.tool === "ask_question" || tc.tool === "render_quiz" || tc.tool === "generate_quiz"
     );
-    const tasksActivity = (toolCalls ?? []).find((tc) => tc.tool === "create_learning_tasks");
     const hasAgenticTask = Boolean(
-      noteReadActivity || searchActivity || crawlActivity || memoryActivity || askQuestionActivity || tasksActivity
+      noteReadActivity || noteSearchActivity || searchActivity || crawlActivity || memoryActivity || recallMemoryActivity || askQuestionActivity
     );
 
     return (
@@ -159,12 +185,21 @@ const ChatMessageRow = memo(({
             <div className="flex flex-col gap-1 text-xs font-semibold my-1 text-white">
               {noteReadActivity && (
                 <TextShimmer duration={2.5}>
-                  {noteReadActivity.status === "success" ? "Note read" : "Reading note..."}
+                  {noteReadActivity.status === "success" ? "Reading complete" : "Reading note..."}
+                </TextShimmer>
+              )}
+              {noteSearchActivity && (
+                <TextShimmer duration={2.5}>
+                  {noteSearchActivity.status === "success" 
+                    ? "Notes searched" 
+                    : noteSearchActivity.args?.query
+                      ? `Searching notes for "${noteSearchActivity.args.query}"`
+                      : "Searching notes..."}
                 </TextShimmer>
               )}
               {searchActivity && (
                 <TextShimmer duration={2.5}>
-                  {searchActivity.query ? `Searching the web for "${searchActivity.query}"...` : "Searching the web..."}
+                  {searchActivity.query ? `Searching the web for "${searchActivity.query}"` : "Searching the web..."}
                 </TextShimmer>
               )}
               {crawlActivity && (
@@ -173,35 +208,36 @@ const ChatMessageRow = memo(({
               {memoryActivity && (
                 <TextShimmer duration={2.5}>Saving memory...</TextShimmer>
               )}
+              {recallMemoryActivity && (
+                <TextShimmer duration={2.5}>Recalling memory...</TextShimmer>
+              )}
               {askQuestionActivity && (
                 <TextShimmer duration={2.5}>Generating questions...</TextShimmer>
-              )}
-              {tasksActivity && (
-                <TextShimmer duration={2.5}>Assigning learning tasks...</TextShimmer>
               )}
             </div>
           )}
 
           {/* Thinking Widget */}
-          {(thinkingTime || thought || (isWorking && !displayText && !hasAgenticTask)) && (
+          {(effectiveThinkingTime || effectiveThought || (isWorking && !effectiveDisplayText && !hasAgenticTask)) && (
             <ThinkingWidget
-              isThinking={isThinking || (isWorking && !displayText)}
-              thinkingTime={thinkingTime}
-              thought={thought}
+              isThinking={effectiveIsThinking || (isWorking && !effectiveDisplayText)}
+              thinkingTime={effectiveThinkingTime}
+              thought={effectiveThought}
             />
           )}
 
           {/* Message content with StreamingResponse */}
-          {displayText ? (
-            <div className="gc-markdown max-w-full select-text" data-ms-editor="false" spellCheck={false} translate="no">
+          {effectiveDisplayText ? (
+            <div className="gc-markdown max-w-full select-text text-white" data-ms-editor="false" spellCheck={false} translate="no">
               <StreamingResponse
                 status={isActiveStream && isStreaming ? "streaming" : "complete"}
-                copyText={displayText}
-                onCopy={() => onCopy(displayText, msg.id)}
+                copyText={effectiveDisplayText}
+                onCopy={() => onCopy(effectiveDisplayText, msg.id)}
+                onRetry={isLastAssistantMessage && !isStreaming && !isSending ? onRegenerate : undefined}
                 className="w-full"
               >
                 <AssistantMessageBody
-                  text={displayText}
+                  text={effectiveDisplayText}
                   isStreaming={isStreaming && isActiveStream}
                   savedSegments={msg.segments}
                   citations={citations}
@@ -247,15 +283,15 @@ const ChatMessageRow = memo(({
           {toolCalls?.map((tc, idx) => {
             if (
               tc.tool === "search_web" ||
+              tc.tool === "search_notes" ||
               tc.tool === "crawl_url" ||
               tc.tool === "save_memory" ||
+              tc.tool === "recall_memory" ||
               tc.tool === "web_citations" ||
               tc.tool === "get_note_content" ||
               tc.tool === "ask_question" ||
               tc.tool === "render_quiz" ||
-              tc.tool === "generate_quiz" ||
-              tc.tool === "create_learning_tasks" ||
-              tc.tool === "update_task_status"
+              tc.tool === "generate_quiz"
             ) {
               return null;
             }
@@ -270,24 +306,21 @@ const ChatMessageRow = memo(({
                   : "completed";
               const isUpdate = tc.tool === "update_note";
               return (
-                <div key={`note-tool-${idx}`} className="my-2">
-                  <Tool state={toolState}>
-                    <ToolCall name={tc.tool} argsSummary={title} />
-                    <ToolStatus state={toolState} />
-                  </Tool>
-                  <IrisNoteCreatedCard
-                    noteId={noteId}
-                    title={title}
-                    content={content}
-                    variant={isUpdate ? "updated" : "created"}
-                  />
-                </div>
+                <IrisNoteCreatedCard
+                  key={`note-tool-${idx}`}
+                  noteId={noteId}
+                  title={title}
+                  content={content}
+                  variant={isUpdate ? "updated" : "created"}
+                  state={toolState}
+                  error={tc.error}
+                />
               );
             }
             return null;
           })}
 
-          {isActiveStream && isStreaming && displayText && <span className="gc-cursor" />}
+          {isActiveStream && isStreaming && effectiveDisplayText && <span className="gc-cursor" />}
         </div>
       </div>
     );
@@ -369,6 +402,7 @@ interface GlobalChatMessagesProps {
   isStreaming: boolean;
   isSending: boolean;
   sendMessage: (text: string) => void;
+  onRegenerate?: () => void;
   prompts: { students: string[], devs: string[] };
   bottomRef: React.RefObject<HTMLDivElement | null>;
   fullWidthAssistant?: boolean;
@@ -383,6 +417,7 @@ export const GlobalChatMessages = memo(({
   isStreaming,
   isSending,
   sendMessage,
+  onRegenerate,
   prompts,
   bottomRef,
   fullWidthAssistant = false,
@@ -499,6 +534,13 @@ export const GlobalChatMessages = memo(({
     userMessageRefs.current[id] = el;
   }, []);
 
+  const lastAssistantMessageId = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === "assistant") return messages[i].id;
+    }
+    return null;
+  }, [messages]);
+
   return (
     <div className="relative flex-1 min-h-0 flex flex-col overflow-hidden">
       {/* Reader-Aware Message Scroller Viewport */}
@@ -550,6 +592,8 @@ export const GlobalChatMessages = memo(({
                 onToggleExpand={handleToggleExpand}
                 expandedHeight={expandedUserMessageHeights[msg.id]}
                 registerUserRef={registerUserRef}
+                isLastAssistantMessage={msg.id === lastAssistantMessageId}
+                onRegenerate={onRegenerate}
               />
             );
           })

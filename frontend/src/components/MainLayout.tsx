@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, lazy, Suspense } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import FoldersPanel from "./folders/FolderPanel";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
@@ -9,12 +9,17 @@ import { useNotesLayout } from "@/hooks/notes/useNotesLayout";
 import ActivityBar from "./header/SideBar";
 import { useFolderStore } from "@/store/useFolderStore";
 import { usePanelStore } from "@/store/usePanelStore";
-import { WhatsNewModal } from "@/components/ui/WhatsNewModal";
 import { useWhatsNew } from "@/hooks/user/useWhatsNew";
-import { SettingsDialog } from "@/components/settings/SettingsDialog";
 import { useSettingsUIStore } from "@/store/useSettingsStore";
 import { DesktopUpdateToast } from "@/components/desktop/DesktopUpdateToast";
 import { useDesktopUpdateStore } from "@/store/useDesktopUpdateStore";
+
+const WhatsNewModal = lazy(() =>
+  import("@/components/ui/WhatsNewModal").then((m) => ({ default: m.WhatsNewModal }))
+);
+const SettingsDialog = lazy(() =>
+  import("@/components/settings/SettingsDialog").then((m) => ({ default: m.SettingsDialog }))
+);
 
 type Pops = {
   middlePanel: React.ReactNode;
@@ -180,8 +185,16 @@ const MainLayout = ({ middlePanel }: Pops) => {
       {isMobile && (
         <MobileDrawer open={isMobileDrawerOpen} onClose={() => setMobileDrawerOpen(false)} />
       )}
-      <WhatsNewModal isOpen={isWhatsNewOpen} onDismiss={dismissWhatsNew} />
-      <SettingsDialog open={settingsOpen} onOpenChange={(v) => !v && closeSettings()} />
+      {isWhatsNewOpen && (
+        <Suspense fallback={null}>
+          <WhatsNewModal isOpen={isWhatsNewOpen} onDismiss={dismissWhatsNew} />
+        </Suspense>
+      )}
+      {settingsOpen && (
+        <Suspense fallback={null}>
+          <SettingsDialog open={settingsOpen} onOpenChange={(v) => !v && closeSettings()} />
+        </Suspense>
+      )}
       <DesktopUpdateToast />
     </>
   );

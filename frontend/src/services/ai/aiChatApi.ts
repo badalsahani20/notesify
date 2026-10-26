@@ -13,6 +13,7 @@ interface ChatStreamPayload {
   imageBase64: string | null;
   chatAttachmentId?: string | null;
   pdfContext: string | null;
+  modelTier?: "fast" | "thinking" | "pro";
   useReasoning: boolean;
   enableWeb: boolean;
   chatMode: "study" | "casual";

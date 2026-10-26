@@ -23,9 +23,6 @@ export const Feedback = () => {
     <section className="relative py-24 z-20 border-t border-white/5 bg-[#050505]">
       <div className="container mx-auto px-6">
         <SpotlightCard className="max-w-4xl mx-auto p-8 md:p-12 overflow-hidden">
-          {/* Subtle background glow */}
-          <div className="absolute top-0 right-0 -translate-y-1/2 translate-x-1/2 w-64 h-64 bg-indigo-500/10 blur-3xl rounded-full"></div>
-          
           <div className="flex flex-col md:flex-row gap-10">
             <div className="flex-1 text-center md:text-left">
               <FadeIn>

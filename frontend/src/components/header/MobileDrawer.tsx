@@ -6,7 +6,7 @@ import { FolderPanelSkeleton } from "@/components/ui/folderPanelSkeleton";
 import { useFolderStore } from "@/store/useFolderStore";
 import { FolderFormDialog } from "@/components/folders/FolderFormDialog";
 import { useState } from "react";
-import notesifyLogo from "@/assets/notesify-favicon.png";
+import notesifyLogo from "@/assets/notesify-favicon.svg";
 
 const FoldersPanel = lazy(() => import("@/components/folders/FolderPanel"));
 

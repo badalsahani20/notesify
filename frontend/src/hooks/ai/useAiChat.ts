@@ -35,6 +35,7 @@ export const useAiChat = (noteId: string, noteContent: string, editor: Editor | 
   // ── AI Settings State ───────────────────────────────────────────────────────
   const [pdfContext, setPdfContext] = useState<string | null>(null);
   const [pdfInjected, setPdfInjected] = useState(false);
+  const [modelTier, setModelTier] = useState<"fast" | "thinking" | "pro">("fast");
   const [useReasoning, setUseReasoning] = useState(false);
   const [useWebSearch, setUseWebSearch] = useState(false);
 
@@ -184,6 +185,7 @@ export const useAiChat = (noteId: string, noteContent: string, editor: Editor | 
         imageBase64: sentImage,
         chatAttachmentId: sentDocId,
         pdfContext: pdfInjected ? null : pdfContext,
+        modelTier,
         useReasoning,
         enableWeb: useWebSearch,
         chatMode,
@@ -243,6 +245,37 @@ export const useAiChat = (noteId: string, noteContent: string, editor: Editor | 
     }
   };
 
+  const regenerateResponse = async () => {
+    if (isSendingChat) return;
+    const msgs = messagesRef.current;
+    if (msgs.length === 0) return;
+
+    let lastAssistantIdx = -1;
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      if (msgs[i].role === "assistant") {
+        lastAssistantIdx = i;
+        break;
+      }
+    }
+    if (lastAssistantIdx === -1) return;
+
+    let precedingUserMsg: Message | null = null;
+    let precedingUserIdx = -1;
+    for (let i = lastAssistantIdx - 1; i >= 0; i--) {
+      if (msgs[i].role === "user") {
+        precedingUserMsg = msgs[i];
+        precedingUserIdx = i;
+        break;
+      }
+    }
+    if (!precedingUserMsg) return;
+
+    const trimmed = msgs.slice(0, precedingUserIdx);
+    messagesRef.current = trimmed;
+    setMessages(trimmed);
+    await sendChatMessage(precedingUserMsg.text);
+  };
+
   return {
     messages,
     streamingMessageId: streaming.streamingMessageId,
@@ -265,6 +298,7 @@ export const useAiChat = (noteId: string, noteContent: string, editor: Editor | 
     loadingAction: actions.loadingAction,
     isSendingChat,
     sendChatMessage,
+    regenerateResponse,
     stopRequest,
     runAction: actions.runAction,
     copySuggestion: suggestion.copySuggestion,
@@ -273,6 +307,8 @@ export const useAiChat = (noteId: string, noteContent: string, editor: Editor | 
     startNewChat: session.startNewChat,
     setResult: actions.setResult,
     chatHistory,
+    modelTier,
+    setModelTier,
     useReasoning,
     setUseReasoning,
     useWebSearch,

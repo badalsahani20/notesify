@@ -21,9 +21,37 @@ export const createIrisMarkdownComponents = (isStreaming = false) => {
 
   return {
     ...shared,
-    p: ({ children, ...props }: any) => (
-      <p className={`${irisTypography.body} ${irisSpacing.paragraph} iris-md-paragraph`} {...props}>{children}</p>
-    ),
+    p: ({ children, node, ...props }: any) => {
+      // In CommonMark, unknown tags like <iris-callout> are treated as inline phrasing HTML,
+      // which causes remark to wrap them inside a <p>. Since IrisCallout renders an <aside>,
+      // HTML prohibits <aside> inside <p>. Render a <div> if any child is a block/directive element.
+      const hasBlockChild = node?.children?.some((child: any) =>
+        child.type === "element" && (
+          child.tagName === "iris-callout" ||
+          child.tagName === "iris-takeaway" ||
+          child.tagName === "iris-comparison" ||
+          child.tagName === "aside" ||
+          child.tagName === "div" ||
+          child.tagName === "section" ||
+          child.tagName === "blockquote" ||
+          child.tagName?.startsWith("iris-")
+        )
+      );
+
+      if (hasBlockChild) {
+        return (
+          <div className={`${irisTypography.body} ${irisSpacing.paragraph} iris-md-paragraph`} {...props}>
+            {children}
+          </div>
+        );
+      }
+
+      return (
+        <p className={`${irisTypography.body} ${irisSpacing.paragraph} iris-md-paragraph`} {...props}>
+          {children}
+        </p>
+      );
+    },
     h1: ({ children, ...props }: any) => (
       <h1 className={`${irisTypography.heading} ${irisSpacing.heading} iris-md-heading iris-md-h1`} {...props}>{children}</h1>
     ),

@@ -5,7 +5,9 @@ declare module '@tiptap/core' {
     aiGhostText: {
       setAiGhost: () => ReturnType;
       unsetAiGhost: () => ReturnType;
-    }
+      unsetAllAiGhost: () => ReturnType;
+      discardAllAiGhost: () => ReturnType;
+    };
   }
 }
 
@@ -31,6 +33,43 @@ export const AiGhostExtension = Mark.create({
       },
       unsetAiGhost: () => ({ commands }) => {
         return commands.unsetMark(this.name);
+      },
+      unsetAllAiGhost: () => ({ tr, state }) => {
+        const ghostMarkType = state.schema.marks[this.name];
+        if (!ghostMarkType) return false;
+        tr.removeMark(0, state.doc.content.size, ghostMarkType);
+        return true;
+      },
+      discardAllAiGhost: () => ({ tr, state }) => {
+        const ghostMarkType = state.schema.marks[this.name];
+        if (!ghostMarkType) return false;
+
+        const ranges: { from: number; to: number }[] = [];
+        state.doc.descendants((node, pos) => {
+          if (node.isText && node.marks.some((m) => m.type === ghostMarkType)) {
+            ranges.push({ from: pos, to: pos + node.nodeSize });
+          }
+        });
+
+        if (ranges.length === 0) return false;
+
+        // Merge contiguous/overlapping ranges
+        const merged: { from: number; to: number }[] = [];
+        for (const range of ranges) {
+          const last = merged[merged.length - 1];
+          if (last && range.from <= last.to) {
+            last.to = Math.max(last.to, range.to);
+          } else {
+            merged.push({ ...range });
+          }
+        }
+
+        // Delete backwards so character positions remain stable
+        for (let i = merged.length - 1; i >= 0; i--) {
+          tr.delete(merged[i].from, merged[i].to);
+        }
+
+        return true;
       },
     };
   },

@@ -1,6 +1,5 @@
 import {
   PRIMARY_MODEL,
-  TEACHING_MODELS,
   DEFAULT_CHAT_MODEL,
   COMPLEX_ANALYSIS_MODEL,
   QUICK_MODEL,
@@ -14,7 +13,31 @@ export const classifyChatIntent = (
   pdfContext = "",
   chatMode = "casual",
   enableWeb = false,
+  modelTier = null,
+  useReasoning = true,
 ) => {
+  // Explicit Model Tier Overrides
+  if (modelTier === "fast" || useReasoning === false) {
+    console.log(
+      `⚡ [ModelRouter] Fast mode active: Routing to ${QUICK_MODEL} (Qwen 3.7 Flash)`,
+    );
+    return QUICK_MODEL;
+  }
+
+  if (modelTier === "thinking") {
+    console.log(
+      `🧠 [ModelRouter] Thinking mode active: Routing to ${PRIMARY_MODEL} (DeepSeek)`,
+    );
+    return PRIMARY_MODEL;
+  }
+
+  if (modelTier === "pro") {
+    console.log(
+      `✨ [ModelRouter] Pro mode active: Routing to ${DEFAULT_CHAT_MODEL} (GLM Max / Flash)`,
+    );
+    return DEFAULT_CHAT_MODEL;
+  }
+
   const msg = message.toLowerCase();
 
   // 1. VISUAL CONVO
@@ -38,23 +61,13 @@ export const classifyChatIntent = (
     console.log(
       `📦 Large context detected (${totalContextLength} characters). Overriding routing to use ${PRIMARY_MODEL} (DeepSeek).`,
     );
-    return PRIMARY_MODEL || DEFAULT_CHAT_MODEL || COMPLEX_ANALYSIS_MODEL;
+    return DEFAULT_CHAT_MODEL || PRIMARY_MODEL || COMPLEX_ANALYSIS_MODEL;
   }
 
-  // 4. STUDY MODE
-  if (chatMode === "study") {
-    const chosenModel = TEACHING_MODELS[0];
-    console.log(
-      `🎓 [Study Mode Active] Routing to Teaching Model: ${chosenModel}`,
-    );
-    return chosenModel;
-  }
-
-
-  // 6. Current, research-heavy requests, or when Web search is toggled ON benefit from the primary model.
+  // 3. Current, research-heavy requests, or when Web search is toggled ON benefit from the primary model.
   const isResearchRequest =
     enableWeb === true ||
-    /\b(latest|today|current|recent|news|research|sources?|cite|citation|according to|compare)\b/.test(
+    / (latest|today|current|recent|news|research|sources?|cite|citation|according to|compare) /.test(
       msg,
     );
   if (isResearchRequest) {
@@ -65,7 +78,7 @@ export const classifyChatIntent = (
   }
 
   // 7. Default chat model
-  return QUICK_MODEL || DEFAULT_CHAT_MODEL;
+  return DEFAULT_CHAT_MODEL || COMPLEX_ANALYSIS_MODEL;
 };
 
 export const selectOptimalModel = classifyChatIntent;

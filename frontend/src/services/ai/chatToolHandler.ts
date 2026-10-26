@@ -1,8 +1,7 @@
 import type { ChatArtifact, ChatMessage, PendingInteraction } from "@/store/useGlobalChatStore";
 import type { InteractiveQuestion, ToolCallRecord } from "@/components/ai/types";
-import { executeClientTool } from "@/services/ai/clientToolExecutor";
 import type { ToolCallEvent } from "@/utils/consumeAiChatStream";
-import { queryClient } from "@/lib/queryClient";
+import { executeClientTool } from "./clientToolExecutor";
 
 type UpdateAssistantMessage = (updater: (message: ChatMessage) => ChatMessage) => void;
 
@@ -97,9 +96,7 @@ export const createChatToolHandler = ({
     citations,
   } = event;
 
-  if (tool === "create_learning_tasks" || tool === "update_task_status") {
-    void queryClient.invalidateQueries({ queryKey: ["learning-tasks"] });
-  }
+
 
   if (tool === "ask_question" && interactionId && checkpointId) {
     const questionList = (questions ?? quizData) as InteractiveQuestion[] | undefined;

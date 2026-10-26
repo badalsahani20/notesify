@@ -166,46 +166,50 @@ export const flipArchiveStatus = async (noteId, userId, clientVersion) => {
     return { updatedNote };
 }
 
-export const searchNote = async(userId, query, folderId = null) => {
-
-    const searchRegex = new RegExp(query, 'i');
-
-    //The base filter
-    const queryFilter = {
+export const searchNote = async (userId, query, folderId = null) => {
+    const baseFilter = {
         user: userId,
         isDeleted: { $ne: true },
-        isArchived: { $ne: true },
-        $or:[
-            { title: { $regex: searchRegex }},
-            { content: { $regex: searchRegex }},
-            { $text: { $search: query }}
-        ]
+        isArchived: { $ne: true }
     };
 
-    const baseFilter = { user: userId, isDeleted: { $ne: true }, isArchived: { $ne: true } };
-
-    //If folderId provided
-    if(folderId && folderId !== null && folderId !== 'undefined'){
+    if (folderId && folderId !== null && folderId !== 'undefined') {
         baseFilter.folder = folderId;
     }
 
-    let notes = await Notes.find({...baseFilter, $text: {$search: query}})
-    .select({ score: {$meta: "textScore" }})
-    .sort({ score: {$meta: "textScore" }});
+    // Escape regex special characters so queries like "C++", "(notes)", "[todo]" don't break RegExp
+    const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const searchRegex = new RegExp(escapedQuery, 'i');
 
-    //Fallback
-    if(notes.length === 0) {
-        const searchRegex = new RegExp(query, 'i');
-        notes = await Notes.find({
+    // 1. Try high-performance full-text index first if available
+    try {
+        const textFilter = {
             ...baseFilter,
-            $or: [
-                {title: { $regex: searchRegex }},
-                {content: { $regex: searchRegex }}
-            ]
-        }).sort({updatedAt: -1});
+            isDeleted: false, // Required equality predicate for compound text index
+            $text: { $search: query }
+        };
+
+        const notes = await Notes.find(textFilter)
+            .select({ score: { $meta: "textScore" } })
+            .sort({ score: { $meta: "textScore" } });
+
+        if (notes && notes.length > 0) {
+            return notes;
+        }
+    } catch (err) {
+        // Log diagnostic warning and gracefully recover via regex search below
+        console.warn("⚠️ [NotesService] Full-text index unavailable or rejected, using regex fallback:", err.message);
     }
-    return notes;
-}
+
+    // 2. Reliable fallback: Regex across title and content
+    return await Notes.find({
+        ...baseFilter,
+        $or: [
+            { title: { $regex: searchRegex } },
+            { content: { $regex: searchRegex } }
+        ]
+    }).sort({ updatedAt: -1 });
+};
 
 export const permanentlyRemoveNote = async (noteId, userId) => {
     return await Notes.findOneAndDelete({ _id: noteId, user: userId, isDeleted: true });

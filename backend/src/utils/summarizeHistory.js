@@ -1,8 +1,24 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { executeOpenRouter, QUICK_MODEL } from "../services/ai/index.js";
+import { DEFAULT_CHAT_MODEL, executeOpenRouter, QUICK_MODEL } from "../services/ai/index.js";
 import { client as groqClient } from "./groqClient.js";
 
-const SUMMARIZER_SYSTEM_INSTRUCTION = `Summarize this conversation for future continuation. Preserve current task state, decisions and rationale, unresolved issues, next steps, exact technical identifiers, constraints, and relevant user preferences. Prioritize actionable state over narrative recap. Use concise, structured prose, targeting 300–600 words when warranted. Never invent missing details.`;
+const SUMMARIZER_SYSTEM_INSTRUCTION = `You are an expert conversation context extractor for Notesify.
+Your task is to extract and update a concise, structured technical context block from conversation messages.
+Do NOT write a narrative story or conversational recap. Do NOT duplicate recent transcript dialogue.
+
+Extract and consolidate only actionable, durable information into these concise sections:
+- Current Goal: What the user is actively working on.
+- Decisions: Architecture choices, libraries, parameters, and rationale.
+- Technical State: File paths, database models, API routes, variable names, and implementation status.
+- Constraints: Hard requirements, platform limitations, or design rules.
+- Unresolved Issues: Bugs, blockers, missing pieces, or open questions.
+- Next Steps: Immediate planned actions.
+- User Preferences: Relevant technical or communication preferences explicitly stated.
+
+Rules:
+1. Be ultra-dense, structured, and factual (target 250–450 words total).
+2. If new messages supersede an earlier decision or fix a previous bug, update the state—never keep outdated facts as current truth.
+3. Omit empty sections. Never fabricate details.`;
 
 /**
  * Summarizes older conversation history, consolidating with any existing summary.
@@ -29,8 +45,8 @@ export const summarizeHistory = async (messagesToSummarize, existingSummary = ""
     .join("\n\n");
 
   const promptContent = existingSummary
-    ? `Prior Consolidated Summary:\n${existingSummary}\n\nOlder Messages Leaving Active Window To Consolidate:\n${fullHistoryStr}\n\nProduce an updated, unified summary (300-600 words) capturing the entire technical state and conversation context.`
-    : `Conversation History To Summarize:\n${fullHistoryStr}\n\nProduce a comprehensive, state-preserving summary (300-600 words) capturing the technical state and conversation context.`;
+    ? `Prior Extracted Context:\n${existingSummary}\n\nNew Unprocessed Messages to Integrate:\n${fullHistoryStr}\n\nUpdate and consolidate the structured technical context according to your instructions. Preserve unresolved items and update superseded decisions.`
+    : `Messages to Extract Context From:\n${fullHistoryStr}\n\nExtract the structured technical context according to your instructions.`;
 
   // ── Tier 1: Gemini Flash ──
   if (process.env.GEMINI_API_KEY) {
@@ -60,7 +76,7 @@ export const summarizeHistory = async (messagesToSummarize, existingSummary = ""
 
   // ── Tier 2: OpenRouter (Ling 3.0 Flash / Quick Model) ──
   try {
-    const summarizerModel = QUICK_MODEL || "inclusionai/ling-3.0-flash";
+    const summarizerModel = DEFAULT_CHAT_MODEL || "deepseek/deepseek-v4-flash-0731";
     const orResult = await executeOpenRouter(
       summarizerModel,
       [

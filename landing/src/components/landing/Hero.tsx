@@ -9,17 +9,22 @@ export const Hero = () => {
 
       <div className="relative z-20 flex flex-col items-center max-w-4xl px-6 text-center mt-10">
         <FadeIn delay={300}>
-          <div className="relative w-20 h-20 sm:w-24 sm:h-24 mx-auto mb-10 group cursor-pointer transition-all duration-500 hover:scale-110">
-            {/* The Morphing Background */}
-            <div className={`absolute inset-0 bg-gradient-to-br from-indigo-500 to-purple-600 iris-hero-blob shadow-[0_0_40px_rgba(99,102,241,0.5)] transition-all duration-700 group-hover:shadow-[0_0_60px_rgba(99,102,241,0.8)] group-hover:rotate-90`}></div>
-            <div className="absolute inset-1 bg-[#050505] iris-hero-blob transition-all duration-700 group-hover:scale-90"></div>
+          <div className="relative size-16 sm:size-20 mx-auto mb-10 group cursor-default">
+            {/* Architectural Specimen Badge */}
+            <div className="absolute inset-0 rounded-2xl bg-neutral-950/80 border border-white/10 group-hover:border-white/20 transition-all duration-500 shadow-xl shadow-black/80 flex items-center justify-center backdrop-blur-sm" />
             
-            {/* The Inner Liquid */}
-            <div className="absolute inset-3 bg-gradient-to-br from-indigo-400 to-purple-500 iris-hero-blob opacity-40 animate-pulse"></div>
+            <div className="relative z-10 flex flex-col items-center justify-center">
+              <img 
+                src="/favicon.png" 
+                alt="Notesify" 
+                className="size-8 sm:size-10 object-contain drop-shadow-md transition-transform duration-500 group-hover:scale-105" 
+              />
+            </div>
             
-            {/* The Core Nucleus */}
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="size-4 rounded-full bg-white shadow-[0_0_20px_rgba(255,255,255,1)] animate-pulse"></div>
+            {/* Live Iris indicator pip */}
+            <div className="absolute -bottom-1 -right-1 z-20 flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-neutral-900 border border-white/10 text-[9px] font-mono text-emerald-400">
+              <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span>v1.3.2</span>
             </div>
           </div>
         </FadeIn>
@@ -36,7 +41,7 @@ export const Hero = () => {
         <FadeIn delay={400}>
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight text-white leading-[1.15] mb-6">
             A calm space for your <br className="hidden sm:block" />
-            notes, <span className="font-serif italic text-indigo-200 font-light tracking-normal transition-all duration-700 group-hover:text-white">quizzes, and flashcards.</span>
+            notes, <span className="text-indigo-200 font-normal">quizzes, and flashcards.</span>
           </h1>
         </FadeIn>
 
@@ -88,44 +93,38 @@ export const Hero = () => {
            {[...Array(12)].map((_, i) => (
              <div 
                key={i}
-               className="absolute w-[2px] h-[800px] bg-gradient-to-t from-transparent via-indigo-500/20 to-transparent"
+               className="absolute w-[1.5px] h-[800px] bg-gradient-to-t from-transparent via-indigo-500/10 to-transparent"
                style={{ 
                  transform: `rotate(${i * 15}deg) translateY(-200px)`,
-                 opacity: 0.4 + (i % 3) * 0.2
+                 opacity: 0.3 + (i % 3) * 0.15
                }}
              />
            ))}
          </div>
 
          {/* The glowing aura behind the moon (The Corona) */}
-         <div className="absolute inset-[-5px] rounded-[100%] bg-white blur-[10px] opacity-40"></div>
-         <div className="absolute inset-[-20px] rounded-[100%] bg-gradient-to-t from-indigo-600 via-indigo-400 to-purple-300 blur-[40px] opacity-60"></div>
-         <div className="absolute inset-[-60px] rounded-[100%] bg-gradient-to-t from-purple-600 via-indigo-600 to-transparent blur-[80px] opacity-30"></div>
+         <div className="absolute inset-[-5px] rounded-[100%] bg-indigo-500/10 blur-[20px] opacity-30"></div>
+         <div className="absolute inset-[-20px] rounded-[100%] bg-gradient-to-t from-indigo-500/15 to-transparent blur-[30px] opacity-40"></div>
          
          {/* The solid black moon (The Horizon) */}
-         {/* Extended Shadow: We make this moon blend into the section background */}
-         <div className="absolute inset-0 rounded-[100%] bg-[#050505] shadow-[inset_0_20px_60px_rgba(0,0,0,1)] border-t border-indigo-500/40"></div>
+         <div className="absolute inset-0 rounded-[100%] bg-[#050505] shadow-[inset_0_20px_60px_rgba(0,0,0,1)] border-t border-indigo-500/30"></div>
          
          {/* The Diamond Ring Flare on the right edge */}
          <div className="absolute top-[2%] sm:top-[4%] right-[25%] sm:right-[30%] -translate-y-1/2 translate-x-1/2 z-20">
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 sm:w-64 sm:h-64 bg-white rounded-full blur-[60px] opacity-40 mix-blend-screen"></div>
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 sm:w-48 sm:h-48 bg-indigo-500 rounded-full blur-[30px] opacity-90 mix-blend-screen animate-pulse"></div>
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 sm:w-24 sm:h-24 bg-white rounded-full blur-[10px] mix-blend-screen"></div>
-            
-            {/* Starburst rays */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[1px] bg-gradient-to-r from-transparent via-white/80 to-transparent rotate-[-15deg] blur-[1px]"></div>
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1px] h-[500px] bg-gradient-to-b from-transparent via-white/80 to-transparent rotate-[-15deg] blur-[1px]"></div>
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-white/20 rounded-full blur-[25px] mix-blend-screen"></div>
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 bg-indigo-400/40 rounded-full blur-[15px] mix-blend-screen"></div>
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-white rounded-full blur-[4px]"></div>
          </div>
       </div>
 
-      {/* Bouncing Scroll Indicator */}
+      {/* Sleek Scroll Indicator */}
       <div className="absolute bottom-20 sm:bottom-36 left-1/2 -translate-x-1/2 z-30">
         <a 
           href="#features" 
-          className="flex h-10 w-10 sm:h-10 sm:w-10 items-center justify-center rounded-full border border-white/10 bg-[#050505]/50 backdrop-blur-sm text-stone-400 hover:text-white hover:border-white/20 hover:bg-white/5 transition-all duration-300 animate-bounce cursor-pointer shadow-lg"
+          className="flex h-10 w-10 sm:h-10 sm:w-10 items-center justify-center rounded-full border border-white/10 bg-[#050505]/80 backdrop-blur-sm text-stone-400 hover:text-white hover:border-white/30 hover:bg-white/5 transition-all duration-300 cursor-pointer shadow-lg group"
           aria-label="Scroll down"
         >
-          <svg className="h-4 w-4 sm:h-4 sm:w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <svg className="h-4 w-4 sm:h-4 sm:w-4 transition-transform duration-300 group-hover:translate-y-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
           </svg>
         </a>

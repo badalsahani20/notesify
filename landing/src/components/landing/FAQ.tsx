@@ -17,15 +17,15 @@ const FAQS = [
   },
   {
     question: "How does the AI router work?",
-    answer: "Iris acts as a smart traffic cop. If you ask a simple question, it routes to a fast, lightweight model (like Llama 3) for instant answers. If you ask a complex coding question, it routes to a high-reasoning model (like DeepSeek or Qwen) to give you the highest quality answer."
+    answer: "Iris acts as a smart traffic cop. If you ask a quick question or draft notes, it routes to a fast model (like Qwen 3.7 Flash or Llama) for instant answers. If you ask a complex reasoning question or attach research context, it routes to deep reasoning models (like DeepSeek v4 Flash or GLM 5.3) to give you the highest quality answer."
   },
   {
     question: "Are my notes private?",
     answer: "Absolutely. We don't train any AI models on your personal notes. Your workspace is private to you, and data is only sent to the AI providers when you explicitly ask Iris a question."
   },
   {
-    question: "Can I self-host Notesify?",
-    answer: "Right now, Notesify is a managed cloud application. We are focusing on making the core experience as fast and stable as possible before exploring self-hosted or local-only options."
+    question: "Can I use Notesify completely offline?",
+    answer: "Yes! Notesify's desktop and web apps feature local-first storage. You can read, write, and organize notes completely offline without network lag. Changes queue safely on your device and synchronize automatically when you reconnect."
   }
 ];
 

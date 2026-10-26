@@ -4,17 +4,14 @@ import {
   List, ListOrdered, CheckSquare,
   Image as ImageIcon, Table as TableIcon,
   Minus, Quote, Code, Eraser,
-  Maximize2, Minimize2, Sparkles, Loader2, ChevronDown, Zap
+  Maximize2, Minimize2, ChevronDown, Zap
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { actionMeta } from "@/components/ai/types";
-import type { useAiChat } from "@/hooks/ai/useAiChat";
 import { Editor } from "@tiptap/react";
 import { cn } from "@/lib/utils";
 import { uploadImage } from "@/utils/uploadImage";
@@ -28,10 +25,9 @@ type Props = {
   editor: Editor;
   isMobile?: boolean;
   yOffset?: number;
-  aiChat?: ReturnType<typeof useAiChat>;
 };
 
-const EditorToolbar = ({ editor, isMobile, yOffset = 0, aiChat }: Props) => {
+const EditorToolbar = ({ editor, isMobile, yOffset = 0 }: Props) => {
   const navigate = useNavigate();
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
@@ -141,46 +137,6 @@ const EditorToolbar = ({ editor, isMobile, yOffset = 0, aiChat }: Props) => {
               title="Auto-format Markdown" 
               color="#ea580c"
             />
-            {aiChat && !isMobile && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    disabled={aiChat.loadingAction !== null}
-                    className={cn(
-                      "dock-btn transition-all duration-300 ml-1",
-                      aiChat.loadingAction && "dock-btn-active"
-                    )}
-                    style={{ "--highlight-color": "var(--accent-strong)" } as React.CSSProperties}
-                    title="AI Actions"
-                  >
-                    <div className="dock-icon-wrapper flex items-center justify-center">
-                      {aiChat.loadingAction ? (
-                        <Loader2 size={16} className="animate-spin text-[var(--accent-strong)]" strokeWidth={1.5} />
-                      ) : (
-                        <Sparkles size={16} className="text-[var(--accent-strong)]" strokeWidth={1.5} />
-                      )}
-                    </div>
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  align="start"
-                  side="top"
-                  sideOffset={8}
-                  className="assistant-actions-menu w-44 shadow-md z-[99999]"
-                >
-                  {(Object.keys(actionMeta) as (keyof typeof actionMeta)[]).map((action) => (
-                    <DropdownMenuItem
-                      key={action}
-                      onClick={() => void aiChat.runAction(action)}
-                      className="assistant-actions-menu-item cursor-pointer text-sm py-1.5 transition-colors"
-                    >
-                      {actionMeta[action].label}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
           </div>
 
           <div className="dock-divider" />

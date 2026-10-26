@@ -32,7 +32,7 @@ export const Roadmap = () => {
             What's Next
           </span>
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-white">
-            Coming soon to <span className="gradient-text">Notesify</span>
+            Coming soon to <span className="text-indigo-300">Notesify</span>
           </h2>
           <p className="mt-4 text-stone-400 text-base sm:text-lg">
             We're shipping fast. Here's a peek at what's landing next.

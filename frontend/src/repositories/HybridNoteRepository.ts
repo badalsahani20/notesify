@@ -83,25 +83,17 @@ export class HybridNoteRepository implements INoteRepository {
     async getNote(noteId: string): Promise<Note> {
         const localNote = await this.localDB.getById(noteId);
 
-        if (!navigator.onLine) {
-            if (localNote) return localNote;
-            throw new Error("No note found locally");
-        }
-
-        // Check if there are active offline mutations or unresolved conflicts queued locally
-        const pendingOp = await db.syncQueue.where("entityId").equals(noteId).first();
-        const conflict = await db.conflictLog
-            .where("entityId")
-            .equals(noteId)
-            .filter(c => c.status === "UNRESOLVED")
-            .first();
-
-        // If this note has pending un-synced edits or active conflicts, protect the local copy
-        if (localNote && (pendingOp || conflict)) {
+        // 1. If present in local Dexie, return immediately for instant (<2ms) local-first load
+        if (localNote) {
             return localNote;
         }
 
-        // When online and no pending mutations, fetch latest authoritative version from server
+        // 2. If missing locally and offline, throw error
+        if (!navigator.onLine) {
+            throw new Error("No note found locally");
+        }
+
+        // 3. Fall back to remote API only if the note is not cached locally (e.g. direct URL on new device)
         try {
             const remoteNote = await this.remoteAPI.getNote(noteId);
             if (remoteNote) {
@@ -109,11 +101,7 @@ export class HybridNoteRepository implements INoteRepository {
                 return remoteNote;
             }
         } catch (err) {
-            console.warn("[HybridNoteRepository] Remote fetch failed, falling back to local:", err);
-        }
-
-        if (localNote) {
-            return localNote;
+            console.warn("[HybridNoteRepository] Remote fetch failed:", err);
         }
 
         throw new Error("No note found locally or remotely");
@@ -133,7 +121,6 @@ export class HybridNoteRepository implements INoteRepository {
                     version: 1,
                     updatedAt: new Date().toISOString(),
                     lastAccessedAt: new Date().toISOString(),
-                    
                 }
         
                 await db.transaction('rw', [db.notes, db.syncQueue], async () => {

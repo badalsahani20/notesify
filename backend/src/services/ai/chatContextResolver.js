@@ -1,21 +1,44 @@
 import Notes from "../../models/notes.model.js";
-import Memory from "../../models/Memory.js";
+import GlobalChatSession from "../../models/globalChatSession.model.js";
 import { stripHtml } from "../../utils/stripHtml.js";
 import { summarizeHistory } from "../../utils/summarizeHistory.js";
 import { formatStructuredNoteContext } from "./chatService.js";
 import { getChatTools } from "./tools/chatTools.js";
 
-const DEFAULT_RECENT_HISTORY_TOKEN_BUDGET = 8000;
+const DEFAULT_HIGH_WATERMARK_TOKENS = 18000;
+const DEFAULT_LOW_WATERMARK_TOKENS = 10000;
+const SYSTEM_AND_TOOL_OVERHEAD_TOKENS = 2500;
+const RESERVED_OUTPUT_TOKENS = 5000;
+const SAFE_MODEL_CONTEXT_LIMIT = 64000;
 
-const getRecentHistoryTokenBudget = () => {
-  const configuredBudget = Number.parseInt(
-    process.env.CHAT_RECENT_HISTORY_TOKEN_BUDGET,
-    10,
+/**
+ * Derives dynamic watermarks accounting for system instructions, tool schemas,
+ * and reserved output token budget.
+ */
+export const getWatermarkThresholds = () => {
+  const configuredHigh = Number.parseInt(process.env.CHAT_HISTORY_HIGH_WATERMARK, 10);
+  const configuredLow = Number.parseInt(process.env.CHAT_HISTORY_LOW_WATERMARK, 10);
+
+  const maxSafeHistoryBudget = Math.max(
+    4000,
+    SAFE_MODEL_CONTEXT_LIMIT - SYSTEM_AND_TOOL_OVERHEAD_TOKENS - RESERVED_OUTPUT_TOKENS,
   );
 
-  return Number.isFinite(configuredBudget) && configuredBudget > 0
-    ? configuredBudget
-    : DEFAULT_RECENT_HISTORY_TOKEN_BUDGET;
+  const highWatermark = Number.isFinite(configuredHigh) && configuredHigh > 0
+    ? Math.min(configuredHigh, maxSafeHistoryBudget)
+    : Math.min(DEFAULT_HIGH_WATERMARK_TOKENS, maxSafeHistoryBudget);
+
+  const targetLow = Number.isFinite(configuredLow) && configuredLow > 0
+    ? Math.min(configuredLow, highWatermark - 100)
+    : Math.min(DEFAULT_LOW_WATERMARK_TOKENS, highWatermark - 2000);
+
+  const lowWatermark = Math.max(100, Math.min(targetLow, highWatermark - 100));
+
+  return {
+    highWatermark,
+    lowWatermark,
+    fallbackMaxTokens: Math.max(highWatermark + 3000, 12000),
+  };
 };
 
 /**
@@ -24,7 +47,7 @@ const getRecentHistoryTokenBudget = () => {
  * individually, and message framing adds overhead. This is approximate, not a
  * tokenizer's exact count.
  */
-const estimateMessageTokens = (message) => {
+export const estimateMessageTokens = (message) => {
   let serializedMessage;
   try {
     serializedMessage = JSON.stringify(message ?? {});
@@ -34,8 +57,6 @@ const estimateMessageTokens = (message) => {
 
   const pieces = serializedMessage.match(/[\p{L}\p{N}_]+|[^\s]/gu) || [];
   const contentTokens = pieces.reduce((total, piece) => {
-    // CJK characters commonly map close to one token each; other word-like
-    // pieces average several characters per token across common tokenizers.
     if (/[\u3400-\u9FFF\uF900-\uFAFF]/u.test(piece)) {
       return total + Array.from(piece).length;
     }
@@ -50,7 +71,77 @@ const estimateMessageTokens = (message) => {
   return contentTokens + 4;
 };
 
-const getRecentHistoryWithinTokenBudget = (history, tokenBudget) => {
+/**
+ * Role-aware extraction for older messages passed to the summarizer.
+ * Preserves high-value technical identifiers, errors, titles, and parameters
+ * while stripping heavy embeddings, raw base64, and massive data dumps.
+ */
+export const sanitizeMessageForSummary = (message) => {
+  if (!message) return message;
+  const clone = {
+    role: message.role,
+    content: typeof message.content === "string" ? message.content : JSON.stringify(message.content ?? ""),
+  };
+
+  if (Array.isArray(message.toolCalls) && message.toolCalls.length > 0) {
+    clone.toolCalls = message.toolCalls.map((tc) => {
+      const sanitized = {
+        tool: tc.tool || tc.function?.name,
+        status: tc.status,
+      };
+
+      if (tc.error) {
+        sanitized.error = tc.error;
+      }
+
+      if (tc.tool === "get_note_content") {
+        sanitized.noteId = tc.args?.noteId;
+        if (tc.data?.title) sanitized.title = tc.data.title;
+        if (tc.data?.content) {
+          sanitized.contentExcerpt = tc.data.content.slice(0, 600);
+        }
+      } else if (tc.tool === "search_web") {
+        sanitized.query = tc.args?.query;
+        if (Array.isArray(tc.data?.citations)) {
+          sanitized.citations = tc.data.citations.map((c) => ({
+            title: c.title,
+            url: c.url,
+          }));
+        }
+      } else if (tc.tool === "recall_memory") {
+        sanitized.query = tc.args?.query;
+        if (Array.isArray(tc.data)) {
+          sanitized.memories = tc.data.map((m) => ({
+            category: m.category,
+            content: m.content,
+          }));
+        }
+      } else if (tc.tool === "create_note" || tc.tool === "update_note") {
+        sanitized.noteId = tc.args?.noteId || tc.data?.noteId;
+        sanitized.title = tc.args?.title || tc.data?.title;
+        sanitized.mode = tc.args?.mode;
+      } else if (tc.tool === "ask_question") {
+        sanitized.purpose = tc.args?.purpose;
+        sanitized.questions = tc.args?.questions?.map((q) => q.question);
+      } else if (tc.data) {
+        if (typeof tc.data === "string") {
+          sanitized.data = tc.data.slice(0, 500);
+        } else if (typeof tc.data === "object") {
+          const cleanData = { ...tc.data };
+          delete cleanData.embedding;
+          delete cleanData.imageBase64;
+          sanitized.data = cleanData;
+        }
+      }
+
+      return sanitized;
+    });
+  }
+
+  return clone;
+};
+
+export const getRecentHistoryWithinTokenBudget = (history, tokenBudget) => {
   let tokenCount = 0;
   let startIndex = history.length;
 
@@ -69,6 +160,9 @@ const getRecentHistoryWithinTokenBudget = (history, tokenBudget) => {
     olderMessages: history.slice(0, startIndex),
   };
 };
+
+// In-memory single-flight lock per session ID to prevent concurrent overlapping compactions
+const activeCompactionLocks = new Map();
 
 /**
  * Fetch note context when the message is plausibly about the note.
@@ -157,35 +251,154 @@ export class ChatContextResolver {
     } = body || {};
 
     let effectiveHistory = history;
-    let sessionSummary = summary;
+    let sessionSummary = activeSession?.summary || summary || "";
 
-    const recentHistoryTokenBudget = getRecentHistoryTokenBudget();
+    const { highWatermark, lowWatermark, fallbackMaxTokens } = getWatermarkThresholds();
     const historyTokenCount = history.reduce(
       (total, item) => total + estimateMessageTokens(item),
       0,
     );
 
-    if (historyTokenCount > recentHistoryTokenBudget) {
-      const { recentHistory, olderMessages } = getRecentHistoryWithinTokenBudget(
-        history,
-        recentHistoryTokenBudget,
-      );
+    const sessionId = activeSession?._id ? String(activeSession._id) : null;
 
-      if (olderMessages.length > 0) {
-        try {
-          const consolidatedSummary = await summarizeHistory(olderMessages, sessionSummary);
-          if (consolidatedSummary) {
-            sessionSummary = consolidatedSummary;
-            if (activeSession) {
-              activeSession.summary = consolidatedSummary;
+    // Await any concurrent in-flight compaction for this specific session (single-flight)
+    if (sessionId && activeCompactionLocks.has(sessionId)) {
+      try {
+        await activeCompactionLocks.get(sessionId);
+        // Refresh session summary & checkpoint after concurrent compaction completes
+        if (activeSession) {
+          sessionSummary = activeSession.summary || sessionSummary;
+        }
+      } catch (_) {
+        // Proceed safely with current state if concurrent compaction failed
+      }
+    }
+
+    // Only compact when history exceeds the high watermark; otherwise reuse existing extracted context
+    if (historyTokenCount > highWatermark) {
+      const { recentHistory } = getRecentHistoryWithinTokenBudget(history, lowWatermark);
+      const cutoffIndex = history.length - recentHistory.length;
+
+      if (cutoffIndex > 0) {
+        const olderSlice = history.slice(0, cutoffIndex);
+
+        // Sequence / Checkpoint resolution:
+        // Use monotonic sequence cursor (survives MESSAGE_CAP trimming) with ID fallback
+        const lastSummarizedSeq = activeSession?.lastSummarizedSeq || 0;
+        const lastSummarizedMessageId = activeSession?.lastSummarizedMessageId || null;
+
+        let deltaMessages = [];
+        if (lastSummarizedSeq > 0) {
+          deltaMessages = olderSlice.filter((m) => (typeof m.seq === "number" ? m.seq > lastSummarizedSeq : true));
+        } else if (lastSummarizedMessageId) {
+          const checkpointIdx = olderSlice.findIndex((m) => m.id === lastSummarizedMessageId);
+          if (checkpointIdx >= 0) {
+            deltaMessages = olderSlice.slice(checkpointIdx + 1);
+          } else {
+            console.warn(
+              `⚠️ [ChatContextResolver] Checkpoint message "${lastSummarizedMessageId}" not found in older slice. Using full older slice.`,
+            );
+            deltaMessages = olderSlice;
+          }
+        } else {
+          // First compaction for this session
+          deltaMessages = olderSlice;
+        }
+
+        if (deltaMessages.length > 0) {
+          const candidateCheckpointMsg = deltaMessages[deltaMessages.length - 1];
+          const candidateCheckpointId = candidateCheckpointMsg?.id || null;
+          const candidateCheckpointSeq =
+            typeof candidateCheckpointMsg?.seq === "number"
+              ? candidateCheckpointMsg.seq
+              : lastSummarizedSeq + deltaMessages.length;
+
+          const sanitizedDelta = deltaMessages.map(sanitizeMessageForSummary);
+
+          const runCompaction = async () => {
+            const consolidatedSummary = await summarizeHistory(sanitizedDelta, sessionSummary);
+            if (consolidatedSummary && typeof consolidatedSummary === "string" && consolidatedSummary.trim()) {
+              const trimmed = consolidatedSummary.trim();
+              sessionSummary = trimmed;
+
+              // Optimistic concurrency update: only advance if checkpoint sequence matches precondition
+              if (activeSession?._id) {
+                try {
+                  const previousSeq = lastSummarizedSeq;
+                  const updated = await GlobalChatSession.findOneAndUpdate(
+                    {
+                      _id: activeSession._id,
+                      $or: [
+                        { lastSummarizedSeq: previousSeq },
+                        { lastSummarizedSeq: { $exists: false } },
+                        { lastSummarizedSeq: 0 },
+                      ],
+                    },
+                    {
+                      $set: {
+                        summary: trimmed,
+                        lastSummarizedMessageId: candidateCheckpointId,
+                        lastSummarizedSeq: candidateCheckpointSeq,
+                      },
+                    },
+                    { new: true },
+                  );
+
+                  if (updated) {
+                    activeSession.summary = updated.summary;
+                    activeSession.lastSummarizedMessageId = updated.lastSummarizedMessageId;
+                    activeSession.lastSummarizedSeq = updated.lastSummarizedSeq;
+                  } else {
+                    // Concurrent write conflict: reload committed summary and checkpoint rather than overwriting
+                    const latest = await GlobalChatSession.findById(activeSession._id).lean();
+                    if (latest) {
+                      activeSession.summary = latest.summary;
+                      activeSession.lastSummarizedMessageId = latest.lastSummarizedMessageId;
+                      activeSession.lastSummarizedSeq = latest.lastSummarizedSeq;
+                      sessionSummary = latest.summary || trimmed;
+                    }
+                  }
+                } catch (dbErr) {
+                  console.warn("⚠️ [ChatContextResolver] Failed to persist compaction checkpoint:", dbErr.message);
+                }
+              }
+              return { success: true, summary: trimmed };
+            }
+            return { success: false, summary: sessionSummary };
+          };
+
+          let compactionPromise;
+          if (sessionId) {
+            compactionPromise = runCompaction();
+            activeCompactionLocks.set(sessionId, compactionPromise);
+          } else {
+            compactionPromise = runCompaction();
+          }
+
+          let compactionResult = { success: false, summary: sessionSummary };
+          try {
+            compactionResult = await compactionPromise;
+          } catch (sumErr) {
+            console.warn("⚠️ [ChatContextResolver] Conversation extraction failed:", sumErr.message);
+          } finally {
+            if (sessionId) {
+              activeCompactionLocks.delete(sessionId);
             }
           }
-        } catch (sumErr) {
-          console.warn("⚠️ [ChatContextResolver] Conversation summarization failed:", sumErr.message);
+
+          if (compactionResult.success) {
+            effectiveHistory = recentHistory;
+          } else {
+            // Failure-safe fallback: retain previous valid summary, do not advance checkpoint,
+            // and retain as much history as safely fits within the fallback context limit to prevent context loss
+            console.warn("⚠️ [ChatContextResolver] Extraction uncommitted; retaining previous summary and safe fallback history.");
+            effectiveHistory = getRecentHistoryWithinTokenBudget(history, fallbackMaxTokens).recentHistory;
+          }
+        } else {
+          // All messages before cutoff were already extracted into summary
+          effectiveHistory = recentHistory;
         }
       }
-
-      effectiveHistory = recentHistory;
     }
 
     // Merge any verified client-side tool execution results into history
@@ -223,21 +436,8 @@ export class ChatContextResolver {
       timestamp: new Date().toISOString(),
     });
 
-    // Retrieve User Facts & Memories (Direct Indexed DB Fetch)
-    let memoryContext = "";
-    if (user?._id) {
-      try {
-        const memories = await Memory.find({ user: user._id })
-          .sort({ lastAccessedAt: -1 })
-          .limit(4)
-          .lean();
-        if (memories?.length > 0) {
-          memoryContext = `\n--- USER MEMORIES ---\nFacts previously noted about the user:\n${memories
-            .map((m) => `- [${m.category}] ${m.content}`)
-            .join("\n")}\n--- END MEMORIES ---\n`;
-        }
-      } catch (_) {}
-    }
+    // Memories are retrieved on-demand via the recall_memory tool by the agent
+    const memoryContext = "";
 
     const activeNoteId = noteId || currentNote?.id || null;
     let activeNoteTitle = currentNote?.title;
@@ -268,8 +468,8 @@ export class ChatContextResolver {
     // note-scoped conversation. Note-scoped chats are the contextual drawer.
     const isNoteScoped = !isGlobalChat;
 
-    // Available tools for current chat mode (in note editor drawer, create_note is excluded)
-    const tools = getChatTools(currentMode, { isNoteScoped });
+    // Available tools for current chat mode (unified schema for prefix caching)
+    const tools = getChatTools();
 
     return {
       effectiveHistory,

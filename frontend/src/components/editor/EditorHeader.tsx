@@ -43,7 +43,6 @@ type EditorHeaderProps = {
   isSaving?: boolean;
   loadingAction?: AiAction | null;
   onRunAction?: (action: AiAction) => Promise<void>;
-  onOpenGenerateNotes?: () => void;
   onClose?: () => void;
 };
 
@@ -71,7 +70,6 @@ const EditorHeader = ({
   isMobile,
   isSaving,
   loadingAction,
-  onOpenGenerateNotes,
   onClose,
 }: EditorHeaderProps) => {
 
@@ -271,19 +269,6 @@ const EditorHeader = ({
         </div>
 
         <div className="editor-meta-stack">
-          {/* Generate Notes button — desktop only */}
-          {!isMobile && (
-            <button
-              type="button"
-              onClick={onOpenGenerateNotes}
-              className="ignite-button h-7 !px-3 text-[0.8rem]"
-              aria-label="Generate notes with Iris"
-            >
-              <div className="iris-orb shrink-0" style={{ width: "12px", height: "12px", borderWidth: "1px", boxShadow: "none" }} />
-              <span className="hidden sm:inline">Generate Notes</span>
-            </button>
-          )}
-
           {/* Study button — desktop only */}
           {!isMobile && (
             <button

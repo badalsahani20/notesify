@@ -448,7 +448,7 @@ export function MessageScroller({
         onViewportKeyDown?.(event);
       }}
       className={cn(
-        "h-full overflow-y-auto overscroll-contain outline-none [overflow-anchor:none] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        "h-full overflow-y-auto overscroll-contain outline-none [overflow-anchor:auto] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
         viewportClassName,
         navigation === "rail" && railOverflowing && "md:pr-10 max-md:pr-0",
       )}

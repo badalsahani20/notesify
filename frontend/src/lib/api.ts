@@ -10,7 +10,8 @@ interface CustomAxiosRequest extends InternalAxiosRequestConfig {
 const getApiBaseUrl = () => {
   const envUrl = import.meta.env.VITE_API_URL;
   // Fallback to production live API when running inside packaged Electron (file:) or PROD if env points to localhost
-  if (import.meta.env.PROD || window.location.protocol === "file:") {
+  const isFileProtocol = typeof window !== "undefined" && window.location?.protocol === "file:";
+  if (import.meta.env.PROD || isFileProtocol) {
     if (!envUrl || envUrl.includes("localhost")) {
       return "https://fullstack-notes-app-xluo.onrender.com/api";
     }

@@ -26,8 +26,9 @@ export const executeOpenRouter = async (
     messages: messages,
     stream: stream,
     max_tokens: maxTokens,
+    cache_control: { type: "ephemeral" },
   };
-
+  
   if (stream) {
     bodyPayload.stream_options = { include_usage: true };
   }
@@ -35,46 +36,34 @@ export const executeOpenRouter = async (
   if (isGlm) {
     bodyPayload.provider = {
       order: [
-        "baseten/fp8",
-        "parasail/fp8",
-        "modal/nvfp4",
-        "crusoe/fp4"
+        "open-inference/fp4",
+        "relace",
+        "wafer/nvfp4",
+        "sail-research/fp4",
+        "gmicloud/fp8",
       ],
       allow_fallbacks: true,
     };
   } else if (isDeepseek) {
     bodyPayload.provider = {
       order: [
-        "digitalocean",
+        "relace/fp4",
         "deepinfra/fp8",
+        "digitalocean",
         "wafer/fast",
       ],
       allow_fallbacks: true,
     };
   }
 
-  if (isLing) {
-    if (includeReasoning === false) {
-      bodyPayload.include_reasoning = false;
-      bodyPayload.reasoning = { effort: "none" };
-    } else {
-      bodyPayload.include_reasoning = true;
-      bodyPayload.reasoning = { effort: "high" };
-    }
-  } else if (isMandatoryReasoningModel) {
-    // These models strictly require reasoning or they deny the request
-    bodyPayload.include_reasoning = true;
-    // OpenRouter rejects reasoning.effort together with reasoning.max_tokens.
-    // Use the explicit budget for mandatory reasoning models.
-    bodyPayload.reasoning = { max_tokens: reasoningMaxTokens };
-  } else if (includeReasoning === false) {
-    // Specifically disable reasoning for Qwen 3.7 Flash and when reasoning is toggled off
+  if (includeReasoning === false) {
+    // Explicitly disable reasoning (e.g. for grammar checking or fast deterministic tasks)
     bodyPayload.include_reasoning = false;
     bodyPayload.reasoning = { effort: "none" };
-  } else if (includeReasoning === true) {
+  } else {
+    // Native adaptive reasoning: allow the model to scale its own thinking tokens
+    // up to a safe token ceiling without forcing artificial effort levels.
     bodyPayload.include_reasoning = true;
-    // Use a hard reasoning budget instead of an effort level so long internal
-    // deliberations cannot consume the whole completion allowance.
     bodyPayload.reasoning = { max_tokens: reasoningMaxTokens };
   }
 
@@ -138,6 +127,13 @@ export const executeOpenRouter = async (
     console.warn(`❌ [OpenRouter] Model "${modelId}" output error string detected`);
     throw new Error(
       `Model output error (${modelId}): ${content.slice(0, 300)}`
+    );
+  }
+
+  if (data?.usage) {
+    const cachedTokens = data.usage.prompt_tokens_details?.cached_tokens ?? 0;
+    console.log(
+      `📊 [OpenRouter Usage] Prompt tokens: ${data.usage.prompt_tokens} (Cached: ${cachedTokens}), Completion tokens: ${data.usage.completion_tokens}`
     );
   }
 

@@ -115,8 +115,13 @@ export const DownloadPage = () => {
     if (shouldAutoDownload) {
       timer = setTimeout(() => {
         setDownloadStarted(true);
-        window.location.href = platform.downloadUrl;
-      }, 2000);
+        const link = document.createElement('a');
+        link.href = platform.downloadUrl;
+        link.setAttribute('download', platform.binaryName);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }, 1500);
     } else {
       setDownloadStarted(false);
     }
@@ -124,50 +129,50 @@ export const DownloadPage = () => {
     return () => {
       if (timer) clearTimeout(timer);
     };
-  }, [shouldAutoDownload, platform.downloadUrl]);
+  }, [shouldAutoDownload, platform.downloadUrl, platform.binaryName]);
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#050505] text-stone-200 selection:bg-indigo-500/30 font-sans relative overflow-x-hidden">
+    <div className="min-h-screen flex flex-col bg-[#08080a] text-stone-200 selection:bg-white/20 font-sans relative overflow-x-hidden">
       <SEO 
         title={`Download Notesify for ${platform.name} — ${latestRelease.version}`}
         description={`Download Notesify desktop app for ${platform.name}. Official release ${latestRelease.version} featuring bounded agentic reasoning, on-demand contextual retrieval, and offline-first notes.`}
         path={`/download/${selectedOS}`}
       />
       
-      {/* Interactive Dot Grid Background */}
+      {/* Refined Architectural Grid Background */}
       <DotField
-        dotRadius={1.5}
-        dotSpacing={14}
-        bulgeStrength={67}
-        glowRadius={160}
-        sparkle={true}
+        dotRadius={1.2}
+        dotSpacing={16}
+        bulgeStrength={40}
+        glowRadius={120}
+        sparkle={false}
         waveAmplitude={0}
-        cursorRadius={500}
-        cursorForce={0.1}
+        cursorRadius={400}
+        cursorForce={0.06}
         bulgeOnly
-        gradientFrom="#A855F7"
-        gradientTo="#B497CF"
-        glowColor="#120F17"
+        gradientFrom="#52525b"
+        gradientTo="#71717a"
+        glowColor="#09090b"
       />
 
       {/* Top Floating Navigation */}
       <header className="relative z-20 w-full px-6 pt-6 max-w-6xl mx-auto flex items-center justify-between">
         <Link 
           to="/" 
-          className="inline-flex items-center gap-2 text-sm text-stone-400 hover:text-white transition-colors bg-white/5 hover:bg-white/10 px-3.5 py-1.5 rounded-full border border-white/10"
+          className="inline-flex items-center gap-2 text-xs font-medium text-stone-400 hover:text-white transition-colors bg-white/[0.04] hover:bg-white/[0.08] px-3.5 py-1.5 rounded-full border border-white/10 backdrop-blur-md"
         >
-          <ArrowLeft className="size-4" />
+          <ArrowLeft className="size-3.5" />
           <span>Back to home</span>
         </Link>
         <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-medium bg-white/[0.04] text-stone-300 border border-white/10">
             Notesify {latestRelease.version}
           </span>
           <a
             href={latestRelease.htmlUrl}
             target="_blank"
             rel="noreferrer"
-            className="hidden sm:inline-flex items-center gap-1.5 text-xs text-stone-400 hover:text-stone-200 bg-white/5 hover:bg-white/10 px-3 py-1 rounded-full border border-white/10 transition-colors"
+            className="hidden sm:inline-flex items-center gap-1.5 text-xs text-stone-400 hover:text-stone-200 bg-white/[0.04] hover:bg-white/[0.08] px-3 py-1 rounded-full border border-white/10 transition-colors font-medium"
           >
             GitHub Release
             <ExternalLink className="size-3" />
@@ -182,30 +187,33 @@ export const DownloadPage = () => {
         {/* ========================================================= */}
         <section className="w-full max-w-3xl text-center mb-16 pt-4">
           <FadeIn delay={100}>
-            {/* Morphing Iris Blob Animation */}
-            <div className="relative w-28 h-28 sm:w-36 sm:h-36 mx-auto mb-8 group cursor-default">
-              <div className="absolute inset-0 bg-gradient-to-br from-indigo-500 via-purple-600 to-pink-500 iris-hero-blob shadow-[0_0_70px_rgba(99,102,241,0.5)] transition-all duration-700 animate-spin-slow"></div>
-              <div className="absolute inset-2 bg-[#050505] iris-hero-blob transition-all duration-700 scale-90"></div>
-              <div className="absolute inset-4 bg-gradient-to-br from-indigo-400 to-purple-500 iris-hero-blob opacity-60 animate-pulse"></div>
-              
-              <div className="absolute inset-0 flex items-center justify-center">
-                {downloadStarted ? (
-                  <CheckCircle2 className="size-10 sm:size-12 text-emerald-400 animate-in zoom-in duration-500" strokeWidth={1.75} />
-                ) : (
-                  <MonitorDown className="size-10 sm:size-12 text-white animate-pulse" strokeWidth={1.5} />
-                )}
+            {/* Tactile Architectural Emblem */}
+            <div className="relative mx-auto mb-8 flex items-center justify-center">
+              <div className="relative size-24 sm:size-28 rounded-3xl bg-neutral-900/90 border border-white/10 p-1 shadow-2xl backdrop-blur-xl flex items-center justify-center group">
+                <div className="absolute -inset-px rounded-3xl bg-gradient-to-b from-white/15 to-transparent opacity-50 pointer-events-none" />
+                <div className="size-full rounded-[22px] bg-gradient-to-b from-neutral-800/80 to-neutral-950 flex flex-col items-center justify-center gap-1.5 border border-white/5">
+                  {downloadStarted ? (
+                    <CheckCircle2 className="size-8 sm:size-9 text-emerald-400 transition-all duration-300" strokeWidth={1.75} />
+                  ) : (
+                    <MonitorDown className="size-8 sm:size-9 text-white transition-transform group-hover:scale-105" strokeWidth={1.5} />
+                  )}
+                  <span className="font-mono text-[10px] tracking-widest uppercase font-semibold text-stone-400">
+                    {downloadStarted ? 'Started' : platform.name}
+                  </span>
+                </div>
               </div>
             </div>
           </FadeIn>
 
           <FadeIn delay={200}>
-            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-indigo-300 text-xs font-semibold tracking-wider mb-4">
-              <span>Latest Release • {latestRelease.version}</span>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-white/10 bg-white/[0.03] text-stone-300 font-mono text-[11px] font-semibold tracking-wider mb-4">
+              <span className="size-1.5 rounded-full bg-emerald-400" />
+              <span>Release {latestRelease.version} • Verified</span>
             </div>
             <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white mb-4">
               {downloadStarted ? 'Thanks for downloading!' : `Download Notesify for ${platform.name}`}
             </h1>
-            <p className="text-stone-400 text-base sm:text-lg max-w-xl mx-auto mb-8 leading-relaxed">
+            <p className="text-stone-300 text-base sm:text-lg max-w-xl mx-auto mb-8 leading-relaxed font-normal">
               {downloadStarted 
                 ? `Your Notesify for ${platform.name} installer is downloading. Check your browser's download shelf to launch setup.`
                 : shouldAutoDownload
@@ -220,7 +228,7 @@ export const DownloadPage = () => {
 
           {/* OS Switcher Pills */}
           <FadeIn delay={250}>
-            <div className="inline-flex items-center p-1.5 rounded-xl bg-[#09090b]/90 border border-white/10 mb-8 backdrop-blur-xl shadow-lg relative">
+            <div className="inline-flex items-center p-1.5 rounded-xl bg-neutral-900/90 border border-white/10 mb-8 backdrop-blur-xl shadow-lg relative">
               {(['windows', 'mac', 'linux'] as OSKey[]).map((osKey) => {
                 const isCurrent = selectedOS === osKey;
                 const osLabel = osKey === 'windows' ? 'Windows' : osKey === 'mac' ? 'macOS' : 'Linux';
@@ -233,14 +241,14 @@ export const DownloadPage = () => {
                     }}
                     className={`relative px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-colors duration-200 cursor-pointer ${
                       isCurrent 
-                        ? 'text-white' 
+                        ? 'text-black' 
                         : 'text-stone-400 hover:text-white'
                     }`}
                   >
                     {isCurrent && (
                       <motion.div
                         layoutId="active-os-pill"
-                        className="absolute inset-0 bg-indigo-600 rounded-lg shadow-lg shadow-indigo-500/30"
+                        className="absolute inset-0 bg-white rounded-lg shadow-sm"
                         transition={{ 
                           type: "spring", 
                           stiffness: 450, 
@@ -251,8 +259,8 @@ export const DownloadPage = () => {
                     <span className="relative z-10 flex items-center">
                       {osLabel}
                       {osKey === 'windows' && (
-                        <span className={`ml-1.5 text-[10px] px-1.5 py-0.5 rounded uppercase font-bold transition-colors ${
-                          isCurrent ? 'bg-white/20 text-white' : 'bg-white/5 text-stone-400'
+                        <span className={`ml-1.5 text-[10px] px-1.5 py-0.5 rounded font-mono font-bold transition-colors ${
+                          isCurrent ? 'bg-neutral-200 text-neutral-900' : 'bg-white/5 text-stone-400'
                         }`}>
                           Exe
                         </span>
@@ -271,11 +279,11 @@ export const DownloadPage = () => {
                 <a 
                   href={platform.downloadUrl}
                   onClick={() => setDownloadStarted(true)}
-                  className="group relative inline-flex items-center justify-center rounded-2xl px-8 sm:px-10 py-4 sm:py-5 text-base sm:text-lg font-bold bg-white text-black hover:bg-stone-200 transition-all duration-300 shadow-[0_0_40px_rgba(255,255,255,0.25)] hover:shadow-[0_0_50px_rgba(255,255,255,0.4)] hover:-translate-y-0.5"
+                  className="group relative inline-flex items-center justify-center rounded-2xl px-8 sm:px-10 py-4 text-base sm:text-lg font-bold bg-white text-neutral-950 hover:bg-neutral-100 border border-white/20 transition-all duration-200 shadow-xl active:scale-[0.99] cursor-pointer"
                 >
-                  <Download className="size-5 sm:size-6 mr-3 text-black group-hover:scale-110 transition-transform" />
+                  <Download className="size-5 sm:size-6 mr-3 text-neutral-950 group-hover:scale-110 transition-transform" />
                   <span>Download for {platform.name}</span>
-                  <span className="ml-3 hidden sm:inline-flex text-xs px-2.5 py-1 rounded-full bg-black/10 font-semibold text-stone-700">
+                  <span className="ml-3 hidden sm:inline-flex text-xs px-2.5 py-1 rounded-full bg-neutral-200 font-mono font-semibold text-neutral-800">
                     {platform.fileSize}
                   </span>
                 </a>
@@ -285,7 +293,7 @@ export const DownloadPage = () => {
                     href="https://app.notesify.in"
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center justify-center rounded-2xl px-8 py-4 text-base font-bold bg-indigo-600 hover:bg-indigo-500 transition-all duration-300 text-white shadow-lg shadow-indigo-500/20"
+                    className="inline-flex items-center justify-center rounded-2xl px-8 py-4 text-base font-bold bg-white text-black hover:bg-neutral-100 transition-all duration-200 shadow-lg"
                   >
                     <ExternalLink className="size-5 mr-2" />
                     Launch Notesify Web App
@@ -301,12 +309,12 @@ export const DownloadPage = () => {
                 </div>
               )}
 
-              <div className="flex items-center gap-3 text-xs text-stone-400 mt-2">
+              <div className="flex items-center gap-3 text-xs font-mono text-stone-400 mt-2">
                 <span>{platform.architecture}</span>
                 <span className="text-stone-600">•</span>
                 <span>{platform.packageType}</span>
                 <span className="text-stone-600">•</span>
-                <span className="text-emerald-400 flex items-center gap-1">
+                <span className="text-emerald-400 flex items-center gap-1 font-sans">
                   <Check className="size-3" />
                   {platform.status}
                 </span>
@@ -315,10 +323,8 @@ export const DownloadPage = () => {
           </FadeIn>
         </section>
 
-        {/* Divider with Ambient Glow */}
-        <div className="w-full max-w-5xl h-px bg-gradient-to-r from-transparent via-white/15 to-transparent my-10 relative">
-          <div className="absolute inset-0 bg-indigo-500/20 blur-sm" />
-        </div>
+        {/* Clean Hairline Divider */}
+        <div className="w-full max-w-5xl h-px bg-white/10 my-12" />
 
         {/* ========================================================= */}
         {/* TIER 2: WHAT'S NEW IN LATEST RELEASE (DYNAMIC METADATA)  */}
@@ -327,12 +333,12 @@ export const DownloadPage = () => {
           <FadeIn delay={350}>
             <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
               <div>
-                <div className="flex items-center gap-2 text-indigo-400 text-xs font-bold uppercase tracking-wider mb-2">
-                  <span>Release Showcase • GitHub Source of Truth</span>
+                <div className="flex items-center gap-2 text-stone-400 font-mono text-[11px] font-semibold uppercase tracking-wider mb-2">
+                  <span>Release Notes • GitHub Verified</span>
                 </div>
                 <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
                   What's New in {latestRelease.version} —{' '}
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-300 via-purple-300 to-pink-300">
+                  <span className="text-stone-300 font-bold">
                     {latestRelease.name.replace(/^🚀\s*/, '').replace(new RegExp(`^Notesify\\s*${latestRelease.version}\\s*[—–-]?\\s*`, 'i'), '') || 'The Agentic Leap'}
                   </span>
                 </h2>
@@ -359,20 +365,20 @@ export const DownloadPage = () => {
                 return (
                   <div 
                     key={idx}
-                    className={`rounded-2xl p-6 border border-white/10 bg-[#09090b]/90 hover:bg-[#111116]/95 backdrop-blur-xl shadow-xl transition-all duration-300 relative overflow-hidden group hover:border-white/20 hover:-translate-y-0.5 ${
-                      idx === 0 ? 'lg:col-span-2 bg-gradient-to-br from-indigo-950/40 via-[#09090b]/95 to-[#09090b]/90 border-indigo-500/30' : ''
+                    className={`rounded-2xl p-6 border border-white/10 bg-neutral-900/80 hover:bg-neutral-900/95 backdrop-blur-xl shadow-xl transition-all duration-200 relative overflow-hidden group hover:border-white/20 hover:-translate-y-0.5 ${
+                      idx === 0 ? 'lg:col-span-2 border-white/20' : ''
                     }`}
                   >
                     <div className="flex items-center justify-between mb-4">
-                      <div className="size-10 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 flex items-center justify-center group-hover:scale-105 transition-transform">
+                      <div className="size-10 rounded-xl bg-white/5 text-white border border-white/10 flex items-center justify-center group-hover:scale-105 transition-transform">
                         <IconComponent className="size-5" />
                       </div>
-                      <span className="text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-white/5 text-stone-300 border border-white/5">
+                      <span className="text-[11px] font-mono font-semibold uppercase tracking-wider px-2.5 py-1 rounded-full bg-white/5 text-stone-300 border border-white/10">
                         {item.tag}
                       </span>
                     </div>
 
-                    <h3 className="text-lg font-bold text-white mb-2 group-hover:text-indigo-200 transition-colors">
+                    <h3 className="text-lg font-bold text-white mb-2 group-hover:text-stone-100 transition-colors">
                       {item.title}
                     </h3>
                     <p className="text-sm text-stone-400 leading-relaxed">
@@ -385,9 +391,9 @@ export const DownloadPage = () => {
 
             {/* Technical Highlights / Guarantees */}
             {latestRelease.technicalNotes.length > 0 && (
-              <div className="rounded-2xl p-6 border border-white/10 bg-[#09090b]/90 backdrop-blur-xl shadow-xl mb-6 relative overflow-hidden">
-                <h4 className="text-xs font-bold text-stone-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-                  <Cpu className="size-4 text-indigo-400" />
+              <div className="rounded-2xl p-6 border border-white/10 bg-neutral-900/80 backdrop-blur-xl shadow-xl mb-6 relative overflow-hidden">
+                <h4 className="text-xs font-mono font-semibold text-stone-300 uppercase tracking-wider mb-4 flex items-center gap-2">
+                  <Cpu className="size-4 text-stone-400" />
                   <span>Architecture & Reliability Highlights</span>
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-stone-300">
@@ -402,13 +408,13 @@ export const DownloadPage = () => {
             )}
 
             {/* Expandable Complete Release Notes Markdown */}
-            <div className="rounded-2xl border border-white/10 bg-[#09090b]/90 backdrop-blur-xl shadow-xl overflow-hidden">
+            <div className="rounded-2xl border border-white/10 bg-neutral-900/80 backdrop-blur-xl shadow-xl overflow-hidden">
               <button
                 onClick={() => setShowFullChangelog((prev) => !prev)}
                 className="w-full px-6 py-4 flex items-center justify-between text-xs font-bold text-stone-300 hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
               >
                 <span className="flex items-center gap-2">
-                  <FileText className="size-4 text-indigo-400" />
+                  <FileText className="size-4 text-stone-400" />
                   <span>{showFullChangelog ? 'Hide complete release notes' : 'Read complete release changelog (Markdown)'}</span>
                 </span>
                 {showFullChangelog ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
@@ -432,8 +438,8 @@ export const DownloadPage = () => {
           <FadeIn delay={400}>
             <div className="flex items-center justify-between mb-6">
               <div>
-                <div className="flex items-center gap-2 text-stone-400 text-xs font-bold uppercase tracking-wider mb-1">
-                  <History className="size-4 text-purple-400" />
+                <div className="flex items-center gap-2 text-stone-400 text-xs font-mono font-semibold uppercase tracking-wider mb-1">
+                  <History className="size-4 text-stone-400" />
                   <span>Release Timeline</span>
                 </div>
                 <h3 className="text-2xl font-bold text-white tracking-tight">
@@ -453,14 +459,14 @@ export const DownloadPage = () => {
                     onClick={() => setActiveReleaseIndex(index)}
                     className={`text-left p-5 rounded-2xl border transition-all duration-200 relative cursor-pointer overflow-hidden ${
                       isActive 
-                        ? 'border-indigo-500/60 shadow-xl shadow-indigo-500/15 backdrop-blur-xl' 
-                        : 'border-white/10 bg-[#09090b]/90 hover:bg-[#111116]/95 hover:border-white/20 backdrop-blur-xl shadow-lg'
+                        ? 'border-white/30 bg-neutral-900 shadow-xl' 
+                        : 'border-white/10 bg-neutral-900/60 hover:bg-neutral-900/80 hover:border-white/20 backdrop-blur-xl shadow-lg'
                     }`}
                   >
                     {isActive && (
                       <motion.div
                         layoutId="active-release-card"
-                        className="absolute inset-0 bg-indigo-950/40 border border-indigo-500/60 rounded-2xl pointer-events-none"
+                        className="absolute inset-0 bg-neutral-800/60 border border-white/20 rounded-2xl pointer-events-none"
                         transition={{ 
                           type: "spring", 
                           stiffness: 380, 
@@ -552,9 +558,7 @@ export const DownloadPage = () => {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
               
               {/* Left Column: How to Install (Tailored for Selected Platform) */}
-              <div className="lg:col-span-7 bg-[#09090b]/90 border border-white/10 rounded-2xl p-6 sm:p-8 shadow-2xl backdrop-blur-xl relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-28 bg-indigo-500/10 blur-[90px] rounded-full pointer-events-none" />
-                
+              <div className="lg:col-span-7 bg-neutral-900/80 border border-white/10 rounded-2xl p-6 sm:p-8 shadow-2xl backdrop-blur-xl relative overflow-hidden">
                 <h3 className="text-xl font-bold text-white mb-2 flex items-center">
                   How to install on {platform.name}
                 </h3>
@@ -565,7 +569,7 @@ export const DownloadPage = () => {
                 <div className="space-y-6">
                   {platform.steps.map((step, idx) => (
                     <div key={idx} className="flex gap-4">
-                      <div className="flex-shrink-0 size-8 rounded-full bg-indigo-500/20 text-indigo-300 flex items-center justify-center font-bold text-sm border border-indigo-500/30">
+                      <div className="flex-shrink-0 size-7 rounded-full bg-white/10 text-white flex items-center justify-center font-mono font-bold text-xs border border-white/15">
                         {idx + 1}
                       </div>
                       <div>
@@ -577,8 +581,8 @@ export const DownloadPage = () => {
                 </div>
               </div>
 
-              {/* Right Column: Platform-Specific Package Specs (Not Generic Global Specs) */}
-              <div className="lg:col-span-5 bg-[#09090b]/90 border border-white/10 rounded-2xl p-6 sm:p-8 shadow-2xl backdrop-blur-xl flex flex-col justify-between relative overflow-hidden">
+              {/* Right Column: Platform-Specific Package Specs */}
+              <div className="lg:col-span-5 bg-neutral-900/80 border border-white/10 rounded-2xl p-6 sm:p-8 shadow-2xl backdrop-blur-xl flex flex-col justify-between relative overflow-hidden">
                 <div>
                   <h3 className="text-lg font-bold text-white mb-2 flex items-center">
                     <ShieldCheck className="size-5 text-emerald-400 mr-2" />
@@ -588,30 +592,30 @@ export const DownloadPage = () => {
                     Verified package metadata and packaging configuration.
                   </p>
 
-                  <dl className="space-y-3.5 text-xs">
+                  <dl className="space-y-3.5 text-xs font-mono">
                     <div className="flex justify-between py-2 border-b border-white/5">
-                      <dt className="text-stone-400">Release Version</dt>
+                      <dt className="text-stone-400 font-sans">Release Version</dt>
                       <dd className="font-semibold text-white">{latestRelease.version} (Stable)</dd>
                     </div>
                     <div className="flex justify-between py-2 border-b border-white/5">
-                      <dt className="text-stone-400">Package Format</dt>
+                      <dt className="text-stone-400 font-sans">Package Format</dt>
                       <dd className="font-semibold text-white">{platform.packageType}</dd>
                     </div>
                     <div className="flex justify-between py-2 border-b border-white/5">
-                      <dt className="text-stone-400">Target Architecture</dt>
+                      <dt className="text-stone-400 font-sans">Target Architecture</dt>
                       <dd className="font-semibold text-white">{platform.architecture}</dd>
                     </div>
                     <div className="flex justify-between py-2 border-b border-white/5">
-                      <dt className="text-stone-400">Display Scaling</dt>
+                      <dt className="text-stone-400 font-sans">Display Scaling</dt>
                       <dd className="font-semibold text-emerald-400">{platform.dpiAware}</dd>
                     </div>
                     <div className="flex justify-between py-2 border-b border-white/5">
-                      <dt className="text-stone-400">Download Size</dt>
+                      <dt className="text-stone-400 font-sans">Download Size</dt>
                       <dd className="font-semibold text-white">{platform.fileSize}</dd>
                     </div>
                     <div className="flex justify-between py-2">
-                      <dt className="text-stone-400">Binary Artifact</dt>
-                      <dd className="font-mono text-[11px] text-indigo-300 truncate max-w-[170px]" title={platform.binaryName}>
+                      <dt className="text-stone-400 font-sans">Binary Artifact</dt>
+                      <dd className="text-[11px] text-stone-300 truncate max-w-[170px]" title={platform.binaryName}>
                         {platform.binaryName}
                       </dd>
                     </div>
@@ -624,7 +628,7 @@ export const DownloadPage = () => {
                     href="https://github.com/badalsahani20/notesify/releases"
                     target="_blank"
                     rel="noreferrer"
-                    className="text-indigo-400 hover:text-indigo-300 font-medium inline-flex items-center gap-1"
+                    className="text-stone-300 hover:text-white font-medium inline-flex items-center gap-1 transition-colors"
                   >
                     All releases
                     <ExternalLink className="size-3" />
