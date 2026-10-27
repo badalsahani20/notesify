@@ -246,6 +246,7 @@ const GlobalChatPage = () => {
   return (
     <div className="gc-shell">
       <SelectionToolbar onAskIris={handleAskIris} />
+
       <GlobalChatSidebar
         isMobile={isMobile}
         sidebarOpen={sidebarOpen}
@@ -263,8 +264,6 @@ const GlobalChatPage = () => {
 
       {/* ── Main chat area ── */}
       <div className="gc-main relative flex-1 flex flex-col h-full min-h-0 min-w-0 overflow-hidden">
-
-
         {/* Floating Sidebar Toggle — visible only when sidebar is collapsed */}
         {!sidebarOpen && (
           <button
@@ -283,55 +282,53 @@ const GlobalChatPage = () => {
         >
           {/* Left Column: Chat Messages & Compose (Always present & active) */}
           <div className="relative flex-1 flex flex-col h-full min-h-0 min-w-0 overflow-hidden">
-            <>
-              <GlobalChatMessages
-                messages={messages as Message[]}
-                messagesLoading={messagesLoading}
-                streamingMessageId={streamingMessageId}
-                streamedMessageText={streamedMessageText}
-                isStreaming={isStreaming}
-                isSending={isSending}
-                sendMessage={sendMessage}
-                prompts={prompts}
-                bottomRef={bottomRef}
-                fullWidthAssistant={!!activeArtifact}
-                hasActivePrompt={hasActivePrompt}
-                onRegenerate={() => void regenerateResponse()}
-              />
+            <GlobalChatMessages
+              messages={messages as Message[]}
+              messagesLoading={messagesLoading}
+              streamingMessageId={streamingMessageId}
+              streamedMessageText={streamedMessageText}
+              isStreaming={isStreaming}
+              isSending={isSending}
+              sendMessage={sendMessage}
+              prompts={prompts}
+              bottomRef={bottomRef}
+              fullWidthAssistant={!!activeArtifact}
+              hasActivePrompt={hasActivePrompt}
+              onRegenerate={() => void regenerateResponse()}
+            />
 
-              {/* Active interactive prompt (Claude-style docked dialog above input box) */}
-              <GlobalChatCompose
-                input={input}
-                setInput={setInput}
-                attachedImage={attachedImage}
-                setAttachedImage={setAttachedImage}
-                attachedDoc={attachedDoc}
-                onDocUpload={uploadDoc}
-                onClearDoc={() => setAttachedDoc(null)}
-                isSending={isSending}
-                imageDisabled={imageDisabled}
-                handleSend={handleSend}
-                onStop={stopGeneration}
-                textareaRef={textareaRef}
-                fileRef={fileRef}
-                modelTier={modelTier}
-                setModelTier={setModelTier}
-                useReasoning={useReasoning}
-                setUseReasoning={setUseReasoning}
-                useWebSearch={useWebSearch}
-                setUseWebSearch={setUseWebSearch}
-                topSlot={
-                  hasActivePrompt && activeQuestions ? (
-                    <InteractivePromptDialog
-                      questions={activeQuestions}
-                      purpose={activePromptToolCall?.purpose ?? pendingInteraction?.purpose ?? undefined}
-                      onSubmit={handlePromptSubmit}
-                      onDismiss={handlePromptDismiss}
-                    />
-                  ) : null
-                }
-              />
-            </>
+            {/* Active interactive prompt (Claude-style docked dialog above input box) */}
+            <GlobalChatCompose
+              input={input}
+              setInput={setInput}
+              attachedImage={attachedImage}
+              setAttachedImage={setAttachedImage}
+              attachedDoc={attachedDoc}
+              onDocUpload={uploadDoc}
+              onClearDoc={() => setAttachedDoc(null)}
+              isSending={isSending}
+              imageDisabled={imageDisabled}
+              handleSend={handleSend}
+              onStop={stopGeneration}
+              textareaRef={textareaRef}
+              fileRef={fileRef}
+              modelTier={modelTier}
+              setModelTier={setModelTier}
+              useReasoning={useReasoning}
+              setUseReasoning={setUseReasoning}
+              useWebSearch={useWebSearch}
+              setUseWebSearch={setUseWebSearch}
+              topSlot={
+                hasActivePrompt && activeQuestions ? (
+                  <InteractivePromptDialog
+                    questions={activeQuestions}
+                    purpose={activePromptToolCall?.purpose ?? pendingInteraction?.purpose ?? undefined}
+                    onSubmit={handlePromptSubmit}
+                    onDismiss={handlePromptDismiss}
+                  />
+                ) : null
+              }
+            />
           </div>
 
           {/* Right Column: Desktop Split Artifact Canvas (Smooth slide in & out) */}

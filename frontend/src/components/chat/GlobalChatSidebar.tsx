@@ -1,4 +1,4 @@
-import { memo, useState, useMemo } from "react";
+import { memo, useState, useMemo, useRef } from "react";
 import { cn } from "@/lib/utils";
 import {
   SquarePen,
@@ -44,6 +44,50 @@ export const GlobalChatSidebar = memo(({
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
 
+  // Desktop sidebar resizable width (in px), persisted to localStorage
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    if (typeof window === "undefined") return 260;
+    const saved = localStorage.getItem("notesify_chat_sidebar_width");
+    const num = saved ? parseInt(saved, 10) : 260;
+    return isNaN(num) || num < 220 || num > 460 ? 260 : num;
+  });
+  const [isResizing, setIsResizing] = useState(false);
+  const isDraggingRef = useRef(false);
+
+  const handleResizeMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    isDraggingRef.current = true;
+    setIsResizing(true);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      if (!isDraggingRef.current) return;
+      const maxWidth = Math.min(window.innerWidth * 0.45, 460);
+      const newWidth = Math.min(Math.max(moveEvent.clientX, 220), maxWidth);
+      setSidebarWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      if (!isDraggingRef.current) return;
+      isDraggingRef.current = false;
+      setIsResizing(false);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+      setSidebarWidth((w) => {
+        try {
+          localStorage.setItem("notesify_chat_sidebar_width", String(w));
+        } catch {}
+        return w;
+      });
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+  };
+
   const filteredSessions = useMemo(() => {
     if (!searchQuery.trim()) return sessions;
     const q = searchQuery.trim().toLowerCase();
@@ -61,13 +105,31 @@ export const GlobalChatSidebar = memo(({
       )}
 
       <aside
+        style={
+          !isMobile
+            ? {
+                width: sidebarOpen ? `${sidebarWidth}px` : 0,
+              }
+            : undefined
+        }
         className={cn(
           "gc-sidebar",
+          isResizing && "gc-sidebar-resizing",
           isMobile && "gc-sidebar-mobile",
           sidebarOpen ? "gc-sidebar-expanded" : "gc-sidebar-collapsed"
         )}
       >
-        <div className="gc-sidebar-inner flex flex-col h-full bg-[#171717] text-white select-none">
+        <div
+          style={
+            !isMobile
+              ? {
+                  width: `${sidebarWidth}px`,
+                  minWidth: `${sidebarWidth}px`,
+                }
+              : undefined
+          }
+          className="gc-sidebar-inner flex flex-col h-full bg-[#050506] text-white select-none"
+        >
           {/* Top Header: Brand + Search & Sidebar collapse icons */}
           <div className="flex items-center justify-between px-3 pt-3.5 pb-2">
             <span className="font-semibold text-[17px] text-white tracking-tight">
@@ -183,7 +245,7 @@ export const GlobalChatSidebar = memo(({
                         className={cn(
                           "w-full text-left flex items-center justify-between gap-2 px-3 py-2 pr-10 rounded-lg text-[13.5px] font-normal transition-colors cursor-pointer group relative",
                           isActive
-                            ? "bg-[#212121] text-white"
+                            ? "bg-white/10 text-white font-medium"
                             : "text-zinc-200/90 hover:text-white hover:bg-white/[0.05]"
                         )}
                         title={cleanTitle}
@@ -247,6 +309,15 @@ export const GlobalChatSidebar = memo(({
             )}
           </div>
         </div>
+
+        {/* Desktop Resize Drag Handle on the right border */}
+        {!isMobile && sidebarOpen && (
+          <div
+            onMouseDown={handleResizeMouseDown}
+            className="absolute top-0 right-0 bottom-0 w-1.5 cursor-col-resize hover:bg-white/20 active:bg-white/40 transition-colors z-40 select-none"
+            title="Drag to resize sidebar"
+          />
+        )}
       </aside>
     </>
   );

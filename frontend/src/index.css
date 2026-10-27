@@ -3226,18 +3226,23 @@ span[data-ai-ghost] {
 
 /* ─── Sidebar ─── */
 .gc-sidebar {
+  position: relative;
   width: 260px;
   display: flex;
   flex-direction: column;
   border-right: 1px solid rgba(255, 255, 255, 0.08);
-  background: #171717;
+  background: #050506;
   overflow: hidden;
   transition: width 0.24s cubic-bezier(0.2, 0, 0, 1), opacity 0.2s ease;
   z-index: 30;
 }
 
+.gc-sidebar.gc-sidebar-resizing {
+  transition: none !important;
+}
+
 .gc-sidebar-collapsed {
-  width: 0;
+  width: 0 !important;
   opacity: 0;
   border-right-width: 0;
   pointer-events: none;
@@ -4889,7 +4894,8 @@ span[data-ai-ghost] {
     bottom: 0;
     z-index: 1001;
     box-shadow: 20px 0 50px rgba(0, 0, 0, 0.4);
-    background: #0d0d12;
+    background: #050506;
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
   }
 
   .gc-sidebar-mobile-closed {
@@ -4954,21 +4960,7 @@ span[data-ai-ghost] {
 }
 
 .gc-sidebar {
-  width: 300px;
-  background: #202020;
-  border-right-color: rgba(255, 255, 255, 0.08);
-}
-
-.gc-sidebar-expanded,
-.gc-sidebar-inner {
-  width: 300px;
-}
-
-.gc-sidebar-collapsed {
-  width: 0;
-  opacity: 0;
-  border-right-width: 0;
-  pointer-events: none;
+  background: #050506;
 }
 
 .gc-sidebar-header {

@@ -37,8 +37,8 @@ export const executeOpenRouter = async (
     bodyPayload.provider = {
       order: [
         "open-inference/fp4",
-        "relace",
         "wafer/nvfp4",
+        "relace",
         "sail-research/fp4",
         "gmicloud/fp8",
       ],

@@ -34,7 +34,7 @@ export const generateTitleFromText = async (text) => {
     {
       role: "system",
       content:
-        "Generate a short, concise title (3 to 6 words maximum) for this content. Be specific to the main topic. No quotes, no markdown formatting, no trailing punctuation. Return ONLY the title string.",
+        "Generate a short, concise title (3 to 4 words maximum) for this content. Be specific to the main topic. No quotes, no markdown formatting, no trailing punctuation. Return ONLY the title string.",
     },
     {
       role: "user",
