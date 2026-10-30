@@ -10,7 +10,26 @@ A production-grade, full-stack notes and intelligent thinking workspace built on
 
 ---
 
-## 🚀 What's New in v1.3.2
+## 🚀 What's New in v1.3.3
+
+- **Offline-First PDF Export & Native Android Share Sheet:**
+  - **Isolated Offscreen DOM Rendering:** Dedicated pipeline builds an isolated DOM clone with print-specific typography, metadata headers, wrapped code and table blocks, and vector Mermaid diagrams without disturbing the live editor state.
+  - **Comprehensive Image Resolution Pipeline (`NoteImageResolver`):** Resolves Base64 inline images, Dexie IndexedDB blobs, and remote HTTPS assets with timeouts, embedding actual image bytes into the document. Unreachable images degrade into non-breaking `[Image unavailable during export]` placeholders with diagnostic feedback.
+  - **Tailwind v4 `oklch()` Compatibility:** Upgraded canvas rendering engine (`html2canvas-pro`) to natively parse modern OKLCH/OKLAB color spaces without throwing parse errors or freezing the browser.
+  - **Adaptive Cross-Platform Delivery:** Directly triggers browser downloads on Web/Desktop and writes to application cache to open the native Android Share Sheet (`@capacitor/filesystem` + `@capacitor/share`) on Capacitor Android.
+- **Unified Three-Tier Reasoning Hierarchy (Fast, Thinking, Pro):**
+  - **Fast:** Instant, snappy answers with minimal reasoning effort for everyday drafting and quick edits.
+  - **Thinking:** Balanced, step-by-step problem solving with medium reasoning effort for technical explanations.
+  - **Pro:** Maximum computational effort for deep, multi-faceted analysis, logic verification, and complex synthesis.
+- **Resilient Fallback Hierarchy for Default Chat:**
+  - OpenRouter fallback pipeline with immediate high-speed fallback for default chat conversations, ensuring zero interruptions during upstream provider outages.
+
+---
+
+## 📜 Previous Release Highlights
+
+<details>
+<summary><b>v1.3.2 Release Notes</b></summary>
 
 - **Inline Slash AI (`/`) & Smart Boundary Palette:** Type `/` anywhere in the note editor to trigger the interactive command palette with both AI assist and block tools:
   - **AI Generation Commands:** `/draft` (*Draft with Iris AI*), `/continue` (*Continue Writing*), `/summarize` (*Summarize Note*), and `/explain` (*Explain Note*).
@@ -33,18 +52,16 @@ A production-grade, full-stack notes and intelligent thinking workspace built on
   - **Spacious Desktop Reading Drawer:** Optional desktop expand toggle opens an 820px wide reading canvas for complex Markdown tables and multi-file code blocks.
   - **Clean Action Hierarchy:** Primary **Insert at cursor** / **Replace selection** (with signature blue/emerald styling and `↵` shortcut), **Copy**, and top-right dismissal without redundant duplicate controls.
 - **Architectural Specimen Callouts:** Replaced generic 2018 side-striped alerts with an archival specimen aesthetic for markdown directives (`:::tip`, `:::warning`, `:::note`, `:::caution`, `:::details`). Features dedicated specimen metadata header bands, tactile technical glyphs (`※ INSIGHT`, `▲ CAUTION`, `✦ METHOD`, `Δ REVISION`, `↳ TAKEAWAY`), and AST paragraph-splitting that eliminates React DOM hydration errors.
-- **Three-Tier AI Model Orchestration (Fast, Thinking, Pro):**
-  - **Fast:** Instant answers for everyday writing and quick queries powered by Qwen 3.7 Flash (`qwen/qwen3.7-flash`).
-  - **Thinking:** In-depth reasoning and multi-step deduction powered by DeepSeek v4 Flash (`deepseek/deepseek-v4-flash-0731`).
-  - **Pro:** Maximum capability for multifaceted research, vision tasks, and complex analysis powered by GLM 5.3 Flash (`z-ai/glm-5.3-flash`).
+- **Three-Tier AI Orchestration (Fast, Thinking, Pro):**
+  - **Fast:** Instant answers for everyday writing and quick queries.
+  - **Thinking:** In-depth reasoning and multi-step deduction for complex challenges.
+  - **Pro:** Maximum capability for multifaceted research, vision tasks, and comprehensive analysis.
 - **Ergonomic & Container-Aware Chat Composer (`<LiquidChatCompose />`):**
   - **Dynamic Compact Mode:** Container-aware `ResizeObserver` detects constrained horizontal widths, locking the toolbar into a tidy single-row layout when note list, editor, and contextual AI panel are co-open.
   - **Clean Action Hierarchy:** High-contrast white typography, solid white active toggles (Web Search), and intuitive thumb-reachable voice dictation button.
-- **OpenRouter Ephemeral Prompt Caching (`cache_control`):** Split static system instructions from dynamic document context across all AI assist actions (`summarize`, `explain`, `rewrite`, `continue`, `noteCreation`, `grammar`). Static prompt prefixes are tagged with `cache_control: { type: "ephemeral" }`, leveraging OpenRouter KV prefix caching (DeepSeek, Claude, Qwen) to slash response latency and token costs on repeated note operations.
+- **OpenRouter Ephemeral Prompt Caching (`cache_control`):** Split static system instructions from dynamic document context across all AI assist actions (`summarize`, `explain`, `rewrite`, `continue`, `noteCreation`, `grammar`). Static prompt prefixes are tagged with `cache_control: { type: "ephemeral" }`, leveraging OpenRouter KV prefix caching to slash response latency and token costs on repeated note operations.
 
----
-
-## 📜 Previous Release Highlights
+</details>
 
 <details>
 <summary><b>v1.3.1 Release Notes</b></summary>
@@ -136,19 +153,24 @@ Every core document carries a monotonic `version` counter:
   - **Smart Merge:** Intelligently combines non-overlapping paragraphs and changes from both versions.
 
 ### 3. Multi-Provider AI Orchestration
-Iris AI dynamically balances speed, intelligence, and cost across specialized providers with cascading fallbacks:
+Iris AI dynamically routes conversations, visual analysis, reasoning traces, and note transformations across OpenRouter models with automated multi-tier fallback resilience:
 
-| Provider | Model / Endpoint | Role / Capability |
+#### OpenRouter Models
+| Role / Capability | OpenRouter Model ID | Purpose & Architecture |
 |---|---|---|
-| OpenRouter | DeepSeek V4 Flash (`deepseek-v4-flash-0731`) | Primary model for complex logic, long-context reasoning, and code |
-| OpenRouter | Qwen 3.7 Flash (`qwen3.7-flash`) | Default high-speed conversational chat & visual analysis |
-| OpenRouter | GLM 5.3 Flash (`z-ai/glm-5.3-flash`) | Deep reasoning traces and structural diagram generation |
-| OpenRouter | Ling 3.0 Flash (`inclusionai/ling-3.0-flash`) | Rapid operations, math, and high-frequency document analysis |
-| OpenRouter | Whisper Large V3 Turbo (`whisper-large-v3-turbo`) | Fast multi-lingual Speech-to-Text (STT) voice dictation |
-| Groq | OpenAI GPT-OSS 120B / 20B | High-speed conversational fallback and fast summarization |
-| Google Gemini | Gemini 3.5 Flash Lite (`gemini-3.5-flash-lite`) | Sub-second conversation title generation & context compression |
+| **Default Chat & Adaptive Reasoning** | `z-ai/glm-5.3-flash` | Powers core conversation, visual understanding, and multi-tier reasoning depth (minimal, medium, high) |
+| **Deep Research & Long Context** | `deepseek/deepseek-v4-flash-0731` | Specialized for massive context analysis, live web retrieval, and complex logic |
+| **High-Speed Operations & Note Generation** | `qwen/qwen3.7-flash` | Rapid text generation, `/draft` assistance, and high-speed execution |
+| **Automated Title Synthesis** | `meta-llama/llama-3.1-8b-instruct` | Sub-second topic extraction and conversation title synthesis |
+| **Grammar & Style Audit** | `inclusionai/ling-3.0-flash` | Non-reasoning high-throughput grammatical auditing and proofreading |
+| **Voice Speech-to-Text (STT)** | `openai/whisper-large-v3-turbo` | Multi-lingual voice transcription with automatic language identification |
 
-*Cascading Fallback Chain:* DeepSeek → Groq (GPT-OSS 120B) → OpenRouter Fallback on transient API downtime.
+#### Cascading Fallback Hierarchy
+To guarantee zero-downtime availability, upstream failures automatically cascade through configured fallbacks:
+- **Tier 1 (Primary):** OpenRouter selected model (`z-ai/glm-5.3-flash` or `deepseek/deepseek-v4-flash-0731`)
+- **Tier 2 (OpenRouter Fallbacks):** `qwen/qwen3.7-flash` (immediate default chat fallback) → `z-ai/glm-5.3-flash` → `deepseek/deepseek-v4-flash-0731`
+- **Tier 3 (Groq Fallbacks):** `openai/gpt-oss-120b` → `openai/gpt-oss-20b`
+- **Tier 4 (Google Gemini Fallback):** `gemini-3.5-flash-lite`
 
 ### 4. Fair-Use Token Budgeting & Tiered Quotas
 To balance heavy AI usage with operational sustainability:
