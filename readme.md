@@ -12,17 +12,31 @@ A production-grade, full-stack notes and intelligent thinking workspace built on
 
 ## 🚀 What's New in v1.3.3
 
-- **Offline-First PDF Export & Native Android Share Sheet:**
-  - **Isolated Offscreen DOM Rendering:** Dedicated pipeline builds an isolated DOM clone with print-specific typography, metadata headers, wrapped code and table blocks, and vector Mermaid diagrams without disturbing the live editor state.
-  - **Comprehensive Image Resolution Pipeline (`NoteImageResolver`):** Resolves Base64 inline images, Dexie IndexedDB blobs, and remote HTTPS assets with timeouts, embedding actual image bytes into the document. Unreachable images degrade into non-breaking `[Image unavailable during export]` placeholders with diagnostic feedback.
-  - **Tailwind v4 `oklch()` Compatibility:** Upgraded canvas rendering engine (`html2canvas-pro`) to natively parse modern OKLCH/OKLAB color spaces without throwing parse errors or freezing the browser.
-  - **Adaptive Cross-Platform Delivery:** Directly triggers browser downloads on Web/Desktop and writes to application cache to open the native Android Share Sheet (`@capacitor/filesystem` + `@capacitor/share`) on Capacitor Android.
-- **Unified Three-Tier Reasoning Hierarchy (Fast, Thinking, Pro):**
-  - **Fast:** Instant, snappy answers with minimal reasoning effort for everyday drafting and quick edits.
-  - **Thinking:** Balanced, step-by-step problem solving with medium reasoning effort for technical explanations.
-  - **Pro:** Maximum computational effort for deep, multi-faceted analysis, logic verification, and complex synthesis.
-- **Resilient Fallback Hierarchy for Default Chat:**
-  - Multi-tier fallback pipeline with immediate high-speed fallback for default chat conversations, ensuring zero interruptions during upstream provider outages.
+### 📄 Offline-First PDF Export & Native Android Share Sheet
+- **Isolated Offscreen DOM Rendering:** Introduced a dedicated PDF rendering pipeline that creates an isolated DOM clone without disturbing the live editor state.
+- **Print-Optimized Layouts:** Added print-specific typography, metadata headers, and improved spacing for cleaner, more professional PDF exports.
+- **Code & Table Formatting:** Improved wrapping for code blocks and tables to preserve readability in exported documents.
+- **Mermaid Diagram Support:** Export Mermaid diagrams as vector graphics for crisp, high-quality output.
+- **Native Android Sharing:** Integrated Android's native share sheet for sharing exported PDFs with other apps.
+
+### 🎨 UI/UX Improvements
+- **Refined Interface:** Improved the overall visual design for a cleaner, more consistent user experience.
+- **Enhanced Readability:** Fine-tuned typography and spacing for better content readability.
+- **Responsive Layouts:** Improved the interface across different screen sizes and devices.
+
+### ⚡ Performance Improvements
+- **Faster Loading:** Optimized application startup for a quicker experience.
+- **Smoother Navigation:** Refined interactions to improve overall responsiveness.
+
+### 📱 Notesify for Android — In Testing
+The Notesify Android app is currently in the testing phase as I continue refining the native mobile experience and addressing performance and usability issues.
+
+> **Note:** The Android app is not yet publicly released. A wider release will be announced when it's ready.
+
+---
+
+For previous updates, see the [commit history](../../commits/main/).
+
 ---
 
 ## 📜 Previous Release Highlights
