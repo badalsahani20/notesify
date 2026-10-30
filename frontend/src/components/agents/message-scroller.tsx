@@ -132,6 +132,7 @@ export function MessageScroller({
   const scrollTimerRef = useRef<number | undefined>(undefined);
   const frameRef = useRef<number | undefined>(undefined);
   const railFrameRef = useRef<number | undefined>(undefined);
+  const scrollRafRef = useRef<number | undefined>(undefined);
   const railIdRef = useRef(new WeakMap<HTMLElement, string>());
   const railIdCounterRef = useRef(0);
   const railTargetsRef = useRef(new Map<string, HTMLElement>());
@@ -169,6 +170,7 @@ export function MessageScroller({
 
   const updateActiveRailItem = useCallback(() => {
     if (navigation !== "rail") return;
+    if (typeof window !== "undefined" && window.innerWidth < 768) return;
     const viewport = viewportRef.current;
     const targets = [...railTargetsRef.current.entries()];
     if (!viewport || targets.length === 0) return;
@@ -211,6 +213,7 @@ export function MessageScroller({
 
   const syncRailItems = useCallback(() => {
     if (navigation !== "rail") return;
+    if (typeof window !== "undefined" && window.innerWidth < 768) return;
     const content = contentRef.current;
     const viewport = viewportRef.current;
     if (!content || !viewport) return;
@@ -265,6 +268,7 @@ export function MessageScroller({
   const scheduleRailSync = useCallback(() => {
     if (navigation !== "rail") return;
     if (railFrameRef.current) cancelAnimationFrame(railFrameRef.current);
+      if (scrollRafRef.current) cancelAnimationFrame(scrollRafRef.current);
     railFrameRef.current = requestAnimationFrame(() => {
       syncRailItems();
       updateActiveRailItem();
@@ -288,14 +292,20 @@ export function MessageScroller({
   }, []);
 
   const handleScroll = useCallback(() => {
-    const viewport = viewportRef.current;
-    if (!viewport || programmaticScrollRef.current) return;
+    if (scrollRafRef.current) return;
+    scrollRafRef.current = requestAnimationFrame(() => {
+      scrollRafRef.current = undefined;
+      const viewport = viewportRef.current;
+      if (!viewport || programmaticScrollRef.current) return;
 
-    const distance =
-      viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
-    setFollowing(distance <= followThreshold);
-    updateActiveRailItem();
-  }, [followThreshold, setFollowing, updateActiveRailItem]);
+      const distance =
+        viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
+      setFollowing(distance <= followThreshold);
+      if (navigation === "rail" && typeof window !== "undefined" && window.innerWidth >= 768) {
+        updateActiveRailItem();
+      }
+    });
+  }, [followThreshold, navigation, setFollowing, updateActiveRailItem]);
 
   const leaveLiveEdge = useCallback(() => {
     programmaticScrollRef.current = false;

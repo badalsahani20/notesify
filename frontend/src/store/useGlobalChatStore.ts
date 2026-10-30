@@ -8,6 +8,8 @@ import { startGlobalChatRequest } from "@/services/ai/chatRequest";
 import { createChatToolHandler } from "@/services/ai/chatToolHandler";
 import { queryClient } from "@/lib/queryClient";
 import { useStreamingTextStore } from "@/store/useStreamingTextStore";
+import { getDailyResetDisplay } from "@/utils/quotaUtils";
+import { triggerAiResponseCompleteHaptic, triggerWarningHaptic } from "@/utils/haptics";
 
 import type {
   IrisSegment,
@@ -452,6 +454,7 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
             : message,
         ),
       }));
+      triggerAiResponseCompleteHaptic();
       console.info("[IrisInteraction] stream completed", {
         interactionId: interaction.interactionId,
         sessionId: activeSessionId,
@@ -468,6 +471,7 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
           interactionId: interaction.interactionId,
         });
       } else {
+        triggerWarningHaptic();
         console.error("[IrisInteraction] resume failed", {
           interactionId: interaction.interactionId,
           error: error instanceof Error ? error.message : error,
@@ -627,6 +631,7 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
             : m
         ),
       }));
+      triggerAiResponseCompleteHaptic();
 
       const userTurnCount = get().messages.filter((message) => message.role === "user").length;
 
@@ -649,6 +654,7 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
           ),
         }));
       } else {
+        triggerWarningHaptic();
         console.error("[IrisRun] chat request failed", {
           name: err?.name,
           code: err?.code,
@@ -662,7 +668,7 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
         } else if (err?.code === "AI_CONCURRENCY_LIMIT_EXCEEDED") {
           userFriendlyError = "⚠️ An AI generation is already in progress. Please wait for it to finish.";
         } else if (err?.code === "AI_TOKEN_LIMIT_EXCEEDED") {
-          userFriendlyError = err.message || "🛑 Daily AI token limit reached (100,000 tokens). Resets at 00:00 UTC.";
+          userFriendlyError = err.message || `🛑 Daily AI token limit reached (100,000 tokens). ${getDailyResetDisplay().fullText}.`;
         } else if (err?.message && err.message !== "Failed to connect to AI") {
           userFriendlyError = `⚠️ ${err.message}`;
         }

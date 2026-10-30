@@ -17,7 +17,9 @@ export const MermaidViewer: React.FC<MermaidViewerProps> = ({ code }) => {
     mermaid.initialize({
       startOnLoad: false,
       theme: 'dark',
-      securityLevel: 'loose',
+      // Diagram source is model/user supplied; loose mode enables raw HTML and
+      // click handlers inside labels.
+      securityLevel: 'strict',
       fontFamily: 'inherit',
       suppressErrorRendering: true,
       themeVariables: {

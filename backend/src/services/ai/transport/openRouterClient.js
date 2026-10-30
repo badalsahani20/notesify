@@ -20,6 +20,7 @@ export const executeOpenRouter = async (
   const isGlm = modelId.toLowerCase().includes("glm");
   const isDeepseek = modelId.toLowerCase().includes("deepseek");
   const isLing = modelId.toLowerCase().includes("ling");
+  const isQwen = modelId.toLowerCase().includes("qwen");
 
   const bodyPayload = {
     model: modelId,
@@ -36,9 +37,9 @@ export const executeOpenRouter = async (
   if (isGlm) {
     bodyPayload.provider = {
       order: [
+        "relace",
         "open-inference/fp4",
         "wafer/nvfp4",
-        "relace",
         "sail-research/fp4",
         "gmicloud/fp8",
       ],
@@ -56,10 +57,21 @@ export const executeOpenRouter = async (
     };
   }
 
-  if (includeReasoning === false) {
+  let reasoningEffort = null;
+  if (typeof includeReasoning === "string") {
+    reasoningEffort = includeReasoning.toLowerCase();
+  } else if (includeReasoning && typeof includeReasoning === "object" && includeReasoning.effort) {
+    reasoningEffort = includeReasoning.effort.toLowerCase();
+  }
+
+  if (includeReasoning === false || reasoningEffort === "none") {
     // Explicitly disable reasoning (e.g. for grammar checking or fast deterministic tasks)
     bodyPayload.include_reasoning = false;
     bodyPayload.reasoning = { effort: "none" };
+  } else if (reasoningEffort) {
+    // OpenRouter standardized effort levels: "minimal" | "low" | "medium" | "high" | "max"
+    bodyPayload.include_reasoning = true;
+    bodyPayload.reasoning = { effort: reasoningEffort };
   } else {
     // Native adaptive reasoning: allow the model to scale its own thinking tokens
     // up to a safe token ceiling without forcing artificial effort levels.
@@ -76,7 +88,7 @@ export const executeOpenRouter = async (
   }
 
   console.log(
-    `🤖 [OpenRouter] Executing model: "${modelId}" | Stream: ${stream} | Reasoning: ${bodyPayload.include_reasoning ?? false} | Tools: ${tools?.map(t => t.type || t.function?.name).join(", ") || "none"} | MaxToolCalls: ${maxToolCalls ?? "default"}`
+    `🤖 [OpenRouter] Executing model: "${modelId}" | Stream: ${stream} | Reasoning: ${JSON.stringify(bodyPayload.reasoning || false)} | Tools: ${tools?.map(t => t.type || t.function?.name).join(", ") || "none"} | MaxToolCalls: ${maxToolCalls ?? "default"}`
   );
 
   const response = await fetch(

@@ -33,8 +33,6 @@ export class IrisStreamHandler {
     const decoder = new TextDecoder();
     let finalReply = "";
     const parser = new SseStreamParser();
-    let memoryToolArgs = "";
-    let memoryToolIndex = -1;
     let askQuestionToolArgs = "";
     let askQuestionToolIndex = -1;
     let interaction = null;
@@ -184,27 +182,34 @@ export class IrisStreamHandler {
                       query: parsed.query,
                     })}\n\n`,
                   )
+                } else if(normalizedTool === "save_memory" && !state.emitted) {
+                  state.emitted = true;
+                  state.parsedArgs = parsed;
+                  res.write(
+                    `data: ${JSON.stringify({
+                      type: "tool_call",
+                      id: state.id,
+                      tool: "save_memory",
+                      args: parsed,
+                      status: "executing",
+                    })}\n\n`,
+                  )
                 } 
               } catch (_) {
                 // Arguments are still streaming across chunks; wait for complete JSON
               }
             }
 
-            // Custom function tools (save_memory, ask_question, recall_memory)
+            // Custom function tools (ask_question, recall_memory)
             if (
               state.name === "ask_question" ||
               tc.function?.name === "ask_question"
             ) {
               askQuestionToolIndex = toolIndex;
               if (tc.function?.arguments) askQuestionToolArgs += tc.function.arguments;
-            } else if (state.name === "save_memory" || tc.function?.name === "save_memory") {
-              memoryToolIndex = toolIndex;
-              if (tc.function?.arguments) memoryToolArgs += tc.function.arguments;
             } else if (state.name === "recall_memory" || tc.function?.name === "recall_memory") {
               recallMemoryToolIndex = toolIndex;
               if (tc.function?.arguments) recallMemoryToolArgs += tc.function.arguments;
-            } else if (memoryToolIndex !== -1 && toolIndex === memoryToolIndex) {
-              if (tc.function?.arguments) memoryToolArgs += tc.function.arguments;
             } else if (askQuestionToolIndex !== -1 && toolIndex === askQuestionToolIndex) {
               if (tc.function?.arguments) askQuestionToolArgs += tc.function.arguments;
             } else if (recallMemoryToolIndex !== -1 && toolIndex === recallMemoryToolIndex) {
@@ -295,6 +300,18 @@ export class IrisStreamHandler {
                 type: "tool_call",
                 id: state.id,
                 tool: "recall_memory",
+                args: parsed,
+                status: "executing",
+              })}\n\n`,
+            );
+          } else if(normalizedTool === "save_memory") {
+            state.emitted = true;
+            state.parsedArgs = parsed;
+            res.write(
+              `data: ${JSON.stringify({
+                type: "tool_call",
+                id: state.id,
+                tool: "save_memory",
                 args: parsed,
                 status: "executing",
               })}\n\n`,
@@ -436,6 +453,21 @@ export class IrisStreamHandler {
             args: parsedArgs,
           });
         }
+      } else if(normalizedTool === "save_memory") {
+        let parsedArgs = state.parsedArgs;
+        if (!parsedArgs && state.rawArgs) {
+          try {
+            parsedArgs = JSON.parse(state.rawArgs);
+          } catch (_) {}
+        }
+
+        if (parsedArgs) {
+          serverToolCalls.push({
+            id: state.id,
+            tool: "save_memory",
+            args: parsedArgs,
+          });
+        }
       } else if(normalizedTool === "search_notes") {
         let parsedArgs = state.parsedArgs;
         if(!parsedArgs && state.rawArgs) {
@@ -468,39 +500,6 @@ export class IrisStreamHandler {
           citations: finalCitations,
         })}\n\n`,
       );
-    }
-
-    // Execute memory save if triggered
-    if (memoryToolIndex !== -1 && memoryToolArgs) {
-      try {
-        const args = JSON.parse(memoryToolArgs);
-        if (args.category && args.content && userId) {
-          import("../../memoryService.js").then(({ saveMemory }) => {
-            saveMemory(userId, args).catch(console.error);
-          });
-          res.write(
-            `data: ${JSON.stringify({ type: "tool_call", tool: "save_memory" })}\n\n`,
-          );
-
-          toolCalls.push({
-            tool: "save_memory",
-            category: args.category,
-            content: args.content,
-          });
-
-          if (!finalReply.trim()) {
-            finalReply = `Got it! I've saved that to my memory: "${args.content}"`;
-            res.write(
-              `data: ${JSON.stringify({ choices: [{ delta: { content: finalReply } }] })}\n\n`,
-            );
-          }
-        }
-      } catch (err) {
-        console.error(
-          `Failed to parse save_memory arguments: ${err.message}. Raw args:`,
-          memoryToolArgs,
-        );
-      }
     }
 
     if (askQuestionToolIndex !== -1 && askQuestionToolArgs) {

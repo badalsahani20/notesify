@@ -1,10 +1,11 @@
 import { SyncService } from "./SyncService";
+import { isOnline } from "@/lib/connectivity";
 
 class SyncCoordinatorEngine {
     private isSyncing: boolean = false;
 
     async triggerSync(): Promise<boolean> {
-        if (this.isSyncing || !navigator.onLine) {
+        if (this.isSyncing || !isOnline()) {
             return false;
         }
 

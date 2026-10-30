@@ -208,16 +208,33 @@ const NotesListPanel = () => {
   }, []);
 
  const [renderLimit, setRenderLimit] = useState(rememberedRenderLimit);
+const notesScrollRafRef = useRef<number | null>(null);
+
+// Scroll fires far more often than the list needs to grow. Coalesce to one
+// check per frame and bail out when the limit would not change, otherwise the
+// whole note list re-renders repeatedly during a single fling.
 const handleNotesScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-  const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
-  if (scrollHeight - scrollTop - clientHeight < 200) {
+  const el = e.currentTarget;
+  if (notesScrollRafRef.current !== null) return;
+  notesScrollRafRef.current = window.requestAnimationFrame(() => {
+    notesScrollRafRef.current = null;
+    const { scrollTop, scrollHeight, clientHeight } = el;
+    if (scrollHeight - scrollTop - clientHeight >= 200) return;
     setRenderLimit((prev) => {
       const next = Math.min(prev + 25, processedNotes.length);
+      if (next === prev) return prev;
       rememberedRenderLimit = next;
       return next;
     });
-  }
+  });
 }, [processedNotes.length]);
+
+useEffect(() => () => {
+  if (notesScrollRafRef.current !== null) {
+    window.cancelAnimationFrame(notesScrollRafRef.current);
+    notesScrollRafRef.current = null;
+  }
+}, []);
 
 
   const handleNoteClick = useCallback((id: string) => {
@@ -394,7 +411,7 @@ const handleNotesScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
           </DropdownMenu>
         </div>
 
-        <div onScroll={handleNotesScroll} className="custom-scrollbar mobile-notes-scroll flex-1 space-y-3 overflow-y-auto px-3 pb-4">
+        <div onScroll={handleNotesScroll} className="custom-scrollbar mobile-notes-scroll gpu-scroll flex-1 space-y-3 overflow-y-auto px-3 pb-4">
           {isInitialNotesLoad ? (
             <NotesListSkeleton />
           ) : shouldShowNotesError ? (

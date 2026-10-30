@@ -1,5 +1,5 @@
 import { getNoteContentForUser, searchNote } from "../../notes.service.js";
-import { searchMemories } from "../../memoryService.js";
+import { saveMemoryWithStatus, searchMemories } from "../../memoryService.js";
 import { stripHtml } from "../../../utils/stripHtml.js";
 
 export class ToolExecutor {
@@ -24,6 +24,37 @@ export class ToolExecutor {
         return { error: `Failed to fetch note: ${err.message}` };
       }
     }
+    if (toolName === "save_memory") {
+      if (!userId) {
+        return { error: "Missing userId for save_memory." };
+      }
+      if (!args?.content || typeof args.content !== "string" || !args.content.trim()) {
+        return { error: "Missing content for save_memory." };
+      }
+
+      try {
+        const result = await saveMemoryWithStatus(userId, {
+          category: args.category,
+          content: args.content.trim(),
+        });
+
+        if (!result?.memory) {
+          return { error: "Failed to save memory." };
+        }
+
+        // Never return the stored document directly: a deduplicated hit carries
+        // the 768-float embedding from the aggregate, which must not reach the model.
+        return {
+          saved: true,
+          created: result.created,
+          category: result.memory.category,
+          content: result.memory.content,
+        };
+      } catch (err) {
+        return { error: `Failed to save memory: ${err.message}` };
+      }
+    }
+
     if (toolName === "recall_memory") {
       if (!args?.query) {
         return { error: "Missing query for recall_memory." };

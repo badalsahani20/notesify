@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { useUserStats } from "@/hooks/user/useUserStats";
 import { VoiceDictationButton } from "./VoiceDictationButton";
 import { AiUsageContextIndicator } from "./AiUsageContextIndicator";
+import { getDailyResetDisplay } from "@/utils/quotaUtils";
 import type { ChatAttachmentBundle } from "@/components/ai/types";
 
 export type LiquidModelType = "pro" | "thinking" | "fast";
@@ -170,17 +171,13 @@ export const LiquidChatCompose = ({
   const [userDismissedCommands, setUserDismissedCommands] = useState(false);
   const commandPaletteRef = useRef<HTMLDivElement>(null);
 
-  // Model selection state: defaults to "fast" (Ling 3.0 Flash)
+  // Model selection state: defaults to "fast"
   const selectedModel: LiquidModelType =
     modelTier || (useReasoning ? "thinking" : "fast");
 
   const handleModelSelect = (m: LiquidModelType) => {
     setModelTier?.(m);
-    if (m === "fast") {
-      setUseReasoning?.(false);
-    } else {
-      setUseReasoning?.(true);
-    }
+    setUseReasoning?.(true);
   };
 
   // ── Auto-Resize Optimization ────────────────────────────────────────────────
@@ -389,7 +386,10 @@ export const LiquidChatCompose = ({
   const isPdf = attachedImage?.startsWith("data:application/pdf");
 
   return (
-    <div className="absolute bottom-0 left-0 w-full z-20 bg-gradient-to-t from-background via-background/95 to-transparent pt-6 pb-2 px-2 sm:px-4 flex flex-col justify-end pointer-events-none">
+    <div
+      className="absolute bottom-0 left-0 w-full z-20 bg-gradient-to-t from-background via-background/95 to-transparent pt-6 pb-[max(0.65rem,env(safe-area-inset-bottom,0px))] px-2 sm:px-4 flex flex-col justify-end pointer-events-none transition-transform duration-100 ease-out will-change-transform"
+      style={{ transform: "translate3d(0, calc(0px - var(--keyboard-offset, 0px)), 0)" }}
+    >
       <div className="pointer-events-auto flex flex-col w-full max-w-3xl mx-auto">
         {topSlot}
 
@@ -418,7 +418,7 @@ export const LiquidChatCompose = ({
             transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
             style={{
               background:
-                "conic-gradient(from 0deg, var(--primary, #3b82f6), #93c5fd, var(--primary, #3b82f6), #1d4ed8, var(--primary, #3b82f6))",
+                "conic-gradient(from 0deg, #3b82f6, #93c5fd, #3b82f6, #1d4ed8, #3b82f6)",
               willChange: "opacity",
             }}
           />
@@ -448,33 +448,25 @@ export const LiquidChatCompose = ({
               }}
             />
 
-            {/* Inner Border Gradient Accent */}
+            {/* Inner Border Gradient Accent.
+                The gradient is painted once and the layer is rotated with
+                `transform`, so the animation runs on the compositor. Animating
+                a conic-gradient's custom property (the previous approach)
+                recalculates style and repaints on the main thread every frame,
+                which janks scrolling in Android WebView. */}
             <div
               aria-hidden
-              className="lmi-border pointer-events-none absolute inset-0 z-10 rounded-[26px] opacity-40 transition-opacity duration-500 group-focus-within:opacity-90 group-hover:opacity-75"
+              className="lmi-border pointer-events-none absolute inset-0 z-10 overflow-hidden rounded-[26px] opacity-40 transition-opacity duration-500 group-focus-within:opacity-90 group-hover:opacity-75"
               style={{
                 padding: "1px",
                 WebkitMask:
                   "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)",
                 WebkitMaskComposite: "xor",
                 maskComposite: "exclude",
-                background:
-                  "conic-gradient(from var(--lmi-angle, 0deg), transparent 65%, rgba(59,130,246,0.6) 80%, #93c5fd 95%, transparent 100%)",
               }}
-            />
-            <style>{`
-              @property --lmi-angle {
-                syntax: '<angle>';
-                initial-value: 0deg;
-                inherits: false;
-              }
-              .lmi-border {
-                animation: lmi-spin 5s linear infinite;
-              }
-              @keyframes lmi-spin {
-                to { --lmi-angle: 360deg; }
-              }
-            `}</style>
+            >
+              <div className="lmi-border-spin" />
+            </div>
 
             {/* Attachments Section */}
             {(attachedImage || attachedDoc) && (
@@ -558,7 +550,7 @@ export const LiquidChatCompose = ({
                 onKeyDown={handleKeyDown}
                 placeholder={
                   isLimitReached
-                    ? "Daily AI token limit reached (Resets at 00:00 UTC)"
+                    ? `Daily AI token limit reached (${getDailyResetDisplay().fullText})`
                     : placeholder
                 }
                 disabled={isLimitReached || isSending || isUploadingDoc}

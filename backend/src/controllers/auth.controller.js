@@ -30,20 +30,40 @@ export const registerUser = catchAsync(async (req, res) => {
       .json({ message: "Please provide name, email and password" });
   }
 
-  const { user, verificationToken } = await AuthService.registerUser({
+  const { user, verificationToken, verificationOtp } = await AuthService.registerUser({
     name,
     email,
     password,
   });
 
   const verificationUrl = `${process.env.FRONTEND_URL}/verify-email/${verificationToken}`;
-  MailService.sendVerificationEmail(email, name, verificationUrl).catch((err) => {
+  MailService.sendVerificationEmail(email, name, verificationUrl, verificationOtp).catch((err) => {
     console.error("Verification email sending failed on register:", err);
   });
 
   res.status(201).json({
     success: true,
     message: "Registration successful! Please check your email to verify your account.",
+    user: { id: user._id, name: user?.name, email: user.email, avatar: user.avatar, isVerified: user.isVerified },
+  });
+});
+
+export const verifyOtp = catchAsync(async (req, res) => {
+  const { email, otp } = req.body;
+  if (!email || !otp) {
+    return res
+      .status(400)
+      .json({ message: "Please provide email and 6-digit verification code" });
+  }
+
+  const { user, accessToken, refreshToken } = await AuthService.verifyUserOtp(email, otp);
+
+  res.cookie("refreshToken", refreshToken, getRefreshCookieOptions());
+  res.status(200).json({
+    success: true,
+    message: "Email verified successfully.",
+    accessToken,
+    refreshToken,
     user: { id: user._id, name: user?.name, email: user.email, avatar: user.avatar, isVerified: user.isVerified },
   });
 });
@@ -60,6 +80,7 @@ export const verifyEmail = catchAsync(async (req, res) => {
     success: true,
     message: "Email verified successfully.",
     accessToken,
+    refreshToken,
     user: { id: user._id, name: user?.name, email: user.email, avatar: user.avatar, isVerified: user.isVerified },
   });
 });
@@ -168,7 +189,9 @@ export const refreshToken = catchAsync(async (req, res, next) => {
 })
 
 export const logoutUser = catchAsync(async (req, res, next) => {
-  const clientRefreshToken = req.cookies.refreshToken ?? req.get("X-Refresh-Token");
+  // Desktop/mobile clients send the rotated token explicitly. Prefer it over a
+  // potentially stale browser cookie, mirroring the refresh endpoint.
+  const clientRefreshToken = req.get("X-Refresh-Token") ?? req.cookies.refreshToken;
   
   await AuthService.logoutUser(clientRefreshToken);
   res.clearCookie("refreshToken", getRefreshCookieClearOptions());

@@ -1,21 +1,17 @@
-import { AnimatePresence, motion } from "framer-motion";
-import { Suspense, lazy, useEffect } from "react";
+import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
 import { Archive, Bot, FileText, Plus, Star, Trash2, X } from "lucide-react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { FolderPanelSkeleton } from "@/components/ui/folderPanelSkeleton";
 import { useFolderStore } from "@/store/useFolderStore";
 import { FolderFormDialog } from "@/components/folders/FolderFormDialog";
-import { useState } from "react";
 import notesifyLogo from "@/assets/notesify-favicon.svg";
-
-const FoldersPanel = lazy(() => import("@/components/folders/FolderPanel"));
+import FoldersPanel from "@/components/folders/FolderPanel";
+import { mobileDrawerVariants, mobileBackdropVariants } from "@/lib/drawerAnimation";
 
 type Props = {
   open: boolean;
   onClose: () => void;
 };
-
-const ease = [0.22, 1, 0.36, 1] as const;
 
 type NavRowProps = {
   icon: React.ElementType;
@@ -44,6 +40,13 @@ const MobileDrawer = ({ open, onClose }: Props) => {
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isSavingFolder, setIsSavingFolder] = useState(false);
+  // Mount the folder tree only on the first open, then keep it alive. Rebuilding
+  // the whole tree during every slide-in is what caused subsequent openings to hitch.
+  const [hasOpened, setHasOpened] = useState(open);
+
+  useEffect(() => {
+    if (open) setHasOpened(true);
+  }, [open]);
 
   // Auto-close when user navigates by tapping a link inside the drawer
   useEffect(() => {
@@ -71,29 +74,27 @@ const MobileDrawer = ({ open, onClose }: Props) => {
   const isAiChat    = p.startsWith("/chat");
 
 
+  if (!hasOpened) return null;
+
   return (
-    <AnimatePresence>
-      {open && (
-        <>
+    <>
           {/* Backdrop */}
           <motion.div
-            key="mob-drawer-backdrop"
             className="mobile-drawer-backdrop"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.25 }}
+            variants={mobileBackdropVariants}
+            initial={open ? "closed" : false}
+            animate={open ? "open" : "closed"}
+            style={{ pointerEvents: open ? "auto" : "none" }}
             onClick={onClose}
           />
 
           {/* Drawer panel */}
           <motion.div
-            key="mob-drawer-panel"
             className="mobile-drawer-panel"
-            initial={{ x: "-100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: "-100%" }}
-            transition={{ duration: 0.32, ease }}
+            variants={mobileDrawerVariants}
+            initial={open ? "closed" : false}
+            animate={open ? "open" : "closed"}
+            style={{ pointerEvents: open ? "auto" : "none" }}
           >
             {/* Header */}
             <div className="mobile-drawer-header">
@@ -160,9 +161,7 @@ const MobileDrawer = ({ open, onClose }: Props) => {
 
               {/* ── Notebooks / Archive / Trash (from FoldersPanel) ── */}
               <div className="mobile-drawer-content py-2">
-                <Suspense fallback={<FolderPanelSkeleton />}>
-                  <FoldersPanel />
-                </Suspense>
+                <FoldersPanel />
               </div>
 
               {/* ── Bottom nav links ── */}
@@ -203,9 +202,7 @@ const MobileDrawer = ({ open, onClose }: Props) => {
               </button>
             </div>
           </motion.div>
-        </>
-      )}
-    </AnimatePresence>
+    </>
   );
 };
 

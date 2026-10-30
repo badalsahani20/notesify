@@ -84,4 +84,76 @@ describe("chatService - chatWithAi", () => {
     const passedTools = executeOpenRouter.mock.calls[0][5];
     expect(passedTools).toBeNull();
   });
+
+  it("should configure minimal effort for fast mode, medium for thinking, and high for pro", async () => {
+    executeOpenRouter.mockResolvedValue("Tier response");
+
+    // Fast mode -> minimal effort
+    await chatWithAi({
+      message: "Fast question",
+      modelTier: "fast",
+      enableWeb: false,
+      stream: false,
+    });
+    expect(executeOpenRouter).toHaveBeenLastCalledWith(
+      "test/default-chat-model",
+      expect.any(Array),
+      false,
+      "minimal",
+      5000,
+      null,
+      null
+    );
+
+    // Thinking mode -> medium effort
+    await chatWithAi({
+      message: "Thinking question",
+      modelTier: "thinking",
+      enableWeb: false,
+      stream: false,
+    });
+    expect(executeOpenRouter).toHaveBeenLastCalledWith(
+      "test/default-chat-model",
+      expect.any(Array),
+      false,
+      "medium",
+      5000,
+      null,
+      null
+    );
+
+    // Pro mode -> high effort
+    await chatWithAi({
+      message: "Pro question",
+      modelTier: "pro",
+      enableWeb: false,
+      stream: false,
+    });
+    expect(executeOpenRouter).toHaveBeenLastCalledWith(
+      "test/default-chat-model",
+      expect.any(Array),
+      false,
+      "high",
+      5000,
+      null,
+      null
+    );
+  });
+
+  it("should fallback to Qwen (QUICK_MODEL) when default chat model fails", async () => {
+    executeOpenRouter
+      .mockRejectedValueOnce(new Error("Default model unavailable"))
+      .mockResolvedValueOnce("Qwen fallback response");
+
+    const result = await chatWithAi({
+      message: "Hello fallback",
+      stream: false,
+    });
+
+    expect(result.reply).toBe("Qwen fallback response");
+    expect(result.model).toBe("test/quick-model");
+    expect(executeOpenRouter).toHaveBeenCalledTimes(2);
+    expect(executeOpenRouter.mock.calls[0][0]).toBe("test/default-chat-model");
+    expect(executeOpenRouter.mock.calls[1][0]).toBe("test/quick-model");
+  });
 });

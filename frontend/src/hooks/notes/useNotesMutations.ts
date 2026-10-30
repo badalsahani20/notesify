@@ -3,6 +3,7 @@ import type { Note } from "@/store/useNoteStore";
 import { toast } from "sonner";
 import { noteRepository } from "@/repositories";
 import api from "@/lib/api";
+import { isOnline } from "@/lib/connectivity";
 
 // Tracks pending title-refresh timers per noteId so autosave doesn't stack them
 const titleRefreshTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -62,7 +63,7 @@ const scheduleAutoTitleSync = (
             }
 
             // If offline, wait for reconnect event then auto-generate title!
-            if (!navigator.onLine) {
+            if (!isOnline()) {
                 const existingListener = onlineReconnectListeners.get(noteId);
                 if (existingListener) {
                     window.removeEventListener("online", existingListener);

@@ -192,7 +192,7 @@ export const GenerateNotesDialog = ({ isOpen, onClose, onGenerate }: GenerateNot
                       onClick={() => setDepth(opt.value)}
                       className={`flex flex-col items-center justify-center py-2 px-1 rounded-md transition-all ${
                         isActive
-                          ? "bg-indigo-600 text-white shadow-md font-semibold"
+                          ? "bg-white text-zinc-950 shadow-md font-semibold dark:bg-white dark:text-zinc-950"
                           : "text-[var(--text-main)] hover:text-[var(--text-strong)] hover:bg-white/5 font-medium"
                       }`}
                     >
@@ -224,7 +224,7 @@ export const GenerateNotesDialog = ({ isOpen, onClose, onGenerate }: GenerateNot
               </Button>
               <Button
                 type="submit"
-                className="h-10 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold gap-1.5 px-5 shadow-[0_4px_14px_rgba(79,70,229,0.3)] transition-all hover:-translate-y-0.5 active:translate-y-0 hover:shadow-[0_6px_20px_rgba(79,70,229,0.4)]"
+                className="h-10 rounded-lg bg-white hover:bg-zinc-200 text-zinc-950 text-xs font-semibold gap-1.5 px-5 shadow-md transition-all hover:-translate-y-0.5 active:translate-y-0 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200"
               >
                 <div className="iris-orb shrink-0 animate-pulse" style={{ width: "12px", height: "12px", borderWidth: "1px", boxShadow: "none" }} />
                 Generate Study Note

@@ -7,13 +7,16 @@
 
 :root {
   --radius: 1rem;
+  /* Native metrics — written at runtime by useCapacitorApp() */
+  --status-bar-height: 0px;
+  --keyboard-offset: 0px;
   --background: #FAFAFA;
   --foreground: #000000;
   --card: #FFFFFF;
   --card-foreground: #000000;
   --popover: #FFFFFF;
   --popover-foreground: #000000;
-  --primary: #3B82F6;
+  --primary: #18181b;
   --primary-foreground: #FFFFFF;
   --secondary: #F1F3F5;
   --secondary-foreground: #000000;
@@ -24,15 +27,15 @@
   --destructive: oklch(0.64 0.23 25);
   --border: #E9ECEF;
   --input: #E9ECEF;
-  --ring: rgba(59, 130, 246, 0.4);
+  --ring: rgba(24, 24, 27, 0.2);
   --sidebar: #F8F9FA;
   --sidebar-foreground: #000000;
-  --sidebar-primary: #3B82F6;
+  --sidebar-primary: #18181b;
   --sidebar-primary-foreground: #FFFFFF;
   --sidebar-accent: #E9ECEF;
   --sidebar-accent-foreground: #000000;
   --sidebar-border: #E9ECEF;
-  --sidebar-ring: rgba(59, 130, 246, 0.4);
+  --sidebar-ring: rgba(24, 24, 27, 0.2);
 
   --app-bg: #FAFAFA;
   --window-bg: #FFFFFF;
@@ -41,25 +44,26 @@
   --surface-muted: #E9ECEF;
   --surface-ghost: #DEE2E6;
   --divider: #E9ECEF;
+  --border-strong: rgba(0, 0, 0, 0.14);
   --muted-text: #000000;
   --placeholder-text: #94A3B8;
   --text-strong: #000000;
   --active-surface: #EBF4FF;
-  --accent-strong: #3B82F6;
-  --accent-soft: rgba(59, 130, 246, 0.08);
+  --accent-strong: #18181b;
+  --accent-soft: rgba(24, 24, 27, 0.06);
   --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.05);
   --shadow-medium: 0 4px 12px rgba(0, 0, 0, 0.05);
-  --assistant-user: linear-gradient(135deg, #3B82F6, #2563EB);
+  --assistant-user: #18181b;
   --assistant-assistant: #FFFFFF;
   --sidebar-rail-bg: #F8F9FA;
   --sidebar-panel-bg: #FFFFFF;
   --note-surface: #FFFFFF;
   --note-surface-hover: #F8F9FA;
-  --note-surface-active: #EBF4FF;
-  --note-glow: rgba(59, 130, 246, 0.04);
+  --note-surface-active: #f4f4f5;
+  --note-glow: rgba(0, 0, 0, 0.03);
   --sidebar-row-text: #000000;
   --sidebar-row-hover: #F1F3F5;
-  --sidebar-row-active: rgba(59, 130, 246, 0.08);
+  --sidebar-row-active: rgba(24, 24, 27, 0.06);
   --sidebar-badge-bg: #E9ECEF;
   --code-bg: rgba(79, 70, 229, 0.08);
   --code-text: #4338ca;
@@ -72,10 +76,92 @@
     transform: translateY(8px);
   }
 
+  /* End on `none` — with fill-mode: both, a residual translateY(0) would keep
+     the page wrapper a transformed ancestor, which stops nested scrollers
+     from being composited independently on Android WebView. */
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: none;
   }
+}
+
+/* Clean scroll utility — no translateZ/will-change/backface-visibility layer
+   hints; those force per-frame re-rasterization of the scroller in Android
+   WebView instead of the threaded scroll path. */
+.gpu-scroll {
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+}
+
+/* Keep scroll anchoring from nudging the offset while the notes list grows. */
+.mobile-notes-scroll {
+  overflow-anchor: none;
+}
+
+/* Mobile AI sheet entrance — CSS animation with fill-mode: backwards, so the
+   element returns to its base style (no transform) when it ends instead of
+   keeping a Framer Motion translateX(0) that blocks scroller compositing. */
+@keyframes assistantRailEnter {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.assistant-rail-enter {
+  animation: assistantRailEnter 0.25s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .assistant-rail-enter {
+    animation: none;
+  }
+}
+
+/* Native floating bars over scrolling content: backdrop blur resamples the
+   moving content every frame — one of the most expensive things Android
+   WebView can do during a scroll. Near-opaque fill instead, glass on web. */
+html.is-capacitor .dock-toolbar,
+html.is-capacitor .editor-toolbar-mobile {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background-color: rgba(18, 18, 22, 0.97);
+}
+
+html.is-capacitor:not(.dark) .dock-toolbar,
+html.is-capacitor:not(.dark) .editor-toolbar-mobile {
+  background-color: rgba(255, 255, 255, 0.97);
+}
+
+/* ── Native safe areas ────────────────────────────────────────────────────
+   Capacitor 8 draws the WebView edge-to-edge on Android 15+, so the page
+   itself has to keep content clear of the status bar. useCapacitorApp()
+   writes the measured inset into --status-bar-height; 2.75rem is the
+   fallback used before (or if) that measurement lands. */
+html.is-capacitor {
+  --status-bar-height: 2.75rem;
+}
+
+/* The app shell and the fixed left drawers all start at the physical top of
+   the screen, so each needs the inset applied independently. */
+html.is-capacitor .app-window,
+html.is-capacitor .mobile-drawer-panel,
+html.is-capacitor .gc-sidebar-mobile {
+  padding-top: var(--status-bar-height, 2.75rem);
+  box-sizing: border-box;
+}
+
+/* Bottom-pinned FABs ride above the native keyboard. */
+html.is-capacitor .mobile-ai-fab-stack {
+  transform: translateY(calc(0px - var(--keyboard-offset, 0px)));
+}
+
+/* Don't animate the composer border while the keyboard is resizing. */
+html.is-capacitor.keyboard-open .lmi-border,
+html.is-capacitor.keyboard-transitioning .lmi-border {
+  animation-play-state: paused;
 }
 
 .page-transition {
@@ -89,8 +175,8 @@
   --card-foreground: oklch(0.96 0.01 240);
   --popover: oklch(0.19 0.015 255);
   --popover-foreground: oklch(0.96 0.01 240);
-  --primary: oklch(0.7 0.17 256);
-  --primary-foreground: oklch(0.16 0.015 255);
+  --primary: #ffffff;
+  --primary-foreground: #09090b;
   --secondary: oklch(0.24 0.015 255);
   --secondary-foreground: oklch(0.95 0.01 240);
   --muted: oklch(0.25 0.015 255);
@@ -100,15 +186,15 @@
   --destructive: oklch(0.68 0.2 26);
   --border: oklch(0.34 0.018 255 / 65%);
   --input: oklch(0.29 0.015 255 / 80%);
-  --ring: oklch(0.7 0.17 256 / 45%);
+  --ring: rgba(255, 255, 255, 0.25);
   --sidebar: oklch(0.19 0.015 255);
   --sidebar-foreground: oklch(0.95 0.01 240);
-  --sidebar-primary: oklch(0.7 0.17 256);
-  --sidebar-primary-foreground: oklch(0.16 0.015 255);
+  --sidebar-primary: #ffffff;
+  --sidebar-primary-foreground: #09090b;
   --sidebar-accent: oklch(0.24 0.015 255);
   --sidebar-accent-foreground: oklch(0.95 0.01 240);
   --sidebar-border: oklch(0.32 0.015 255 / 65%);
-  --sidebar-ring: oklch(0.7 0.17 256 / 45%);
+  --sidebar-ring: rgba(255, 255, 255, 0.25);
 
   --app-bg: #171a1f;
   --window-bg: #171717;
@@ -117,23 +203,24 @@
   --surface-muted: rgba(255, 255, 255, 0.04);
   --surface-ghost: rgba(255, 255, 255, 0.06);
   --divider: #262626;
+  --border-strong: rgba(255, 255, 255, 0.14);
   --muted-text: #9ca3af;
   --text-strong: #f3f4f6;
   --active-surface: rgba(255, 255, 255, 0.075);
-  --accent-strong: #60a5fa;
-  --accent-soft: rgba(47, 128, 237, 0.16);
+  --accent-strong: #ffffff;
+  --accent-soft: rgba(255, 255, 255, 0.08);
   --shadow-soft: 0 18px 44px rgba(0, 0, 0, 0.28);
-  --assistant-user: linear-gradient(135deg, #2f80ed, #2c74dd);
+  --assistant-user: #27272a;
   --assistant-assistant: rgba(255, 255, 255, 0.045);
   --sidebar-rail-bg: #18181b;
   --sidebar-panel-bg: #171717;
   --note-surface: rgba(255, 255, 255, 0.018);
   --note-surface-hover: rgba(255, 255, 255, 0.032);
   --note-surface-active: rgba(37, 99, 235, 0.13);
-  --note-glow: rgba(96, 165, 250, 0.14);
+  --note-glow: rgba(255, 255, 255, 0.05);
   --sidebar-row-text: #d1d5db;
   --sidebar-row-hover: rgba(255, 255, 255, 0.035);
-  --sidebar-row-active: rgba(30, 64, 175, 0.2);
+  --sidebar-row-active: rgba(255, 255, 255, 0.08);
   --sidebar-badge-bg: rgba(255, 255, 255, 0.06);
   --code-bg: #2c2c2d;
   --code-text:  rgb(249, 117, 131);
@@ -1286,8 +1373,8 @@
   flex-direction: column;
   width: 100vw;
   max-width: 100vw;
-  height: calc(100dvh - max(0.75rem, env(safe-area-inset-top)));
-  max-height: calc(100dvh - max(0.75rem, env(safe-area-inset-top)));
+  height: 100%;
+  max-height: 100%;
   border-left: 0;
   border-right: 0;
   margin-inline: 0;
@@ -1298,7 +1385,7 @@
   background: var(--panel-bg, #171717);
   box-shadow: 0 -24px 54px rgba(0, 0, 0, 0.15);
   overflow: hidden;
-  padding-bottom: env(safe-area-inset-bottom);
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 0.75rem);
   contain: layout paint;
   isolation: isolate;
   will-change: transform;
@@ -1311,7 +1398,11 @@
   display: flex;
   align-items: flex-end;
   justify-content: stretch;
-  padding: max(0.75rem, env(safe-area-inset-top)) 0 0;
+  /* The sheet is fixed to the viewport, so the app shell's safe-area padding
+     does not apply here — reserve the status bar (plus a little breathing
+     room) inside the overlay itself. */
+  padding: max(calc(var(--status-bar-height, 0px) + 0.5rem), max(0.75rem, env(safe-area-inset-top))) 0 0;
+  box-sizing: border-box;
   background: color-mix(in srgb, #000 48%, transparent);
   /* A viewport-sized backdrop blur forces the editor underneath to repaint on
      every frame of the sheet transition. Keep the dimming, skip the blur. */
@@ -1567,25 +1658,25 @@
   background-position: 0% 50%;
   border: 1px solid rgba(255, 255, 255, 0.2);
   transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+  box-shadow: 0 0 10px rgba(99, 102, 241, 0.3);
 }
 
 .ai-rail-button:hover .iris-orb,
 .ai-rail-button:hover .iris-orb {
   transform: scale(1.45);
-  background: linear-gradient(90deg, #818cf8, #c4b5fd, #818cf8);
+  background: linear-gradient(90deg, #6366f1, #a855f7, #ec4899);
   background-size: 200% auto;
   background-position: 100% 50%;
   border-color: transparent;
-  box-shadow: 0 0 30px rgba(129, 140, 248, 0.7);
+  box-shadow: 0 0 24px rgba(129, 140, 248, 0.8);
 }
 
 .ai-rail-button-active .iris-orb {
   transform: scale(1.15);
-  background: linear-gradient(90deg, #818cf8, #c4b5fd, #818cf8);
+  background: linear-gradient(90deg, #6366f1, #c4b5fd, #818cf8);
   background-size: 200% auto;
   background-position: 0% 50%;
-  box-shadow: 0 0 20px rgba(129, 140, 248, 0.4);
+  box-shadow: 0 0 16px rgba(129, 140, 248, 0.6);
 }
 
 .ai-rail-button {
@@ -1673,6 +1764,59 @@
       color-mix(in srgb, var(--surface-muted) 92%, transparent));
   padding: 0.82rem 0.76rem 0.64rem;
   box-shadow: 0 -12px 30px rgba(0, 0, 0, 0.2);
+}
+
+/* ── Chat compose: rotating border accent ─────────────────────────────── */
+/* The gradient is painted once onto an oversized layer and the whole layer
+   is rotated with `transform`, so the animation runs on the compositor.
+   Animating a custom property inside a conic-gradient (the previous
+   approach) recalculates style and repaints on the main thread every
+   frame, which janks scrolling in Android WebView. The parent (.lmi-border
+   in LiquidChatCompose) holds the 1px ring mask; this layer spins under it. */
+.lmi-border-spin {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  /* Oversized square (covers the composer's diagonal at any rotation;
+     the remaining area is clipped by the parent's mask/overflow) */
+  width: 150%;
+  aspect-ratio: 1;
+  background: conic-gradient(
+    from 0deg,
+    transparent 65%,
+    rgba(59, 130, 246, 0.5) 80%,
+    #93c5fd 95%,
+    transparent 100%
+  );
+  transform: translate(-50%, -50%) rotate(0deg);
+  animation: lmi-border-rotate 4s linear infinite;
+  will-change: transform;
+  pointer-events: none;
+}
+
+.dark .lmi-border-spin {
+  background: conic-gradient(
+    from 0deg,
+    transparent 65%,
+    rgba(59, 130, 246, 0.6) 80%,
+    #93c5fd 95%,
+    transparent 100%
+  );
+}
+
+@keyframes lmi-border-rotate {
+  from {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lmi-border-spin {
+    animation: none;
+  }
 }
 
 /* ── GlobalChatCompose inside the contextual AI sidebar ── */
@@ -1942,17 +2086,17 @@
   width: 100%;
   padding: 0.7rem 1rem;
   border-radius: 0.75rem;
-  background: linear-gradient(135deg, #3b82f6, #2563eb);
-  color: white;
+  background: #ffffff;
+  color: #09090b;
   font-size: 0.9rem;
   font-weight: 600;
-  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.32);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
   transition: transform 0.18s ease, box-shadow 0.18s ease;
 }
 
 .mobile-drawer-create-btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 10px 28px rgba(37, 99, 235, 0.44);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
 }
 
 .mobile-drawer-create-btn:active {
@@ -3552,7 +3696,7 @@ span[data-ai-ghost] {
   height: 1.75rem;
   min-width: 1.75rem;
   border-radius: 0.5rem;
-  background: linear-gradient(135deg, #6366f1, #818cf8);
+  background: #ffffff; color: #09090b;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4476,7 +4620,7 @@ span[data-ai-ghost] {
   }
 }
 
-/* --- Premium Ignite Button (Header) --- */
+/* --- Premium Ignite Button (Header & Hero) --- */
 .ignite-button {
   position: relative;
   height: 40px;
@@ -4485,50 +4629,43 @@ span[data-ai-ghost] {
   align-items: center;
   gap: 0.6rem;
   border-radius: 10px;
-
-  border: 1px solid transparent;
-  color: var(--text-strong);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: #ffffff !important;
+  color: #09090b !important;
   font-weight: 600;
   font-size: 0.85rem;
-  transition: all 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  transition: all 0.25s ease;
   cursor: pointer;
   overflow: hidden;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
 }
 
 .ignite-button::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, #6366f1, #c4b5fd, #6366f1);
-  background-size: 200% auto;
-  background-position: 0% 50%;
-  opacity: 0;
-  transition: opacity 0.35s ease, background-position 0.5s ease;
-  z-index: 0;
+  display: none !important;
 }
 
 .ignite-button:hover {
-  transform: translateY(-2px) scale(1.02);
-  border-color: rgba(245, 158, 11, 0.4);
-  box-shadow: 0 8px 25px rgba(245, 158, 11, 0.2);
+  transform: translateY(-1px);
+  background: #f4f4f5 !important;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
 }
 
-.ignite-button:hover::before {
-  opacity: 1;
-  background-position: 100% 50%;
+.ignite-button:active {
+  transform: scale(0.98);
 }
 
 .ignite-button span,
 .ignite-button svg {
   position: relative;
   z-index: 1;
-  transition: all 0.35s ease;
+  color: #09090b !important;
+  stroke: #09090b !important;
 }
 
 .ignite-button:hover span,
 .ignite-button:hover svg {
-  color: #000000;
+  color: #09090b !important;
+  stroke: #09090b !important;
 }
 
 .ignite-button:hover svg {
@@ -4544,12 +4681,12 @@ span[data-ai-ghost] {
     width: 3.5rem;
     height: 3.5rem;
     border-radius: 50%;
-    background: linear-gradient(135deg, #3b82f6, #2563eb);
-    color: white;
+    background: #ffffff;
+    color: #09090b;
     display: flex !important;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 10px 30px rgba(37, 99, 235, 0.45);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
     z-index: 500;
     transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     border: 1px solid rgba(255, 255, 255, 0.15);
@@ -4557,7 +4694,7 @@ span[data-ai-ghost] {
 
   .mobile-create-button:hover {
     transform: translateY(-4px) scale(1.05);
-    box-shadow: 0 14px 35px rgba(37, 99, 235, 0.55);
+    box-shadow: 0 14px 35px rgba(0, 0, 0, 0.45);
   }
 
   .mobile-create-button:active {

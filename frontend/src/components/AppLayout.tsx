@@ -196,22 +196,19 @@ useEffect(() => {
                 )}
               </AnimatePresence>
 
-              <AnimatePresence initial={false}>
-                {showNotesPanel && (
-                  <motion.div
-                    key="notes"
-                    initial={{ width: 0, opacity: 0, x: 24 }}
-                    animate={{ width: "100%", opacity: 1, x: 0 }}
-                    exit={{ width: 0, opacity: 0, x: 24 }}
-                    transition={{ duration: 0.36, ease: panelEase }}
-                    className="h-full shrink-0 overflow-hidden"
-                  >
-                    <div className="desktop-notes-column w-full h-full">
-                      {middlePanel}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              {showNotesPanel && (
+                <motion.div
+                  key="notes"
+                  initial={{ opacity: 0, x: 16 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.2, ease: panelEase }}
+                  className="h-full w-full shrink-0 overflow-hidden"
+                >
+                  <div className="desktop-notes-column w-full h-full">
+                    {middlePanel}
+                  </div>
+                </motion.div>
+              )}
 
               {showMainPanel ? (
                 <main className="desktop-main-panel flex-1 relative flex flex-col min-w-0">

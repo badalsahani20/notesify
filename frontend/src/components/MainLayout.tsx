@@ -40,9 +40,19 @@ const MainLayout = ({ middlePanel }: Pops) => {
   } = useNotesLayout();
   const { fetchFolders } = useFolderStore();
   const { isMobileDrawerOpen, setMobileDrawerOpen } = usePanelStore();
-  const [theme, setTheme] = useState<"light" | "dark">("dark");
+  const [theme, setTheme] = useState<"light" | "dark">(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("notesify_theme");
+      if (saved === "light" || saved === "dark") return saved;
+      return document.documentElement.classList.contains("dark") ? "dark" : "light";
+    }
+    return "dark";
+  });
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
+    try {
+      localStorage.setItem("notesify_theme", theme);
+    } catch {}
   }, [theme]);
 
   useEffect(() => {

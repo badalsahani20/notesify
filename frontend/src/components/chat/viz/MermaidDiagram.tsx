@@ -8,6 +8,9 @@ interface MermaidDiagramProps {
 const MERMAID_THEME_CONFIG = {
   startOnLoad: false,
   theme: "dark" as const,
+  // Strict mode encodes HTML in labels and removes click handlers. Diagrams
+  // come from model output, so "loose" would be an XSS vector.
+  securityLevel: "strict" as const,
   suppressErrorRendering: true,
 };
 

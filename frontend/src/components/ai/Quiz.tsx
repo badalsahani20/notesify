@@ -116,7 +116,7 @@ export default function Quiz({ questions, onComplete, onDismiss }: QuizProps) {
           <Button 
             onClick={handleNext} 
             disabled={currentAnswer === null}
-            className="h-9 px-5 text-[13px] font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors border-0 shadow-none flex items-center gap-1.5"
+            className="h-9 px-5 text-[13px] font-medium bg-white text-zinc-950 font-semibold hover:bg-zinc-200 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200 rounded-md transition-colors border-0 shadow-none flex items-center gap-1.5"
           >
             <span>{isLastQuestion ? "Submit" : "Next"}</span>
             {!isLastQuestion && <ArrowRight className="h-4 w-4" />}

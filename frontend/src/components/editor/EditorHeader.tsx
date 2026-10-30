@@ -1,7 +1,9 @@
 import React from "react";
 import type { Editor } from "@tiptap/react";
-import { Archive, Star, BookOpen, ChevronLeft, Share2, MoreHorizontal, Loader2, ChevronDown, Check, FileText, Search, X } from "lucide-react";
+import { Archive, Star, BookOpen, ChevronLeft, Share2, MoreHorizontal, Loader2, ChevronDown, Check, FileText, Search, X, FileDown } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { toast } from "sonner";
+import { PdfExportService } from "@/services/pdf/PdfExportService";
 import type { AiAction } from "@/components/ai/types";
 import { EditorStats } from "./EditorStats";
 import { ShareModal } from "./ShareModal";
@@ -76,6 +78,47 @@ const EditorHeader = ({
   const navigate = useNavigate();
   const [isShareOpen, setIsShareOpen] = React.useState(false);
   const [searchNoteQuery, setSearchNoteQuery] = React.useState("");
+  const [isExportingPdf, setIsExportingPdf] = React.useState(false);
+  const [exportProgressText, setExportProgressText] = React.useState("");
+
+  const handleExportPdf = async () => {
+    if (isExportingPdf || !note) return;
+    setIsExportingPdf(true);
+    setExportProgressText("Preparing...");
+    const toastId = toast.loading("Generating PDF...");
+
+    try {
+      const currentContent = editor ? editor.getHTML() : (note.content || "");
+      const currentTitle = draftTitle || note.title || "Untitled Note";
+
+      const result = await PdfExportService.exportNote(
+        {
+          title: currentTitle,
+          content: currentContent,
+          updatedAt: note.updatedAt,
+        },
+        {
+          theme: document.documentElement.classList.contains("dark") ? "dark" : "light",
+          onProgress: (stage) => setExportProgressText(stage),
+        }
+      );
+
+      if (result.diagnostics.missingImages.length > 0) {
+        toast.warning(
+          `PDF exported (${result.diagnostics.missingImages.length} image(s) unavailable offline)`,
+          { id: toastId }
+        );
+      } else {
+        toast.success("PDF exported successfully!", { id: toastId });
+      }
+    } catch (err: any) {
+      console.error("PDF export error:", err);
+      toast.error(err?.message || "Failed to export PDF", { id: toastId });
+    } finally {
+      setIsExportingPdf(false);
+      setExportProgressText("");
+    }
+  };
 
   const handleClose = () => {
     if (onClose) {
@@ -274,15 +317,15 @@ const EditorHeader = ({
             <button
               type="button"
               onClick={onStudy}
-              className={`ignite-button h-7 !px-3 text-[0.8rem] ${
+              className={`h-7 px-2.5 text-[0.78rem] font-medium rounded-lg inline-flex items-center gap-1.5 transition-all duration-200 cursor-pointer ${
                 isStudyOpen
-                  ? "nav-action-btn-active !bg-[var(--study-accent-soft)] !text-[var(--study-accent)] !border-[color-mix(in_srgb,var(--study-accent)_25%,transparent)]"
-                  : ""
+                  ? "bg-emerald-500/20 text-emerald-300 dark:text-emerald-300 border border-emerald-500/40 shadow-[0_0_12px_rgba(16,185,129,0.25)]"
+                  : "bg-emerald-500/10 hover:bg-emerald-500/18 text-black dark:text-white border border-emerald-500/20 hover:border-emerald-500/35"
               }`}
               aria-label="Toggle Study Mode"
               id="study-mode-btn"
             >
-              <BookOpen size={14} />
+              <BookOpen size={13} className="shrink-0 text-black dark:text-white" />
               <span className="hidden sm:inline">Study</span>
             </button>
           )}
@@ -294,12 +337,16 @@ const EditorHeader = ({
               onClick={onAskAi}
               onMouseEnter={onAskAiHover}
               onFocus={onAskAiHover}
-              className={`ignite-button h-7 !px-3 text-[0.8rem] ${isAiOpen ? "nav-action-btn-active" : ""}`}
+              className={`h-7 px-2.5 text-[0.78rem] font-medium rounded-lg inline-flex items-center gap-1.5 transition-all duration-200 cursor-pointer ${
+                isAiOpen
+                  ? "bg-gradient-to-r from-violet-600/30 via-indigo-600/30 to-purple-600/30 text-violet-200 dark:text-violet-100 border border-violet-400/50 shadow-[0_0_14px_rgba(139,92,246,0.3)]"
+                  : "bg-gradient-to-r from-violet-500/10 via-indigo-500/10 to-purple-500/10 hover:from-violet-500/18 hover:via-indigo-500/18 hover:to-purple-500/18 text-violet-600 dark:text-violet-300 border border-violet-500/25 hover:border-violet-500/45 shadow-[0_2px_8px_rgba(139,92,246,0.08)]"
+              }`}
               aria-label="Toggle Iris AI Assistant"
               title={`Iris AI (${typeof navigator !== "undefined" && /Mac|iPhone|iPad/i.test(navigator.platform) ? "⌘J" : "Ctrl+J"})`}
             >
               {loadingAction ? (
-                <Loader2 size={14} className="animate-spin" />
+                <Loader2 size={13} className="animate-spin text-violet-500 dark:text-violet-300" />
               ) : (
                 <div className="iris-orb shrink-0" style={{ width: "12px", height: "12px", borderWidth: "1px", boxShadow: "none" }} />
               )}
@@ -329,7 +376,23 @@ const EditorHeader = ({
                   className="cursor-pointer text-[13px] text-[var(--text-main)] focus:bg-[var(--surface-ghost)] focus:text-[var(--text-strong)] gap-2.5"
                 >
                   <Share2 size={14} className={note.isShared ? "text-[var(--accent-strong)]" : "opacity-40"} />
-                  {note.isShared ? "Sharing (on)" : "Share note"}
+                  {note.isShared ? "Sharing (on)" : "Share link"}
+                </DropdownMenuItem>
+
+                <DropdownMenuItem
+                  disabled={isExportingPdf}
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    handleExportPdf();
+                  }}
+                  className="cursor-pointer text-[13px] text-[var(--text-main)] focus:bg-[var(--surface-ghost)] focus:text-[var(--text-strong)] gap-2.5"
+                >
+                  {isExportingPdf ? (
+                    <Loader2 size={14} className="animate-spin text-[var(--accent-strong)] shrink-0" />
+                  ) : (
+                    <FileDown size={14} className="opacity-60 shrink-0" />
+                  )}
+                  {isExportingPdf ? exportProgressText || "Exporting..." : "Export as PDF"}
                 </DropdownMenuItem>
 
                 <DropdownMenuSeparator className="bg-[var(--divider)]" />

@@ -9,16 +9,23 @@ export type SpellCheck = boolean;
 export type LineSpacing = "normal" | "relaxed";
 
 // ─── Non-persisted UI state (dialog open/close) ───────────────────────────────
+export type SettingsTabId = "account" | "editor" | "memory" | "shortcuts" | "about";
+
 interface SettingsUIStore {
   settingsOpen: boolean;
+  /** Deep-link target for the next open; null means the default tab. */
+  settingsTab: SettingsTabId | null;
   openSettings: () => void;
+  openSettingsAt: (tab: SettingsTabId) => void;
   closeSettings: () => void;
 }
 
 export const useSettingsUIStore = create<SettingsUIStore>()((set) => ({
   settingsOpen: false,
-  openSettings: () => set({ settingsOpen: true }),
-  closeSettings: () => set({ settingsOpen: false }),
+  settingsTab: null,
+  openSettings: () => set({ settingsOpen: true, settingsTab: null }),
+  openSettingsAt: (settingsTab) => set({ settingsOpen: true, settingsTab }),
+  closeSettings: () => set({ settingsOpen: false, settingsTab: null }),
 }));
 
 interface SettingsState {

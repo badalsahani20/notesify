@@ -3,7 +3,7 @@ export const saveMemoryTool = {
   function: {
     name: "save_memory",
     description:
-      "Save lasting user facts, preferences, goals, or projects. Never invent details.",
+      "Save lasting user facts, preferences, goals, or projects. Never invent details. The result reports whether the memory was newly created or already known.",
     parameters: {
       type: "object",
       properties: {

@@ -1,4 +1,5 @@
 import Notes from "../models/notes.model.js";
+import Memory from "../models/Memory.js";
 import User from "../models/user.model.js";
 import catchAsync from "../utils/catchAsync.js";
 import getEffectiveDailyLimit, { getEffectiveDailyLimits, getStartOfUtcDay } from "../utils/getEffectiveDailyLimit.js";
@@ -7,6 +8,7 @@ export const getStats = catchAsync(async (req, res) => {
   const { user } = req;
 
   const notesCount = await Notes.countDocuments({ user: user._id });
+  const memoriesCount = await Memory.countDocuments({ user: user._id });
   const startOfToday = getStartOfUtcDay();
 
   const isNewDay = !user?.aiUsage?.lastResetAt || user.aiUsage.lastResetAt < startOfToday;
@@ -21,6 +23,7 @@ export const getStats = catchAsync(async (req, res) => {
     success: true,
     stats:{
       notesCount,
+      memoriesCount,
       aiCount,
       limit: limits.tokenLimit,
       tokensUsed,

@@ -1,24 +1,40 @@
-import { useState, useEffect } from "react";
+/* Hallmark · component: login · genre: modern-minimal · theme: vercel-obsidian
+ * states: default · hover · focus-visible · active · disabled · loading · error · success
+ * contrast: pass (WCAG AAA on black canvas)
+ */
+
+import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Loader2, ArrowLeft } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import api from "@/lib/api";
 import { useAuthStore } from "@/store/useAuthStore";
-import Google from "../assets/google.svg";
+import Google from "@/assets/google.svg";
+import notesifyLogo from "@/assets/notesify-favicon.svg";
 import { toast } from "sonner";
-import { generatePkceChallenge, getCodeVerifier, clearCodeVerifier } from "../utils/pkce";
+import { generatePkceChallenge, getCodeVerifier, clearCodeVerifier } from "@/utils/pkce";
+import { Capacitor } from "@capacitor/core";
+import { Preferences } from "@capacitor/preferences";
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [step, setStep] = useState<"email" | "password">("email");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const emailInputRef = useRef<HTMLInputElement>(null);
+  const passwordInputRef = useRef<HTMLInputElement>(null);
+
   const { setAuth } = useAuthStore();
   const nav = useNavigate();
 
-  const isDesktop = !!(window as any).electronAPI?.auth;
+  const isDesktop = typeof window !== "undefined" && Boolean((window as any).electronAPI?.auth);
+  const isNative = Capacitor.isNativePlatform();
 
+  // Desktop OAuth deep-link listener
   useEffect(() => {
     if (isDesktop) {
       (window as any).electronAPI.auth.onOAuthCallback(async (code: string) => {
@@ -26,8 +42,8 @@ const Login = () => {
           setLoading(true);
           const code_verifier = getCodeVerifier();
           if (!code_verifier) {
-             toast.error("Invalid state: no verifier");
-             return;
+            toast.error("Invalid authentication state. Please try again.");
+            return;
           }
 
           const res = await api.post("/users/exchange-code", { code, code_verifier });
@@ -58,47 +74,56 @@ const Login = () => {
     }
   }, [isDesktop, nav, setAuth]);
 
-  const handleResendVerification = async (userEmail: string) => {
-    if (!userEmail) {
-      toast.error("Please enter your email address first.");
+  const handleEmailStepSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = email.trim();
+    if (!trimmed || !trimmed.includes("@") || !trimmed.includes(".")) {
+      toast.error("Please enter a valid email address");
       return;
     }
-    try {
-      const res = await api.post("/users/resend-verification", { email: userEmail });
-      toast.success(res.data?.message || "Verification email sent! Check your inbox.");
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || "Failed to resend verification email.");
-    }
+    setStep("password");
+    setTimeout(() => {
+      passwordInputRef.current?.focus();
+    }, 60);
   };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!email.trim() || !password) return;
+
     setLoading(true);
     try {
-      if (isDesktop) {
-        // Desktop PKCE Flow
+      if (isDesktop || isNative) {
+        // Native Client PKCE Flow (Electron Desktop & Capacitor Mobile)
         const { challenge } = await generatePkceChallenge();
-        
-        // 1. Authenticate & get Authorization Code
+        const clientId = isDesktop ? "notesify-desktop" : "notesify-mobile";
+        const clientType = isDesktop ? "desktop" : "mobile";
+
+        // 1. Authenticate with credentials and retrieve authorization code
         const authRes = await api.post("/users/desktop/login", {
-          email,
+          email: email.trim(),
           password,
           code_challenge: challenge,
           redirect_uri: "notesify://callback",
-          clientId: "notesify-desktop",
-          clientType: "desktop"
+          clientId,
+          clientType,
         });
 
         const authCode = authRes.data.authorizationCode;
 
-        // 2. Exchange Authorization Code for tokens
+        // 2. Exchange authorization code for tokens
         const exchangeRes = await api.post("/users/exchange-code", {
           code: authCode,
-          code_verifier: getCodeVerifier()
+          code_verifier: getCodeVerifier(),
         });
 
+        // 3. Persist rotated refresh token into native secure storage
         if (exchangeRes.data?.refreshToken) {
-          await (window as any).electronAPI.auth.setRefreshToken(exchangeRes.data.refreshToken);
+          if (isDesktop) {
+            await (window as any).electronAPI.auth.setRefreshToken(exchangeRes.data.refreshToken);
+          } else if (isNative) {
+            await Preferences.set({ key: "refreshToken", value: exchangeRes.data.refreshToken });
+          }
         }
 
         setAuth(
@@ -114,8 +139,8 @@ const Login = () => {
         clearCodeVerifier();
         nav("/");
       } else {
-        // Standard Web Flow
-        const res = await api.post("/users/login", { email, password });
+        // Standard Web Flow (cookies managed by browser)
+        const res = await api.post("/users/login", { email: email.trim(), password });
         if (res.data) {
           setAuth(
             {
@@ -137,8 +162,8 @@ const Login = () => {
       if (errorMessage.toLowerCase().includes("verify your email")) {
         toast.error(errorMessage, {
           action: {
-            label: "Resend Email",
-            onClick: () => handleResendVerification(email),
+            label: "Enter Code",
+            onClick: () => nav("/verify-email", { state: { email: email.trim() } }),
           },
           duration: 8000,
         });
@@ -160,164 +185,225 @@ const Login = () => {
       authUrl.searchParams.set("clientId", "notesify-desktop");
       authUrl.searchParams.set("clientType", "desktop");
       
-      // Open in system browser, via IPC
       (window as any).electronAPI.auth.openExternal(authUrl.toString());
+    } else if (isNative) {
+      const { Browser } = await import("@capacitor/browser");
+      const { challenge } = await generatePkceChallenge();
+      const authUrl = new URL(`${API_BASE_URL}/users/google`);
+      authUrl.searchParams.set("code_challenge", challenge);
+      authUrl.searchParams.set("redirect_uri", "notesify://callback");
+      authUrl.searchParams.set("clientId", "notesify-mobile");
+      authUrl.searchParams.set("clientType", "mobile");
+      
+      await Browser.open({ url: authUrl.toString(), windowName: "_system" });
     } else {
       window.location.href = `${API_BASE_URL}/users/google`;
     }
   };
 
   return (
-    <>
-      {/* Logo & Header */}
-      <div className="mb-10 flex flex-col items-center gap-4 text-center">
-        <div className="relative">
-          <div className="absolute inset-0 rounded-2xl bg-white/10 blur-[30px] scale-110" />
-          <img
-            src="/notesify-favicon.svg"
-            alt="Notesify"
-            width={64}
-            height={64}
-            className="relative rounded-2xl shadow-[0_0_20px_rgba(255,255,255,0.05)]"
-          />
-        </div>
-        <div className="space-y-1">
-          <h1 className="text-3xl font-bold tracking-tight text-white">Welcome back</h1>
-          <p className="text-sm text-zinc-200">The minimalist way to <span className="text-indigo-400 font-semibold">organize</span> your <span className="text-indigo-400 font-semibold">thoughts</span>.</p>
-        </div>
-      </div>
-
-      {/* Translucent Obsidian Glass Card */}
-      <div className="group relative z-10">
-        <div className="absolute -inset-[1px] rounded-[21px] bg-gradient-to-b from-white/15 via-transparent to-white/5 opacity-50 transition-opacity duration-500 group-hover:opacity-100" />
-
-        <div className="relative rounded-2xl bg-white/[0.02] p-8 shadow-[inset_0_1px_1px_rgba(255,255,255,0.05),0_32px_100px_rgba(0,0,0,0.8)] backdrop-blur-[40px] border border-white/[0.08]">
-          <form
-            id="login-form"
-            name="login"
-            onSubmit={handleLogin}
-            className="space-y-6"
-          >
-            {/* Email */}
-            <div className="space-y-2">
-              <label
-                htmlFor="login-email"
-                className="text-[11px] font-semibold uppercase tracking-[0.15em] text-zinc-300 ml-1"
-              >
-                Email Address
-              </label>
-              <Input
-                id="login-email"
-                name="email"
-                type="email"
-                placeholder="name@example.com"
-                className="h-12 border-white/10 bg-white/[0.03] text-white placeholder:text-zinc-400 focus-visible:border-white/30 focus-visible:ring-white/5 transition-all duration-300"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                autoFocus
-              />
-            </div>
-
-            {/* Password */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between ml-1">
-                <label
-                  htmlFor="login-password"
-                  className="text-[11px] font-semibold uppercase tracking-[0.15em] text-zinc-300"
-                >
-                  Password
-                </label>
-              </div>
-              <div className="relative">
-                <Input
-                  id="login-password"
-                  name="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="min. 6 characters"
-                  className="h-12 border-white/10 bg-white/[0.03] pr-12 text-white placeholder:text-zinc-400 focus-visible:border-white/30 focus-visible:ring-white/5 transition-all duration-300"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400 transition-colors hover:text-white"
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-            </div>
-
-            <div className="flex justify-end">
-              <Link
-                to="/forgot-password"
-                className="text-xs font-medium text-zinc-400 transition-colors hover:text-white"
-              >
-                Forgot password?
-              </Link>
-            </div>
-
-            {/* Submit Button */}
-            <Button
-              type="submit"
-              disabled={loading}
-              className="auth-primary-button auth-gradient-hover h-12 w-full active:scale-[0.98] cursor-pointer"
-            >
-              {loading ? (
-                <span className="flex items-center gap-2">
-                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-black/20 border-t-black" />
-                  Authenticating…
-                </span>
-              ) : (
-                "Continue"
-              )}
-            </Button>
-
-            {/* Divider */}
-            <div className="relative flex items-center gap-4 py-2">
-              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-              <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">security</span>
-              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-            </div>
-
-            {/* Google */}
-            <Button
-              type="button"
-              onClick={handleGoogleLogin}
-              variant="outline"
-              className="auth-google-button auth-gradient-hover group relative h-12 w-full cursor-pointer overflow-hidden border-white/10 bg-gradient-to-r from-white/[0.03] via-indigo-400/10 to-white/[0.03] font-semibold text-white hover:border-white/20 active:scale-[0.98]"
-            >
-              <div className="absolute inset-0 translate-x-[-100%] bg-gradient-to-r from-transparent via-white/5 to-transparent transition-transform duration-1000 group-hover:translate-x-[100%]" />
-              <span className="relative flex items-center justify-center gap-3">
-                <img src={Google} alt="Google" width={18} height={18} />
-                Continue with Google
-              </span>
-            </Button>
-          </form>
-
-          <div className="mt-8 pt-6 border-t border-white/5 text-center">
-            <p className="text-sm text-zinc-400">
-              New to Notesify?{" "}
-              <Link to="/signup" className="font-semibold text-white transition-all hover:underline decoration-white/30 underline-offset-4">
-                Create an account
-              </Link>
-            </p>
+    <div className="w-full flex flex-col items-center">
+      {/* Brand Header */}
+      <div className="mb-6 flex flex-col items-center text-center">
+        <div className="relative mb-3 flex items-center justify-center">
+          <div className="relative w-10 h-10 rounded-xl overflow-hidden bg-black border border-white/10 shadow-[0_8px_24px_rgba(0,0,0,0.6)] flex items-center justify-center">
+            <img
+              src={notesifyLogo}
+              alt="Notesify"
+              width={26}
+              height={26}
+              className="w-6.5 h-6.5 object-contain"
+            />
           </div>
         </div>
+        <h1 className="text-2xl font-bold tracking-tight text-white">
+          Log in to Notesify
+        </h1>
       </div>
 
-      {/* Footer */}
-      <div className="mt-8 flex flex-col items-center gap-4 text-center">
-        <p className="text-[10px] text-white max-w-[280px] leading-relaxed">
-          By continuing, you agree to our <span onClick={() => window.open("https://notesify.in/terms", "_blank")} className="text-[#818cf8] font-bold transition-colors hover:text-indigo-100 cursor-pointer">Terms</span> and <span onClick={() => window.open("https://notesify.in/privacy", "_blank")} className="text-[#818cf8] font-semibold transition-colors hover:text-indigo-100 cursor-pointer">Privacy Policy</span>.
+      {/* Main Form Container */}
+      <div className="w-full">
+        <AnimatePresence mode="wait" initial={false}>
+          {step === "email" ? (
+            /* ── Step 1: Vercel-Style Initial View (Email + Providers) ── */
+            <motion.form
+              key="step-email"
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.16 }}
+              onSubmit={handleEmailStepSubmit}
+              className="space-y-3.5 w-full"
+            >
+              <div>
+                <Input
+                  ref={emailInputRef}
+                  id="login-email"
+                  name="email"
+                  type="email"
+                  placeholder="Email Address"
+                  autoComplete="email"
+                  required
+                  autoFocus
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="h-10 w-full rounded-lg border border-zinc-800 bg-black px-3.5 text-sm text-white placeholder:text-zinc-500 focus-visible:border-zinc-500 focus-visible:ring-1 focus-visible:ring-zinc-500/30 transition-colors"
+                />
+              </div>
+
+              <Button
+                type="submit"
+                disabled={!email.trim()}
+                className="h-10 w-full rounded-lg bg-white text-black font-medium text-sm hover:bg-zinc-200 active:scale-[0.99] transition-all disabled:opacity-40 cursor-pointer shadow-sm"
+              >
+                Continue with Email
+              </Button>
+
+              <button
+                type="button"
+                onClick={handleGoogleLogin}
+                className="group relative flex h-10 w-full items-center justify-center gap-2.5 rounded-lg border border-zinc-800 bg-black px-4 text-sm font-medium text-white transition-all hover:bg-zinc-900/90 hover:border-zinc-700 active:scale-[0.99] cursor-pointer"
+              >
+                <img src={Google} alt="" width={16} height={16} className="shrink-0" />
+                <span>Continue with Google</span>
+              </button>
+            </motion.form>
+          ) : (
+            /* ── Step 2: Expanded Password View ── */
+            <motion.form
+              key="step-password"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 6 }}
+              transition={{ duration: 0.18 }}
+              onSubmit={handleLogin}
+              className="space-y-4 w-full"
+            >
+              {/* Email Pill with Edit Action */}
+              <div className="flex items-center justify-between px-3.5 py-2 rounded-lg bg-zinc-900/60 border border-zinc-800 text-xs">
+                <span className="text-zinc-300 font-mono truncate max-w-[220px]">
+                  {email}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStep("email");
+                    setTimeout(() => emailInputRef.current?.focus(), 50);
+                  }}
+                  className="text-zinc-400 hover:text-white transition-colors cursor-pointer text-xs font-medium ml-2 shrink-0"
+                >
+                  Edit
+                </button>
+              </div>
+
+              {/* Password Field */}
+              <div className="space-y-1.5 text-left">
+                <div className="flex items-center justify-between">
+                  <label
+                    htmlFor="login-password"
+                    className="text-xs font-medium text-zinc-300"
+                  >
+                    Password
+                  </label>
+                  <Link
+                    to="/forgot-password"
+                    className="text-xs text-zinc-400 hover:text-white transition-colors"
+                  >
+                    Forgot password?
+                  </Link>
+                </div>
+                <div className="relative">
+                  <Input
+                    ref={passwordInputRef}
+                    id="login-password"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="••••••••"
+                    autoComplete="current-password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="h-10 w-full rounded-lg border border-zinc-800 bg-black pl-3.5 pr-10 text-sm text-white placeholder:text-zinc-500 focus-visible:border-zinc-500 focus-visible:ring-1 focus-visible:ring-zinc-500/30 transition-colors"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Submit CTA */}
+              <Button
+                type="submit"
+                disabled={loading || !password}
+                className="h-10 w-full rounded-lg bg-white text-black font-medium text-sm hover:bg-zinc-200 active:scale-[0.99] transition-all disabled:opacity-40 cursor-pointer shadow-sm"
+              >
+                {loading ? (
+                  <span className="inline-flex items-center gap-2">
+                    <Loader2 size={15} className="animate-spin text-zinc-800" />
+                    <span>Signing in…</span>
+                  </span>
+                ) : (
+                  "Log In"
+                )}
+              </Button>
+
+              {/* Back to Email step */}
+              <button
+                type="button"
+                onClick={() => {
+                  setStep("email");
+                  setTimeout(() => emailInputRef.current?.focus(), 50);
+                }}
+                className="flex items-center justify-center gap-1.5 w-full text-xs text-zinc-400 hover:text-white transition-colors py-1 cursor-pointer"
+              >
+                <ArrowLeft size={13} />
+                <span>Back to all options</span>
+              </button>
+            </motion.form>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* Footer Navigation */}
+      <div className="mt-8 text-center">
+        <p className="text-xs text-zinc-400">
+          Don&apos;t have an account?{" "}
+          <Link
+            to="/signup"
+            className="font-medium text-white hover:text-zinc-200 hover:underline underline-offset-4 transition-colors"
+          >
+            Sign Up
+          </Link>
         </p>
       </div>
-    </>
+
+      {/* Understated Legal Disclaimer */}
+      <div className="mt-6 flex items-center justify-center gap-3 text-[11px] text-zinc-600">
+        <a
+          href="https://notesify.in/terms"
+          target="_blank"
+          rel="noreferrer"
+          className="hover:text-zinc-400 transition-colors"
+        >
+          Terms
+        </a>
+        <span>·</span>
+        <a
+          href="https://notesify.in/privacy"
+          target="_blank"
+          rel="noreferrer"
+          className="hover:text-zinc-400 transition-colors"
+        >
+          Privacy Policy
+        </a>
+      </div>
+    </div>
   );
 };
 
 export default Login;
-

@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import api from "@/lib/api";
-import Google from "../../assets/google.svg";
+import Google from "@/assets/google.svg";
+import notesifyLogo from "@/assets/notesify-favicon.svg";
 import { toast } from "sonner";
-import { generatePkceChallenge } from "../../utils/pkce";
+import { generatePkceChallenge } from "@/utils/pkce";
+import { Capacitor } from "@capacitor/core";
 
 const SignupForm = () => {
   const [name, setName] = useState("");
@@ -16,8 +18,19 @@ const SignupForm = () => {
   const [loading, setLoading] = useState(false);
   const nav = useNavigate();
 
+  const isDesktop = typeof window !== "undefined" && Boolean((window as any).electronAPI?.auth);
+  const isNative = Capacitor.isNativePlatform();
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!name.trim()) {
+      toast.error("Please enter your name");
+      return;
+    }
+    if (!email.trim() || !email.includes("@")) {
+      toast.error("Please enter a valid email address");
+      return;
+    }
     if (password.length < 6) {
       toast.error("Password must be at least 6 characters");
       return;
@@ -25,13 +38,17 @@ const SignupForm = () => {
 
     setLoading(true);
     try {
-      const res = await api.post("/users/register", { name, email, password });
+      const res = await api.post("/users/register", {
+        name: name.trim(),
+        email: email.trim(),
+        password,
+      });
       if (res.data) {
-        toast.success(res.data.message || "Registration successful! Please verify your email.");
+        toast.success(res.data.message || "Registration successful! Please check your email.");
         nav("/verify-email", {
           state: {
-            email: res.data.user?.email || email,
-            name: res.data.user?.name || name,
+            email: res.data.user?.email || email.trim(),
+            name: res.data.user?.name || name.trim(),
           },
         });
       }
@@ -42,8 +59,6 @@ const SignupForm = () => {
       setLoading(false);
     }
   };
-
-  const isDesktop = !!(window as any).electronAPI?.auth; //return true if desktop and false if web
 
   const handleGoogleSignup = async () => {
     const { API_BASE_URL } = await import("@/lib/api");
@@ -56,164 +71,181 @@ const SignupForm = () => {
       authUrl.searchParams.set("clientType", "desktop");
       
       (window as any).electronAPI.auth.openExternal(authUrl.toString());
+    } else if (isNative) {
+      const { Browser } = await import("@capacitor/browser");
+      const { challenge } = await generatePkceChallenge();
+      const authUrl = new URL(`${API_BASE_URL}/users/google`);
+      authUrl.searchParams.set("code_challenge", challenge);
+      authUrl.searchParams.set("redirect_uri", "notesify://callback");
+      authUrl.searchParams.set("clientId", "notesify-mobile");
+      authUrl.searchParams.set("clientType", "mobile");
+      
+      await Browser.open({ url: authUrl.toString(), windowName: "_system" });
     } else {
       window.location.href = `${API_BASE_URL}/users/google`;
     }
   };
 
   return (
-    <div className="relative flex w-full flex-col justify-center">
-      <div className="relative mx-auto w-full max-w-md">
-        <div className="mb-8 flex flex-col items-start gap-4 text-left [@media(max-height:800px)]:mb-6">
-          <div className="relative">
-            <div className="absolute inset-0 rounded-2xl bg-white/10 blur-[30px] scale-110" />
+    <div className="w-full flex flex-col items-center">
+      {/* Brand Header */}
+      <div className="mb-6 flex flex-col items-center text-center">
+        <div className="relative mb-3 flex items-center justify-center">
+          <div className="relative w-10 h-10 rounded-xl overflow-hidden bg-black border border-white/10 shadow-[0_8px_24px_rgba(0,0,0,0.6)] flex items-center justify-center">
             <img
-              src="/notesify-favicon.svg"
+              src={notesifyLogo}
               alt="Notesify"
-              width={56}
-              height={56}
-              className="relative rounded-2xl shadow-[0_0_20px_rgba(255,255,255,0.05)]"
+              width={26}
+              height={26}
+              className="w-6.5 h-6.5 object-contain"
             />
           </div>
-          <div className="space-y-1">
-            <h1 className="text-3xl font-bold tracking-tight text-white">Create account</h1>
-            <p className="text-sm text-zinc-200">
-              Join the minimalist workspace for your <span className="text-white">ideas</span>.
-            </p>
-          </div>
+        </div>
+        <h1 className="text-2xl font-bold tracking-tight text-white">
+          Create an account
+        </h1>
+        <p className="mt-1.5 text-xs text-zinc-400 max-w-[280px]">
+          Join the minimalist workspace for your notes and thinking
+        </p>
+      </div>
+
+      {/* Main Form Container */}
+      <div className="w-full space-y-3.5">
+        {/* Google 1-Tap Signup */}
+        <button
+          type="button"
+          onClick={handleGoogleSignup}
+          className="group relative flex h-10 w-full items-center justify-center gap-2.5 rounded-lg border border-zinc-800 bg-black px-4 text-sm font-medium text-white transition-all hover:bg-zinc-900/90 hover:border-zinc-700 active:scale-[0.99] cursor-pointer"
+        >
+          <img src={Google} alt="" width={16} height={16} className="shrink-0" />
+          <span>Continue with Google</span>
+        </button>
+
+        {/* Hairline Divider */}
+        <div className="relative my-4 flex items-center justify-center">
+          <div className="h-px w-full bg-zinc-800/80" />
+          <span className="absolute bg-black px-2.5 text-[10.5px] font-medium uppercase tracking-wider text-zinc-500">
+            or continue with email
+          </span>
         </div>
 
-        <div className="group auth-card-group">
-          <div className="auth-card-border" />
+        {/* Signup Form */}
+        <form onSubmit={handleRegister} className="space-y-3.5 w-full">
+          {/* Full Name */}
+          <div className="space-y-1.5 text-left">
+            <label htmlFor="signup-name" className="block text-xs font-medium text-zinc-300">
+              Full name
+            </label>
+            <Input
+              id="signup-name"
+              name="name"
+              type="text"
+              placeholder="Your name"
+              autoComplete="name"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="h-10 w-full rounded-lg border border-zinc-800 bg-black px-3.5 text-sm text-white placeholder:text-zinc-500 focus-visible:border-zinc-500 focus-visible:ring-1 focus-visible:ring-zinc-500/30 transition-colors"
+            />
+          </div>
 
-          <div className="auth-card [@media(max-height:800px)]:p-6">
-            <form
-              id="signup-form"
-              name="signup"
-              onSubmit={handleRegister}
-              className="space-y-5 [@media(max-height:800px)]:space-y-4"
-            >
-              <div className="space-y-1.5">
-                <label
-                  htmlFor="signup-name"
-                  className="ml-1 text-[11px] font-semibold uppercase tracking-[0.15em] text-zinc-300"
-                >
-                  Full Name
-                </label>
-                <Input
-                  id="signup-name"
-                  name="name"
-                  type="text"
-                  placeholder="John Doe"
-                  className="h-12 border-white/10 bg-white/[0.03] text-white placeholder:text-zinc-500 focus-visible:border-white/30 focus-visible:ring-white/5 transition-all duration-300 [@media(max-height:800px)]:h-10"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                  autoFocus
-                />
-              </div>
+          {/* Email */}
+          <div className="space-y-1.5 text-left">
+            <label htmlFor="signup-email" className="block text-xs font-medium text-zinc-300">
+              Email address
+            </label>
+            <Input
+              id="signup-email"
+              name="email"
+              type="email"
+              placeholder="name@example.com"
+              autoComplete="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="h-10 w-full rounded-lg border border-zinc-800 bg-black px-3.5 text-sm text-white placeholder:text-zinc-500 focus-visible:border-zinc-500 focus-visible:ring-1 focus-visible:ring-zinc-500/30 transition-colors"
+            />
+          </div>
 
-              <div className="space-y-1.5">
-                <label
-                  htmlFor="signup-email"
-                  className="ml-1 text-[11px] font-semibold uppercase tracking-[0.15em] text-zinc-300"
-                >
-                  Email Address
-                </label>
-                <Input
-                  id="signup-email"
-                  name="email"
-                  type="email"
-                  placeholder="name@example.com"
-                  className="h-12 border-white/10 bg-white/[0.03] text-white placeholder:text-zinc-500 focus-visible:border-white/30 focus-visible:ring-white/5 transition-all duration-300 [@media(max-height:800px)]:h-10"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label
-                  htmlFor="signup-password"
-                  className="ml-1 text-[11px] font-semibold uppercase tracking-[0.15em] text-zinc-300"
-                >
-                  Password
-                </label>
-                <div className="relative">
-                  <Input
-                    id="signup-password"
-                    name="password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="Min. 6 characters"
-                    className="h-12 border-white/10 bg-white/[0.03] pr-12 text-white placeholder:text-zinc-500 focus-visible:border-white/30 focus-visible:ring-white/5 transition-all duration-300 [@media(max-height:800px)]:h-10"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((v) => !v)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400 transition-colors hover:text-white"
-                    aria-label={showPassword ? "Hide password" : "Show password"}
-                  >
-                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                </div>
-              </div>
-
-              <Button
-                type="submit"
-                disabled={loading}
-                variant="ghost"
-                className="auth-primary-button auth-gradient-hover mt-2 h-12 w-full [@media(max-height:800px)]:h-10 active:scale-[0.98]"
-              >
-                {loading ? (
-                  <span className="flex items-center gap-2">
-                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-black/20 border-t-black" />
-                    Creating account...
-                  </span>
-                ) : (
-                  "Get Started"
-                )}
-              </Button>
-
-              <div className="relative flex items-center gap-4 py-1 [@media(max-height:800px)]:py-0.5">
-                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-                <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">or</span>
-                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-              </div>
-
-              <Button
+          {/* Password */}
+          <div className="space-y-1.5 text-left">
+            <label htmlFor="signup-password" className="block text-xs font-medium text-zinc-300">
+              Password
+            </label>
+            <div className="relative">
+              <Input
+                id="signup-password"
+                name="password"
+                type={showPassword ? "text" : "password"}
+                placeholder="At least 6 characters"
+                autoComplete="new-password"
+                required
+                minLength={6}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="h-10 w-full rounded-lg border border-zinc-800 bg-black pl-3.5 pr-10 text-sm text-white placeholder:text-zinc-500 focus-visible:border-zinc-500 focus-visible:ring-1 focus-visible:ring-zinc-500/30 transition-colors"
+              />
+              <button
                 type="button"
-                onClick={handleGoogleSignup}
-                variant="outline"
-                className="auth-google-button auth-gradient-hover group relative h-12 w-full cursor-pointer overflow-hidden border-white/10 bg-gradient-to-r from-white/[0.03] via-indigo-400/10 to-white/[0.03] font-semibold text-white hover:border-white/20 active:scale-[0.98] [@media(max-height:800px)]:h-10"
+                onClick={() => setShowPassword((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                aria-label={showPassword ? "Hide password" : "Show password"}
               >
-                <div className="absolute inset-0 translate-x-[-100%] bg-gradient-to-r from-transparent via-white/5 to-transparent transition-transform duration-1000 group-hover:translate-x-[100%]" />
-                <span className="relative flex items-center justify-center gap-3">
-                  <img src={Google} alt="Google" width={18} height={18} />
-                  Continue with Google
-                </span>
-              </Button>
-            </form>
-
-            <div className="mt-6 border-t border-white/5 pt-5 text-center [@media(max-height:800px)]:mt-4 [@media(max-height:800px)]:pt-4">
-              <p className="text-sm text-zinc-400">
-                Already have an account?{" "}
-                <Link to="/login" className="font-semibold text-white transition-all hover:underline decoration-white/30 underline-offset-4">
-                  Sign in instead
-                </Link>
-              </p>
+                {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+              </button>
             </div>
           </div>
-        </div>
 
-        <div className="mt-6 flex flex-col items-center gap-4 text-left [@media(max-height:800px)]:mt-4">
-          <p className="max-w-[380px] text-sm leading-relaxed text-zinc-200">
-            By signing up, you agree to our <span onClick={() => window.open("https://notesify.in/terms", "_blank")} className="cursor-pointer font-semibold text-[#818cf8] transition-colors hover:text-indigo-400">Terms</span> and{" "}
-            <span onClick={() => window.open("https://notesify.in/privacy", "_blank")} className="cursor-pointer font-semibold text-[#818cf8] transition-colors hover:text-indigo-400">Privacy Policy</span>.
-          </p>
-        </div>
+          {/* Submit Button */}
+          <Button
+            type="submit"
+            disabled={loading || !name.trim() || !email.trim() || password.length < 6}
+            className="h-10 w-full rounded-lg bg-white text-black font-medium text-sm hover:bg-zinc-200 active:scale-[0.99] transition-all disabled:opacity-40 cursor-pointer shadow-sm pt-0"
+          >
+            {loading ? (
+              <span className="inline-flex items-center gap-2">
+                <Loader2 size={15} className="animate-spin text-zinc-800" />
+                <span>Creating account…</span>
+              </span>
+            ) : (
+              "Create Account"
+            )}
+          </Button>
+        </form>
+      </div>
+
+      {/* Footer Navigation */}
+      <div className="mt-8 text-center">
+        <p className="text-xs text-zinc-400">
+          Already have an account?{" "}
+          <Link
+            to="/login"
+            className="font-medium text-white hover:text-zinc-200 hover:underline underline-offset-4 transition-colors"
+          >
+            Log in
+          </Link>
+        </p>
+      </div>
+
+      {/* Understated Legal Disclaimer */}
+      <div className="mt-6 flex items-center justify-center gap-3 text-[11px] text-zinc-600">
+        <a
+          href="https://notesify.in/terms"
+          target="_blank"
+          rel="noreferrer"
+          className="hover:text-zinc-400 transition-colors"
+        >
+          Terms
+        </a>
+        <span>·</span>
+        <a
+          href="https://notesify.in/privacy"
+          target="_blank"
+          rel="noreferrer"
+          className="hover:text-zinc-400 transition-colors"
+        >
+          Privacy Policy
+        </a>
       </div>
     </div>
   );

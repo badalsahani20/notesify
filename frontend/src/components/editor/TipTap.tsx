@@ -29,6 +29,10 @@ import { TaskItem } from "@tiptap/extension-task-item";
 import { TextAlign } from "@tiptap/extension-text-align";
 import { Color } from "@tiptap/extension-color";
 import { DOCUMENT_PATTERNS, markdownToHtml } from "@/utils/markdownToHtml";
+import {
+  looksLikeMarkdownDocument,
+  shouldPasteAsCodeBlock,
+} from "@/utils/pasteMarkdown";
 import { usePanelStore } from "@/store/usePanelStore";
 import Placeholder from "@tiptap/extension-placeholder";
 import { useSettingsStore } from "@/store/useSettingsStore";
@@ -36,6 +40,7 @@ import { cn } from "@/lib/utils";
 import { formatMarkDownNodes } from "@/utils/FormatMarkdownNodes";
 import { useEditorUIStore } from "@/store/useEditorUIStore";
 import { BlockIdExtension } from "@/extensions/blockIdExtension";
+import { triggerSuccessHaptic } from "@/utils/haptics";
 
 const PLACEHOLDERS = [
   "Need a starting point? Generate study notes with AI.",
@@ -45,38 +50,6 @@ const PLACEHOLDERS = [
   "Start writing manually or generate notes with AI."
 ];
 
-const CODE_MARKERS = [
-  /[{};]\s*\n/,
-  /\b(function|const|let|var|class|import|export|async|await|def|print)\b\s*[\s(]/,
-  /=>\s*[{(]/,
-  /^\s*(if|for|while|switch)\s*\(/m,
-];
-
-const looksLikeCodeSnippet = (text: string) => {
-  if (!text.includes("\n")) return false;
-
-  // 1. Detect standard programming languages
-  const matchCount = CODE_MARKERS.filter((p) => p.test(text)).length;
-  if (matchCount >= 2) return true; // Strong code confidence overrides document patterns
-
-  // 2. Reject if it looks like a markdown document
-  if (DOCUMENT_PATTERNS.some((p) => p.test(text))) return false; // Likely a document with a stray code word
-
-  // 3. Detect Mermaid definitions
-  const isMermaid = /^(graph|flowchart|sequenceDiagram|classDiagram|stateDiagram|erDiagram|gantt|pie)\b/m.test(text);
-  if (isMermaid) return true;
-
-  // 4. Detect ASCII Art / Diagrams (box drawing characters, structural arrows with indentation)
-  const hasBoxDrawing = /[─│┌┐└┘├┤┬┴┼═║╒╓╔╕╖╗╘╙╚╛╜╝╞╟╠╡╢╣╤╥╦╧╨╩╪╫╬╭╮╯╰]/.test(text);
-  const hasDiagramArrows = /──►|◄──|-->|<--|==>|<==/.test(text);
-  const hasVerticalAlignment = /^\s{2,}[│▼▲|]/m.test(text) || /\s{4,}/.test(text);
-  
-  if ((hasBoxDrawing || hasDiagramArrows) && hasVerticalAlignment) {
-    return true;
-  }
-
-  return matchCount >= 1;
-};
 
 const FontSize = Extension.create({
   name: "fontSize",
@@ -274,20 +247,23 @@ const TipTap = ({ noteId, content, onChange, onEditorReady, aiChat, editable = t
           // ignore
         }
 
-        const isFencedMarkdown = /^\s*`{3,}/m.test(plainText);
-        const isIdeCopy = html && /vscode-editor-data|font-family:.*?(?:Consolas|monospace|Courier|JetBrains)/i.test(html) && !isVsCodeMarkdown;
-        const isCode = plainText && !isFencedMarkdown && (isIdeCopy || looksLikeCodeSnippet(plainText));
+        const isIdeCopy =
+          !!html &&
+          /vscode-editor-data|font-family:.*?(?:Consolas|monospace|Courier|JetBrains)/i.test(html) &&
+          !isVsCodeMarkdown;
 
-        if (isCode) {
-          // Wrap in code block if there's no rich HTML indicating it's a styled document
-          if (!html || (/<(?:pre|code|div|span)\b/i.test(html) && !/<(?:h[1-6]|ul|ol|table)\b/i.test(html))) {
-            event.preventDefault();
-            const { schema, tr } = view.state;
-            const codeNode = schema.nodes.codeBlock?.create({}, schema.text(plainText.replace(/\r\n/g, "\n")));
-            if (codeNode) {
-              view.dispatch(tr.replaceSelectionWith(codeNode).scrollIntoView());
-              return true;
-            }
+        // A full markdown document is never a "code snippet", even though its
+        // prose is full of code-ish tokens (`const`, `=>`, `;`). Without this
+        // check a pasted .md file became one giant code block.
+        const isMarkdownDocument = looksLikeMarkdownDocument(plainText);
+
+        if (shouldPasteAsCodeBlock(plainText, html, isIdeCopy)) {
+          event.preventDefault();
+          const { schema, tr } = view.state;
+          const codeNode = schema.nodes.codeBlock?.create({}, schema.text(plainText.replace(/\r\n/g, "\n")));
+          if (codeNode) {
+            view.dispatch(tr.replaceSelectionWith(codeNode).scrollIntoView());
+            return true;
           }
         }
 
@@ -300,8 +276,15 @@ const TipTap = ({ noteId, content, onChange, onEditorReady, aiChat, editable = t
         }
 
         // 3. Fallback: Parse as Markdown if it matches document structure
-        // This gracefully catches mobile Plain Text Table copies or raw Markdown pastes
-        if (plainText && DOCUMENT_PATTERNS.some((p) => p.test(plainText)) || plainText.includes("\t")) {
+        // This gracefully catches mobile Plain Text Table copies or raw Markdown pastes.
+        // A document detected by prose density also takes this path even when the
+        // copy lost its literal markers (rendered browser/chat/PDF copy).
+        if (
+          plainText &&
+          (isMarkdownDocument ||
+            DOCUMENT_PATTERNS.some((p) => p.test(plainText)) ||
+            plainText.includes("\t"))
+        ) {
           // Even if it doesn't match DOCUMENT_PATTERNS perfectly, tab-separation strongly hints at a table
           event.preventDefault();
           const convertedHtml = markdownToHtml(plainText);
@@ -582,7 +565,18 @@ const TipTap = ({ noteId, content, onChange, onEditorReady, aiChat, editable = t
       )}
 
       <div className="overflow-x-auto">
-        <EditorContent className="editor-content-shell" editor={editor} spellCheck={spellCheck && editable} onKeyDown={handleEditorKeyDown} />
+        <EditorContent
+          className="editor-content-shell"
+          editor={editor}
+          spellCheck={spellCheck && editable}
+          onKeyDown={handleEditorKeyDown}
+          onChangeCapture={(event) => {
+            const target = event.target;
+            if (target instanceof HTMLInputElement && target.type === "checkbox" && target.checked) {
+              triggerSuccessHaptic();
+            }
+          }}
+        />
       </div>
 
 

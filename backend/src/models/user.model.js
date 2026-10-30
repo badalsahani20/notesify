@@ -53,6 +53,8 @@ const userSchema = new mongoose.Schema({
     },
     verificationToken: { type: String, select: false},
     verificationTokenExpires: { type: Date, select: false},
+    verificationOtp: { type: String, select: false},
+    verificationOtpExpires: { type: Date, select: false},
     preferences: {
         theme: { type: String, enum: ["light", "dark", "system"], default: "system"},
         editorFontSize: { type: Number, default: 18, min: 12, max: 28 },

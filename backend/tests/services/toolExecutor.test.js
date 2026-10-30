@@ -9,11 +9,12 @@ jest.unstable_mockModule('../../src/services/notes.service.js', () => ({
 
 jest.unstable_mockModule('../../src/services/memoryService.js', () => ({
   searchMemories: jest.fn(),
+  saveMemoryWithStatus: jest.fn(),
 }));
 
 // Dynamic imports
 const { getNoteContentForUser, searchNote } = await import('../../src/services/notes.service.js');
-const { searchMemories } = await import('../../src/services/memoryService.js');
+const { searchMemories, saveMemoryWithStatus } = await import('../../src/services/memoryService.js');
 const { toolExecutor } = await import('../../src/services/ai/tools/toolExecutor.js');
 const { CHAT_TOOLS, searchNotesTool } = await import('../../src/services/ai/tools/chatTools.js');
 
@@ -158,6 +159,77 @@ describe('ToolExecutor - search_notes & chat tools', () => {
 
       expect(getNoteContentForUser).toHaveBeenCalledWith(fallbackId, userId);
       expect(result.title).toBe('Active Note');
+    });
+  });
+
+  describe('save_memory execution', () => {
+    it('persists a new memory and reports it as created', async () => {
+      saveMemoryWithStatus.mockResolvedValue({
+        memory: { _id: 'm1', category: 'GOAL', content: 'Preparing for GATE' },
+        created: true,
+      });
+
+      const result = await toolExecutor.execute({
+        toolName: 'save_memory',
+        args: { category: 'GOAL', content: '  Preparing for GATE  ' },
+        userId,
+      });
+
+      expect(saveMemoryWithStatus).toHaveBeenCalledWith(userId, {
+        category: 'GOAL',
+        content: 'Preparing for GATE',
+      });
+      expect(result).toEqual({
+        saved: true,
+        created: true,
+        category: 'GOAL',
+        content: 'Preparing for GATE',
+      });
+    });
+
+    it('reports a deduplicated hit without exposing the stored embedding', async () => {
+      saveMemoryWithStatus.mockResolvedValue({
+        memory: {
+          _id: 'm1',
+          category: 'GOAL',
+          content: 'Preparing for GATE',
+          embedding: [0.1, 0.2, 0.3],
+        },
+        created: false,
+      });
+
+      const result = await toolExecutor.execute({
+        toolName: 'save_memory',
+        args: { category: 'GOAL', content: 'Preparing for the GATE exam' },
+        userId,
+      });
+
+      expect(result.created).toBe(false);
+      expect(result.saved).toBe(true);
+      expect(result.embedding).toBeUndefined();
+    });
+
+    it('rejects missing content without calling the service', async () => {
+      const result = await toolExecutor.execute({
+        toolName: 'save_memory',
+        args: { category: 'GOAL', content: '   ' },
+        userId,
+      });
+
+      expect(result.error).toMatch(/missing content/i);
+      expect(saveMemoryWithStatus).not.toHaveBeenCalled();
+    });
+
+    it('surfaces a failed write as an error', async () => {
+      saveMemoryWithStatus.mockResolvedValue(null);
+
+      const result = await toolExecutor.execute({
+        toolName: 'save_memory',
+        args: { category: 'GOAL', content: 'Preparing for GATE' },
+        userId,
+      });
+
+      expect(result.error).toMatch(/failed to save memory/i);
     });
   });
 });

@@ -1,11 +1,14 @@
-import React, { useMemo, useRef, useCallback, useEffect } from "react";
-import { Archive, RotateCcw, Star, Trash2, X, MoreVertical, AlertTriangle } from "lucide-react";
+import React, { useMemo, useRef, useCallback, useEffect, useState } from "react";
+import { Archive, RotateCcw, Star, Trash2, X, MoreVertical, AlertTriangle, FileDown } from "lucide-react";
 import { stripHtml } from "@/utils/stripHtml";
 import { useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import type { Note } from "@/store/useNoteStore";
 import { getRelativeUpdatedLabel } from "@/utils/getRelativeUpdatedLabel";
 import { fetchNote } from "@/hooks/notes/useNotesQuery";
+import { triggerSelectionHaptic } from "@/utils/haptics";
+import { toast } from "sonner";
+import { PdfExportService } from "@/services/pdf/PdfExportService";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -82,6 +85,41 @@ const NoteCard = ({
     };
   }, []);
 
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExport = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isExporting) return;
+    setIsExporting(true);
+    const toastId = toast.loading("Generating PDF...");
+
+    try {
+      const result = await PdfExportService.exportNote(
+        {
+          title: note.title,
+          content: note.content,
+          updatedAt: note.updatedAt,
+        },
+        {
+          theme: document.documentElement.classList.contains("dark") ? "dark" : "light",
+        }
+      );
+
+      if (result.diagnostics.missingImages.length > 0) {
+        toast.warning(
+          `PDF exported (${result.diagnostics.missingImages.length} image(s) unavailable offline)`,
+          { id: toastId }
+        );
+      } else {
+        toast.success("PDF exported successfully!", { id: toastId });
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to export PDF", { id: toastId });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   return (
     <article
       onClick={onClick}
@@ -95,6 +133,7 @@ const NoteCard = ({
           version: note.version 
         }));
         e.dataTransfer.effectAllowed = "move";
+        triggerSelectionHaptic();
       }}
       className={cn(
         "note-list-row group",
@@ -185,6 +224,10 @@ const NoteCard = ({
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-40" onClick={(e) => e.stopPropagation()}>
+              <DropdownMenuItem className="cursor-pointer" onClick={handleExport} disabled={isExporting}>
+                <FileDown size={14} className="mr-2" />
+                {isExporting ? "Exporting..." : "Export as PDF"}
+              </DropdownMenuItem>
               <DropdownMenuItem className="cursor-pointer" onClick={() => onToggleArchive?.(note._id)}>
                 <Archive size={14} className="mr-2" />
                 {isArchiveView ? "Unarchive" : "Archive"}

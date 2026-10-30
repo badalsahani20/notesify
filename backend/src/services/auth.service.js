@@ -23,15 +23,24 @@ export const registerUser = async (userData) => {
     .update(verificationToken)
     .digest("hex");
 
+  // 6-digit OTP for in-app verification (15 minutes)
+  const verificationOtp = Math.floor(100000 + Math.random() * 900000).toString();
+  const hashedOtp = crypto
+    .createHash("sha256")
+    .update(verificationOtp)
+    .digest("hex");
+
   const user = await User.create({
     ...userData,
     verificationToken: hashedToken,
     verificationTokenExpires: Date.now() + 24 * 60 * 60 * 1000, // 24 hours
+    verificationOtp: hashedOtp,
+    verificationOtpExpires: Date.now() + 15 * 60 * 1000, // 15 minutes
     provider: "local",
     isVerified: false,
   });
   
-  return { user, verificationToken };
+  return { user, verificationToken, verificationOtp };
 };
 
 export const verifyUserEmail = async (token) => {
@@ -52,6 +61,8 @@ export const verifyUserEmail = async (token) => {
   user.isVerified = true;
   user.verificationToken = undefined;
   user.verificationTokenExpires = undefined;
+  user.verificationOtp = undefined;
+  user.verificationOtpExpires = undefined;
 
   const accessToken = user.generateAccessToken();
   const refreshToken = user.generateRefreshToken();
@@ -74,6 +85,61 @@ export const verifyUserEmail = async (token) => {
   return { user, accessToken, refreshToken };
 };
 
+export const verifyUserOtp = async (email, otp) => {
+  if (!email || !otp) {
+    const error = new Error("Email and 6-digit verification code are required");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const cleanOtp = String(otp).trim();
+  if (cleanOtp.length !== 6) {
+    const error = new Error("Verification code must be 6 digits");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const hashedOtp = crypto.createHash("sha256").update(cleanOtp).digest("hex");
+
+  const user = await User.findOne({
+    email: email.toLowerCase().trim(),
+    verificationOtp: hashedOtp,
+    verificationOtpExpires: { $gt: Date.now() },
+  });
+
+  if (!user) {
+    const error = new Error("Invalid or expired verification code");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  // Mark as verified and clear verification secrets
+  user.isVerified = true;
+  user.verificationToken = undefined;
+  user.verificationTokenExpires = undefined;
+  user.verificationOtp = undefined;
+  user.verificationOtpExpires = undefined;
+
+  const accessToken = user.generateAccessToken();
+  const refreshToken = user.generateRefreshToken();
+  const hashedRefreshToken = hashRefreshToken(refreshToken);
+
+  user.refreshToken.push({ token: hashedRefreshToken });
+  if (user.refreshToken.length > 5) {
+    user.refreshToken = user.refreshToken.slice(-5);
+  }
+
+  await user.save();
+
+  await createWelcomeNote(user._id);
+
+  sendWelcomeEmail(user.email, user.name).catch((err) =>
+    console.error("Welcome email failed:", err)
+  );
+
+  return { user, accessToken, refreshToken };
+};
+
 export const resendVerificationToken = async(email) => {
   const user = await User.findOne({email});
   if(!user) {
@@ -91,13 +157,18 @@ export const resendVerificationToken = async(email) => {
   const rawToken = crypto.randomBytes(32).toString("hex");
   const hashedToken = crypto.createHash("sha256").update(rawToken).digest("hex");
 
+  const verificationOtp = Math.floor(100000 + Math.random() * 900000).toString();
+  const hashedOtp = crypto.createHash("sha256").update(verificationOtp).digest("hex");
+
   user.verificationToken = hashedToken;
   user.verificationTokenExpires = Date.now() + 24 * 60 * 60 * 1000;
+  user.verificationOtp = hashedOtp;
+  user.verificationOtpExpires = Date.now() + 15 * 60 * 1000;
   await user.save();
 
   const verificationUrl = `${process.env.FRONTEND_URL}/verify-email/${rawToken}`;
 
-  await sendVerificationEmail(user.email, user.name, verificationUrl);
+  await sendVerificationEmail(user.email, user.name, verificationUrl, verificationOtp);
 
   return { success: true };
 };

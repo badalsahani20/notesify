@@ -4,7 +4,9 @@ import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import rehypeRaw from "rehype-raw";
+import rehypeSanitize from "rehype-sanitize";
 import { sharedMarkdownComponents } from "@/utils/sharedMarkdownComponents";
+import { irisSanitizeSchema } from "@/utils/markdownSanitizeSchema";
 import { irisSpacing, irisTypography, normalizeIrisDirectives } from "@/utils/irisMarkdown";
 import { IrisCallout, IrisComparison, IrisKeyTakeaway } from "./IrisSemanticBlocks";
 
@@ -104,7 +106,7 @@ export const IrisMarkdownRenderer = ({ content, isStreaming = false }: IrisMarkd
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm, remarkMath]}
-      rehypePlugins={[rehypeRaw, rehypeKatex]}
+      rehypePlugins={[rehypeRaw, [rehypeSanitize, irisSanitizeSchema], rehypeKatex]}
       components={components}
     >
       {markdown}

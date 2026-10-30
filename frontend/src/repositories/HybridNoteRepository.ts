@@ -3,6 +3,7 @@ import type { Note } from "@/store/useNoteStore";
 import type { LocalNoteDataSource } from "@/datasources/local/LocalNoteDataSource";
 import type { RemoteNoteDataSource } from "./api/RemoteNoteDataSource";
 import { db } from "@/database/database";
+import { isOnline } from "@/lib/connectivity";
 import { generateObjectId } from "@/utils/generateObjectId";
 
 export class HybridNoteRepository implements INoteRepository {
@@ -73,7 +74,7 @@ export class HybridNoteRepository implements INoteRepository {
             return activeNotes;
         }
 
-        if (!navigator.onLine) return [];
+        if (!isOnline()) return [];
 
         const remoteNotes = await this.remoteAPI.getNotes();
         await this.localDB.saveMany(remoteNotes);
@@ -89,7 +90,7 @@ export class HybridNoteRepository implements INoteRepository {
         }
 
         // 2. If missing locally and offline, throw error
-        if (!navigator.onLine) {
+        if (!isOnline()) {
             throw new Error("No note found locally");
         }
 
@@ -168,7 +169,7 @@ export class HybridNoteRepository implements INoteRepository {
             note => !note.isDeleted && note.isArchived,
         );
 
-        if (allNotes.length > 0 || !navigator.onLine) {
+        if (allNotes.length > 0 || !isOnline()) {
             return archivedNotes;
         }
 
@@ -181,7 +182,7 @@ export class HybridNoteRepository implements INoteRepository {
         const allNotes = await this.localDB.getAll();
         const trashedNotes = allNotes.filter(note => note.isDeleted);
 
-        if (allNotes.length > 0 || !navigator.onLine) {
+        if (allNotes.length > 0 || !isOnline()) {
             return trashedNotes;
         }
 

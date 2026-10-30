@@ -78,20 +78,44 @@ const NoteEditor = () => {
   const keyboardOffset = useKeyboardOffset();
 
   const editorScrollRef = useRef<HTMLDivElement>(null);
+  const scrollRafRef = useRef<number | null>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [showScrollBottom, setShowScrollBottom] = useState(false);
 
-  const handleEditorScroll = useCallback(() => {
-    if (!editorScrollRef.current) return;
-    const { scrollTop, scrollHeight, clientHeight } = editorScrollRef.current;
+  const updateScrollButtons = useCallback(() => {
+    const el = editorScrollRef.current;
+    if (!el) return;
+    const { scrollTop, scrollHeight, clientHeight } = el;
+    const nextTop = scrollTop > 300;
+    const nextBottom =
+      scrollHeight > clientHeight && scrollHeight - scrollTop - clientHeight > 300;
 
-    setShowScrollTop(scrollTop > 300);
-    setShowScrollBottom(scrollHeight > clientHeight && (scrollHeight - scrollTop - clientHeight > 300));
+    // Only schedule a render when the visibility actually flips. Setting the
+    // same boolean on every scroll event still pushes work through React on
+    // every frame, which shows up as scroll lag on Android WebView.
+    setShowScrollTop((prev) => (prev === nextTop ? prev : nextTop));
+    setShowScrollBottom((prev) => (prev === nextBottom ? prev : nextBottom));
+  }, []);
+
+  // Coalesce scroll events to one update per animation frame.
+  const handleEditorScroll = useCallback(() => {
+    if (scrollRafRef.current !== null) return;
+    scrollRafRef.current = window.requestAnimationFrame(() => {
+      scrollRafRef.current = null;
+      updateScrollButtons();
+    });
+  }, [updateScrollButtons]);
+
+  useEffect(() => () => {
+    if (scrollRafRef.current !== null) {
+      window.cancelAnimationFrame(scrollRafRef.current);
+      scrollRafRef.current = null;
+    }
   }, []);
 
   useEffect(() => {
-    handleEditorScroll();
-  }, [note?.content, handleEditorScroll]);
+    updateScrollButtons();
+  }, [note?.content, updateScrollButtons]);
 
   // Reset scroll to top when switching between notes
   useEffect(() => {
@@ -300,7 +324,12 @@ const NoteEditor = () => {
         <div
           ref={editorScrollRef}
           onScroll={handleEditorScroll}
-          className="editor-workspace custom-scrollbar flex-1 overflow-y-auto px-8 pb-8 pt-4"
+          className="editor-workspace custom-scrollbar gpu-scroll flex-1 overflow-y-auto px-8 pb-8 pt-4"
+          style={
+            isMobile && keyboardOffset > 0
+              ? { paddingBottom: `calc(${keyboardOffset}px + 4.5rem)` }
+              : undefined
+          }
         >
           <TipTap
             noteId={note?._id}
@@ -316,6 +345,7 @@ const NoteEditor = () => {
           showScrollBottom={showScrollBottom}
           onScrollTop={() => editorScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" })}
           onScrollBottom={() => editorScrollRef.current?.scrollTo({ top: editorScrollRef.current.scrollHeight, behavior: "smooth" })}
+          yOffset={isMobile ? keyboardOffset : 0}
         />
 
         {editorInstance && (!isMobile || !isAiPanelOpen) && (

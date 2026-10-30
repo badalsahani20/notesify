@@ -4,7 +4,8 @@ import { useFolderStore } from "../store/useFolderStore";
 import { useGlobalChatStore } from "../store/useGlobalChatStore";
 import { useNotificationStore } from "../store/useNotificationStore";
 import { queryClient } from "./queryClient";
-import { db } from "@/database/database"
+import { db } from "@/database/database";
+import { clearStoredRefreshToken } from "./refreshTokenStorage";
 
  // Completely wipes all local application state when user logs out or session expires.
 
@@ -24,8 +25,6 @@ export const clearAllLocalState = ({ clearLocalDatabase = true }: { clearLocalDa
   // 2. Clear React Query cache
   queryClient.clear();
 
-  // 3. Clear Desktop IPC Tokens
-  if (!!(window as any).electronAPI?.auth) {
-    (window as any).electronAPI.auth.clearRefreshToken().catch(console.error);
-  }
+  // 3. Clear Desktop / Mobile Tokens
+  clearStoredRefreshToken().catch(console.error);
 };

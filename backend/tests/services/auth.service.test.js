@@ -19,7 +19,7 @@ describe('Auth Service', () => {
   describe('registerUser', () => {
     it('should successfully register a new user and return a verification token', async () => {
       const userData = { name: 'Test User', email: 'test@example.com', password: 'password123' };
-      const { user, verificationToken } = await AuthService.registerUser(userData);
+      const { user, verificationToken, verificationOtp } = await AuthService.registerUser(userData);
 
       expect(user).toBeDefined();
       expect(user.email).toBe(userData.email);
@@ -31,6 +31,12 @@ describe('Auth Service', () => {
       // Verify token was stored hashed in the db
       const hashedToken = crypto.createHash("sha256").update(verificationToken).digest("hex");
       expect(user.verificationToken).toBe(hashedToken);
+
+      // Verify OTP was returned and stored hashed
+      expect(verificationOtp).toBeDefined();
+      expect(verificationOtp).toMatch(/^\d{6}$/);
+      const hashedOtp = crypto.createHash("sha256").update(verificationOtp).digest("hex");
+      expect(user.verificationOtp).toBe(hashedOtp);
     });
 
     it('should throw an error if the email already exists', async () => {
@@ -39,6 +45,58 @@ describe('Auth Service', () => {
 
       // Attempt to register again
       await expect(AuthService.registerUser(userData)).rejects.toThrow('Email already exists, please Login');
+    });
+  });
+
+  describe('verifyUserOtp', () => {
+    it('should successfully verify a user with valid 6-digit OTP and return tokens', async () => {
+      const userData = { name: 'Otp User', email: 'otp-verify@example.com', password: 'password123' };
+      const { user, verificationOtp } = await AuthService.registerUser(userData);
+
+      expect(verificationOtp).toBeDefined();
+
+      const result = await AuthService.verifyUserOtp(userData.email, verificationOtp);
+
+      expect(result.user).toBeDefined();
+      expect(result.user.isVerified).toBe(true);
+      expect(result.user.verificationOtp).toBeUndefined();
+      expect(result.user.verificationToken).toBeUndefined();
+      expect(result.accessToken).toBeDefined();
+      expect(result.refreshToken).toBeDefined();
+
+      // Subsequent login must succeed
+      const loginResult = await AuthService.loginUser(userData.email, userData.password);
+      expect(loginResult.accessToken).toBeDefined();
+    });
+
+    it('should throw an error if email or otp is missing', async () => {
+      await expect(AuthService.verifyUserOtp('', '123456')).rejects.toThrow('Email and 6-digit verification code are required');
+      await expect(AuthService.verifyUserOtp('test@example.com', '')).rejects.toThrow('Email and 6-digit verification code are required');
+    });
+
+    it('should throw an error if OTP is not 6 digits', async () => {
+      await expect(AuthService.verifyUserOtp('test@example.com', '123')).rejects.toThrow('Verification code must be 6 digits');
+      await expect(AuthService.verifyUserOtp('test@example.com', '1234567')).rejects.toThrow('Verification code must be 6 digits');
+    });
+
+    it('should throw an error if OTP is incorrect', async () => {
+      const userData = { name: 'Wrong Otp User', email: 'wrong-otp@example.com', password: 'password123' };
+      await AuthService.registerUser(userData);
+
+      await expect(AuthService.verifyUserOtp(userData.email, '999999')).rejects.toThrow('Invalid or expired verification code');
+    });
+
+    it('should throw an error if OTP has expired', async () => {
+      const userData = { name: 'Expired Otp User', email: 'expired-otp@example.com', password: 'password123' };
+      const { verificationOtp } = await AuthService.registerUser(userData);
+
+      // Force OTP to be expired in database
+      await User.updateOne(
+        { email: userData.email },
+        { $set: { verificationOtpExpires: new Date(Date.now() - 1000) } }
+      );
+
+      await expect(AuthService.verifyUserOtp(userData.email, verificationOtp)).rejects.toThrow('Invalid or expired verification code');
     });
   });
 

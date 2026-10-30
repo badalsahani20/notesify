@@ -102,7 +102,7 @@ const SharedNotePage = () => {
       </div>
 
       {/* ── Sticky Header ── */}
-      <header className="sticky top-0 z-50 border-b border-white/[0.06] bg-[#171717]/80 backdrop-blur-xl">
+      <header className="shared-note-header sticky top-0 z-50 border-b border-white/[0.06] bg-[#171717]/80 backdrop-blur-xl">
         <div className="max-w-4xl mx-auto h-14 px-5 flex items-center justify-between">
           {/* Brand */}
           <div className="flex items-center gap-2.5">

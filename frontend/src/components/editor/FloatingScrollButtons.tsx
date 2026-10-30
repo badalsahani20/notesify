@@ -6,6 +6,7 @@ type Props = {
   showScrollBottom: boolean;
   onScrollTop: () => void;
   onScrollBottom: () => void;
+  yOffset?: number;
 };
 
 export const FloatingScrollButtons = ({
@@ -13,9 +14,13 @@ export const FloatingScrollButtons = ({
   showScrollBottom,
   onScrollTop,
   onScrollBottom,
+  yOffset = 0,
 }: Props) => {
   return (
-    <div className="absolute bottom-24 right-8 flex flex-col gap-3 z-40 pointer-events-none">
+    <div
+      className="absolute bottom-24 right-8 flex flex-col gap-3 z-40 pointer-events-none transition-transform duration-150"
+      style={yOffset ? { transform: `translateY(-${yOffset}px)` } : undefined}
+    >
       <AnimatePresence>
         {showScrollTop && (
           <motion.button

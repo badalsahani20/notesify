@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Capacitor } from "@capacitor/core";
 import { useMediaQuery } from "@/hooks/ui/useMediaQuery";
 
 export const useKeyboardOffset = () => {
@@ -6,7 +7,25 @@ export const useKeyboardOffset = () => {
   const isMobile = useMediaQuery("(max-width: 960px)");
 
   useEffect(() => {
-    if (!isMobile || !window.visualViewport) return;
+    if (!isMobile) return;
+
+    if (Capacitor.isNativePlatform()) {
+      const readOffset = () => {
+        const offset = Number.parseFloat(
+          getComputedStyle(document.documentElement).getPropertyValue("--keyboard-offset")
+        );
+        setKeyboardOffset(Number.isFinite(offset) ? offset : 0);
+      };
+      const handleNativeOffset = (event: Event) => {
+        setKeyboardOffset((event as CustomEvent<number>).detail ?? 0);
+      };
+
+      readOffset();
+      window.addEventListener("notesify:keyboard-offset", handleNativeOffset);
+      return () => window.removeEventListener("notesify:keyboard-offset", handleNativeOffset);
+    }
+
+    if (!window.visualViewport) return;
 
     const handler = () => {
       if (!window.visualViewport) return;

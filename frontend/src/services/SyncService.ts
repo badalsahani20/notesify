@@ -1,4 +1,5 @@
 import { db, type SyncOperation } from "@/database/database";
+import { isOnline } from "@/lib/connectivity";
 import axios from "axios";
 
 
@@ -51,7 +52,7 @@ class SyncEngine {
 
     async processQueue(): Promise<void> {
         // Single-flight guard: don't run if already running or offline
-        if (this.isProcessing || !navigator.onLine) {
+        if (this.isProcessing || !isOnline()) {
             return;
         }
 
@@ -134,7 +135,7 @@ class SyncEngine {
     }
 
     async pullServerChanges(): Promise<boolean> {
-        if(this.isPulling || !navigator.onLine) return false;
+        if(this.isPulling || !isOnline()) return false;
 
         this.isPulling = true;
         let hasChanges = false;

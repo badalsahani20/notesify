@@ -1,5 +1,7 @@
 import { memo, useState, useMemo, useRef } from "react";
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { mobileDrawerVariants, mobileBackdropVariants } from "@/lib/drawerAnimation";
 import {
   SquarePen,
   Search,
@@ -94,42 +96,18 @@ export const GlobalChatSidebar = memo(({
     return sessions.filter((s) => s.title?.toLowerCase().includes(q));
   }, [sessions, searchQuery]);
 
-  return (
-    <>
-      {/* Mobile backdrop overlay */}
-      {isMobile && sidebarOpen && (
-        <div
-          className="gc-sidebar-backdrop"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
-      <aside
-        style={
-          !isMobile
-            ? {
-                width: sidebarOpen ? `${sidebarWidth}px` : 0,
-              }
-            : undefined
-        }
-        className={cn(
-          "gc-sidebar",
-          isResizing && "gc-sidebar-resizing",
-          isMobile && "gc-sidebar-mobile",
-          sidebarOpen ? "gc-sidebar-expanded" : "gc-sidebar-collapsed"
-        )}
-      >
-        <div
-          style={
-            !isMobile
-              ? {
-                  width: `${sidebarWidth}px`,
-                  minWidth: `${sidebarWidth}px`,
-                }
-              : undefined
-          }
-          className="gc-sidebar-inner flex flex-col h-full bg-[#050506] text-white select-none"
-        >
+  const sidebarContent = (
+    <div
+      style={
+        !isMobile
+          ? {
+              width: `${sidebarWidth}px`,
+              minWidth: `${sidebarWidth}px`,
+            }
+          : undefined
+      }
+      className="gc-sidebar-inner flex flex-col h-full bg-[#050506] text-white select-none"
+    >
           {/* Top Header: Brand + Search & Sidebar collapse icons */}
           <div className="flex items-center justify-between px-3 pt-3.5 pb-2">
             <span className="font-semibold text-[17px] text-white tracking-tight">
@@ -309,16 +287,59 @@ export const GlobalChatSidebar = memo(({
             )}
           </div>
         </div>
+      );
 
-        {/* Desktop Resize Drag Handle on the right border */}
-        {!isMobile && sidebarOpen && (
-          <div
-            onMouseDown={handleResizeMouseDown}
-            className="absolute top-0 right-0 bottom-0 w-1.5 cursor-col-resize hover:bg-white/20 active:bg-white/40 transition-colors z-40 select-none"
-            title="Drag to resize sidebar"
-          />
-        )}
-      </aside>
+  return (
+    <>
+      {/* Mobile backdrop overlay */}
+      {isMobile && (
+        <motion.div
+          key="gc-sidebar-backdrop"
+          className="gc-sidebar-backdrop"
+          variants={mobileBackdropVariants}
+          initial={sidebarOpen ? "closed" : false}
+          animate={sidebarOpen ? "open" : "closed"}
+          style={{ pointerEvents: sidebarOpen ? "auto" : "none" }}
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {isMobile ? (
+        <motion.aside
+          key="gc-sidebar-mobile-panel"
+          variants={mobileDrawerVariants}
+          initial={sidebarOpen ? "closed" : false}
+          animate={sidebarOpen ? "open" : "closed"}
+          style={{ pointerEvents: sidebarOpen ? "auto" : "none" }}
+          className={cn(
+            "gc-sidebar",
+            "gc-sidebar-mobile",
+            "gc-sidebar-expanded"
+          )}
+        >
+          {sidebarContent}
+        </motion.aside>
+      ) : (
+        <aside
+          style={{ width: sidebarOpen ? `${sidebarWidth}px` : 0 }}
+          className={cn(
+            "gc-sidebar",
+            isResizing && "gc-sidebar-resizing",
+            sidebarOpen ? "gc-sidebar-expanded" : "gc-sidebar-collapsed"
+          )}
+        >
+          {sidebarContent}
+
+          {/* Desktop Resize Drag Handle on the right border */}
+          {sidebarOpen && (
+            <div
+              onMouseDown={handleResizeMouseDown}
+              className="absolute top-0 right-0 bottom-0 w-1.5 cursor-col-resize hover:bg-white/20 active:bg-white/40 transition-colors z-40 select-none"
+              title="Drag to resize sidebar"
+            />
+          )}
+        </aside>
+      )}
     </>
   );
 });

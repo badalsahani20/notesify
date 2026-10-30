@@ -19,6 +19,7 @@ import {
   ArtifactContent,
 } from "@/components/ai/artifact";
 import { markdownToHtml } from "@/utils/markdownToHtml";
+import { sanitizeNoteHtml } from "@/utils/sanitizeHtml";
 import type { ChatArtifact } from "@/components/ai/types";
 
 interface ChatArtifactViewerProps {
@@ -34,18 +35,29 @@ export const ChatArtifactViewer: React.FC<ChatArtifactViewerProps> = ({
   const [copied, setCopied] = useState(false);
 
   const noteContent = artifact.type === "note" ? artifact.content : undefined;
+  const artifactUrl = artifact.type === "pdf" ? artifact.url : undefined;
 
   const renderedHtml = useMemo(() => {
     if (!noteContent?.trim()) return "<p>Empty note</p>";
     const raw = noteContent.trim();
     const isHtml = /<\/?(p|div|h[1-6]|ul|ol|li|table|tr|td|th|pre|code|blockquote|hr)[^>]*>/i.test(raw);
-    return isHtml ? raw : markdownToHtml(raw);
+    return sanitizeNoteHtml(isHtml ? raw : markdownToHtml(raw));
   }, [noteContent]);
 
   // If the generated note already starts with a title/heading, avoid duplicating it
   const hasHeadingInContent = useMemo(() => {
     return /^<h[1-2]/i.test(renderedHtml.trim());
   }, [renderedHtml]);
+
+  const safeArtifactUrl = useMemo(() => {
+    if (!artifactUrl) return null;
+    try {
+      const url = new URL(artifactUrl, window.location.origin);
+      return ["http:", "https:", "blob:"].includes(url.protocol) ? url.href : null;
+    } catch {
+      return null;
+    }
+  }, [artifactUrl]);
 
   const handleCopy = () => {
     const textToCopy =
@@ -141,9 +153,9 @@ export const ChatArtifactViewer: React.FC<ChatArtifactViewerProps> = ({
         ) : (
           /* PDF Viewer Branch */
           <div className="h-full w-full flex flex-col items-center justify-center">
-            {artifact.url ? (
+            {safeArtifactUrl ? (
               <iframe
-                src={artifact.url}
+                src={safeArtifactUrl}
                 title={title}
                 className="w-full h-full rounded-xl border border-white/10 bg-neutral-900"
               />

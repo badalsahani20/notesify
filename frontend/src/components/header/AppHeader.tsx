@@ -107,10 +107,10 @@ const AppHeader = ({ theme, onToggleTheme, onMenuOpen }: AppHeaderProps) => {
           <button
             type="button"
             onClick={() => setIsNewNotebookOpen(true)}
-            className="ignite-button bg-[#2563eb] border-[#2563eb]/20 hover:bg-[#1d4ed8] text-white transition-colors shadow-sm"
+            className="ignite-button !bg-white !text-zinc-950 font-semibold border-white/20 hover:!bg-zinc-200 transition-colors shadow-sm"
           >
-            <Plus size={18} />
-            <span className="hidden sm:inline">New Notebook</span>
+            <Plus size={18} className="text-zinc-950" />
+            <span className="hidden sm:inline text-zinc-950 font-semibold">New Notebook</span>
           </button>
         </div>
         <UserMenu />

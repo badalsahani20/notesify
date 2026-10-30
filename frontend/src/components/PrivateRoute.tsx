@@ -1,10 +1,11 @@
 import { Navigate, Outlet } from "react-router-dom";
 import { useAuthStore } from "@/store/useAuthStore";
+import { isOnline } from "@/lib/connectivity";
 
 import WelcomeLoader from "./ui/WelcomeLoader";
 
 const PrivateRoute = () => {
-  const { user, accessToken, authChecked } = useAuthStore();
+  const { user, accessToken, authChecked, offlineSession } = useAuthStore();
 
   if (!authChecked) {
     return <WelcomeLoader />;
@@ -12,7 +13,9 @@ const PrivateRoute = () => {
 
   // Online: requires valid user + accessToken
   // Offline: allows local workspace bootstrap if user profile is available locally
-  const isAuthenticated = Boolean(user && (accessToken || !navigator.onLine));
+  const isAuthenticated = Boolean(
+    user && (accessToken || offlineSession || !isOnline()),
+  );
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;

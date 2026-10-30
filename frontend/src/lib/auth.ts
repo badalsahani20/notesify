@@ -1,5 +1,6 @@
 import api from "./api";
 import { clearAllLocalState } from "./state";
+import { getStoredRefreshToken } from "./refreshTokenStorage";
 
 export interface User {
     id: string;
@@ -20,7 +21,14 @@ export const checkAuth = async (): Promise<User | null> => {
 // * Logs out by calling the backend to clear the HttpOnly cookies.
 export const logout = async () => {
     try {
-        await api.post("/users/logout");
+        // Native/desktop clients keep the refresh token outside the cookie jar,
+        // so send it explicitly to revoke the correct rotated token server-side.
+        const refreshToken = await getStoredRefreshToken();
+        await api.post(
+            "/users/logout",
+            {},
+            { headers: refreshToken ? { "X-Refresh-Token": refreshToken } : {} },
+        );
     } catch (error) {
         console.error("Logout failed on server", error);
     } finally {

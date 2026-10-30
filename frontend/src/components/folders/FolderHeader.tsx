@@ -112,7 +112,7 @@ export const FolderHeader: React.FC<FolderHeaderProps> = ({
           {isRoot ? (
             <Button
               onClick={onNewFolder}
-              className="h-9 rounded-lg bg-blue-600 px-3.5 text-xs sm:text-sm font-medium text-white shadow hover:bg-blue-500 transition-all active:scale-[0.98]"
+              className="h-9 rounded-lg bg-white px-3.5 text-xs sm:text-sm font-semibold text-zinc-950 shadow hover:bg-zinc-200 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200 transition-all active:scale-[0.98]"
             >
               <Plus className="mr-1.5 h-3.5 w-3.5" />
               New Notebook
@@ -120,7 +120,7 @@ export const FolderHeader: React.FC<FolderHeaderProps> = ({
           ) : (
             <Button
               onClick={onNewNote}
-              className="h-9 rounded-lg bg-blue-600 px-3.5 text-xs sm:text-sm font-medium text-white shadow hover:bg-blue-500 transition-all active:scale-[0.98]"
+              className="h-9 rounded-lg bg-white px-3.5 text-xs sm:text-sm font-semibold text-zinc-950 shadow hover:bg-zinc-200 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200 transition-all active:scale-[0.98]"
             >
               <Plus className="mr-1.5 h-3.5 w-3.5" />
               New Note

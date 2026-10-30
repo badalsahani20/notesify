@@ -14,8 +14,11 @@ interface AuthState {
   user: User | null;
   accessToken: string | null;
   authChecked: boolean;
+  /** True when the session could not be refreshed because the server was unreachable. */
+  offlineSession: boolean;
   setAuth: (user: User, token: string) => void;
   markAuthChecked: () => void;
+  markOfflineSession: () => void;
   clearAuth: () => void;
   updateUser: (updates: Partial<User>) => void;
 }
@@ -33,6 +36,7 @@ export const useAuthStore = create<AuthState>()((set) => ({
   user: getInitialUser(),
   accessToken: null,
   authChecked: false,
+  offlineSession: false,
   setAuth: (user, token) => {
     if (user?.name) {
       localStorage.setItem("lastUserName", user.name);
@@ -40,14 +44,15 @@ export const useAuthStore = create<AuthState>()((set) => ({
     if (user) {
       localStorage.setItem("notesify_user_profile", JSON.stringify(user));
     }
-    set({ user, accessToken: token, authChecked: true });
+    set({ user, accessToken: token, authChecked: true, offlineSession: false });
   },
   markAuthChecked: () => set({ authChecked: true }),
+  markOfflineSession: () => set({ offlineSession: true }),
 
   clearAuth: () => {
     localStorage.removeItem("lastUserName");
     localStorage.removeItem("notesify_user_profile");
-    set({ user: null, accessToken: null, authChecked: true });
+    set({ user: null, accessToken: null, authChecked: true, offlineSession: false });
   },
   updateUser: (updates) =>
     set((state) => {

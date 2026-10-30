@@ -212,7 +212,7 @@ export const FolderWorkspace: React.FC = () => {
                 <Button
                   onClick={() => setIsNewFolderOpen(true)}
                   size="sm"
-                  className="mt-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs"
+                  className="mt-2 bg-white text-zinc-950 font-semibold hover:bg-zinc-200 rounded-lg text-xs dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200"
                 >
                   <Plus className="mr-1 h-3.5 w-3.5" />
                   Create Notebook
@@ -335,7 +335,7 @@ export const FolderWorkspace: React.FC = () => {
                 <Button
                   onClick={handleCreateNote}
                   size="sm"
-                  className="mt-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs"
+                  className="mt-2 bg-white text-zinc-950 font-semibold hover:bg-zinc-200 rounded-lg text-xs dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200"
                 >
                   <Plus className="mr-1 h-3.5 w-3.5" />
                   Create Note

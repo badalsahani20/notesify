@@ -2,6 +2,7 @@ import React from "react";
 import { Sparkles, Clock } from "lucide-react";
 import { useUserStats } from "@/hooks/user/useUserStats";
 import { useMediaQuery } from "@/hooks/ui/useMediaQuery";
+import { getDailyResetDisplay } from "@/utils/quotaUtils";
 import { Popover } from "radix-ui";
 import {
   Tooltip,
@@ -146,7 +147,7 @@ export const AiUsageContextIndicator: React.FC<AiUsageContextIndicatorProps> = (
           {/* Reset Schedule */}
           <div className="flex items-center gap-1.5 text-[10px] text-white/45">
             <Clock size={11} className="shrink-0" />
-            <span>Resets daily at 00:00 UTC</span>
+            <span>{getDailyResetDisplay().fullText}</span>
           </div>
     </>
   );

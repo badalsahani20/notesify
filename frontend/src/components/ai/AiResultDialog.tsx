@@ -231,7 +231,7 @@ const AiResultDialog = ({ result, onApply, onClose }: AiResultDialogProps) => {
                   "gap-1.5 h-8 px-4 text-xs font-semibold rounded-lg text-white shadow-sm disabled:opacity-50 transition-all",
                   result.action === "rewrite"
                     ? "bg-emerald-600 hover:bg-emerald-700"
-                    : "bg-blue-600 hover:bg-blue-700"
+                    : "bg-white text-zinc-950 font-semibold hover:bg-zinc-200 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200"
                 )}
                 title="Insert into document (⌘+Enter)"
               >

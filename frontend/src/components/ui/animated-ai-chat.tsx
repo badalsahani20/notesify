@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { getDailyResetDisplay } from "@/utils/quotaUtils";
 
 interface UseAutoResizeTextareaProps {
     minHeight: number;
@@ -445,7 +446,7 @@ export function AnimatedAIChat({
                                                 ? "bg-white text-black shadow-md hover:bg-white/90 active:scale-95 cursor-pointer"
                                                 : "bg-white/5 text-white/30 cursor-not-allowed"
                                         )}
-                                        title={disabled ? "Daily AI token limit reached (Resets at 00:00 UTC)" : "Send message"}
+                                        title={disabled ? `Daily AI token limit reached (${getDailyResetDisplay().fullText})` : "Send message"}
                                     >
                                         {isTyping ? (
                                             <LoaderIcon className="w-4 h-4 animate-[spin_2s_linear_infinite]" />

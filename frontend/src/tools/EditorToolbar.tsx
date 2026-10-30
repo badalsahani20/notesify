@@ -117,7 +117,11 @@ const EditorToolbar = ({ editor, isMobile, yOffset = 0 }: Props) => {
       className={cn("dock-toolbar-wrapper", isMobile && "dock-toolbar-mobile")}
       style={isMobile ? { transform: `translateY(-${yOffset}px)` } : undefined}
     >
-      <div className="dock-toolbar">
+      <div 
+        className="dock-toolbar"
+        onTouchStart={(e) => e.stopPropagation()}
+        onTouchMove={(e) => e.stopPropagation()}
+      >
         <div className="dock-toolbar-inner">
           {/* Group 1: Utilities */}
           <div className="dock-toolbar-cluster flex items-center">
@@ -127,7 +131,7 @@ const EditorToolbar = ({ editor, isMobile, yOffset = 0 }: Props) => {
                 onClick={toggleFocusMode} 
                 icon={isFocusMode ? <Minimize2 size={16} strokeWidth={1.5} /> : <Maximize2 size={16} strokeWidth={1.5} />} 
                 title="Toggle Focus Mode" 
-                color="#3b82f6"
+                color="#ffffff"
               />
             )}
             <ToolbarButton 
@@ -200,9 +204,9 @@ const EditorToolbar = ({ editor, isMobile, yOffset = 0 }: Props) => {
 
           {/* Group 3: Lists */}
           <div className="dock-toolbar-cluster">
-            <ToolbarButton active={editor.isActive("bulletList")} onClick={() => editor.chain().focus().toggleBulletList().run()} icon={<List size={16} strokeWidth={1.5} />} title="Bullet List" color="#3b82f6" />
-            <ToolbarButton active={editor.isActive("orderedList")} onClick={() => editor.chain().focus().toggleOrderedList().run()} icon={<ListOrdered size={16} strokeWidth={1.5} />} title="Numbered List" color="#3b82f6" />
-            <ToolbarButton active={editor.isActive("taskList")} onClick={() => editor.chain().focus().toggleTaskList().run()} icon={<CheckSquare size={16} strokeWidth={1.5} />} title="Task List" color="#3b82f6" />
+            <ToolbarButton active={editor.isActive("bulletList")} onClick={() => editor.chain().focus().toggleBulletList().run()} icon={<List size={16} strokeWidth={1.5} />} title="Bullet List" color="#ffffff" />
+            <ToolbarButton active={editor.isActive("orderedList")} onClick={() => editor.chain().focus().toggleOrderedList().run()} icon={<ListOrdered size={16} strokeWidth={1.5} />} title="Numbered List" color="#ffffff" />
+            <ToolbarButton active={editor.isActive("taskList")} onClick={() => editor.chain().focus().toggleTaskList().run()} icon={<CheckSquare size={16} strokeWidth={1.5} />} title="Task List" color="#ffffff" />
           </div>
 
           <div className="dock-divider" />

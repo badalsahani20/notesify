@@ -12,6 +12,7 @@ import { useAiChatStreaming } from "./useAiChatStreaming";
 import { postAiChatStream } from "@/services/ai/aiChatApi";
 import { uploadChatAttachment } from "@/services/ai/uploadChatAttachment";
 import { queryClient } from "@/lib/queryClient";
+import { triggerAiResponseCompleteHaptic, triggerWarningHaptic } from "@/utils/haptics";
 
 import { useGlobalChatStore } from "@/store/useGlobalChatStore";
 
@@ -209,6 +210,7 @@ export const useAiChat = (noteId: string, noteContent: string, editor: Editor | 
 
       setChatHistory((prev) => [...prev, { role: "user", content: textToSend }, { role: "assistant", content: fullText }]);
       actions.setResult(null);
+      triggerAiResponseCompleteHaptic();
 
       if (pdfContext && !pdfInjected) {
         setPdfInjected(true);
@@ -226,6 +228,7 @@ export const useAiChat = (noteId: string, noteContent: string, editor: Editor | 
       const axiosError = error as AxiosError<{ message?: string }>;
       const message = axiosError?.response?.data?.message || "Chat request failed. Please try again.";
       const status = axiosError?.response?.status;
+      triggerWarningHaptic();
 
       if (status === 429 || /quota|rate limit|too many requests/i.test(message)) {
         toast.error("AI Limit Reached", {

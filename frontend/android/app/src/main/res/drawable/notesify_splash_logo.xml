@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Notesify brand mark: a rounded-square tile, never a circular badge. -->
+    <path
+        android:fillColor="#171717"
+        android:strokeColor="#3A3A3A"
+        android:strokeWidth="1.2"
+        android:pathData="M31,13L77,13C86.4,13 94,20.6 94,30L94,78C94,87.4 86.4,95 77,95L31,95C21.6,95 14,87.4 14,78L14,30C14,20.6 21.6,13 31,13Z" />
+
+    <path android:fillColor="#F5F5F5" android:pathData="M31,27L33,27C34.7,27 36,28.3 36,30L36,78C36,79.7 34.7,81 33,81L31,81C29.3,81 28,79.7 28,78L28,30C28,28.3 29.3,27 31,27Z" />
+    <path android:fillColor="#F5F5F5" android:pathData="M38,33L40,33C41.7,33 43,34.3 43,36L43,72C43,73.7 41.7,75 40,75L38,75C36.3,75 35,73.7 35,72L35,36C35,34.3 36.3,33 38,33Z" />
+    <path android:fillColor="#F5F5F5" android:pathData="M45,41L47,41C48.7,41 50,42.3 50,44L50,60C50,61.7 48.7,63 47,63L45,63C43.3,63 42,61.7 42,60L42,44C42,42.3 43.3,41 45,41Z" />
+    <path android:fillColor="#F5F5F5" android:pathData="M52,45L54,45C55.7,45 57,46.3 57,48L57,64C57,65.7 55.7,67 54,67L52,67C50.3,67 49,65.7 49,64L49,48C49,46.3 50.3,45 52,45Z" />
+    <path android:fillColor="#F5F5F5" android:pathData="M59,49L61,49C62.7,49 64,50.3 64,52L64,68C64,69.7 62.7,71 61,71L59,71C57.3,71 56,69.7 56,68L56,52C56,50.3 57.3,49 59,49Z" />
+    <path android:fillColor="#F5F5F5" android:pathData="M66,33L68,33C69.7,33 71,34.3 71,36L71,72C71,73.7 69.7,75 68,75L66,75C64.3,75 63,73.7 63,72L63,36C63,34.3 64.3,33 66,33Z" />
+    <path android:fillColor="#F5F5F5" android:pathData="M73,27L75,27C76.7,27 78,28.3 78,30L78,78C78,79.7 76.7,81 75,81L73,81C71.3,81 70,79.7 70,78L70,30C70,28.3 71.3,27 73,27Z" />
+</vector>

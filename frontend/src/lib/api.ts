@@ -1,6 +1,8 @@
 import axios, { type InternalAxiosRequestConfig } from "axios";
 import { useAuthStore } from "../store/useAuthStore";
 import { clearAllLocalState } from "./state";
+import { isOnline } from "./connectivity";
+import { getStoredRefreshToken, setStoredRefreshToken } from "./refreshTokenStorage";
 
 //_retry doesn't exist in InternalAxiosRequestConfig, so we need to extend it
 interface CustomAxiosRequest extends InternalAxiosRequestConfig {
@@ -33,11 +35,9 @@ export const requestSessionRefresh = async () => {
   if (!refreshPromise) {
     refreshPromise = (async () => {
       const config: any = { withCredentials: true, headers: {} };
-      if (!!(window as any).electronAPI?.auth) {
-        const desktopToken = await (window as any).electronAPI.auth.getRefreshToken();
-        if (desktopToken) {
-          config.headers["X-Refresh-Token"] = desktopToken;
-        }
+      const storedRefreshToken = await getStoredRefreshToken();
+      if (storedRefreshToken) {
+        config.headers["X-Refresh-Token"] = storedRefreshToken;
       }
 
       return axios
@@ -48,9 +48,9 @@ export const requestSessionRefresh = async () => {
         )
         .then(async (res) => {
           const { user, accessToken, refreshToken } = res.data;
-          // If a new refresh token is issued and we're on desktop, save it securely
-          if (!!(window as any).electronAPI?.auth && refreshToken) {
-            await (window as any).electronAPI.auth.setRefreshToken(refreshToken);
+          // If a new refresh token is issued and we're on desktop/mobile, save it securely
+          if (refreshToken) {
+            await setStoredRefreshToken(refreshToken);
           }
           useAuthStore.getState().setAuth(user, accessToken);
           return accessToken;
@@ -69,6 +69,7 @@ const isAuthRoute = (url = "") =>
   url.includes("/users/desktop/login") ||
   url.includes("/users/register") ||
   url.includes("/users/verify-email") ||
+  url.includes("/users/verify-otp") ||
   url.includes("/users/resend-verification") ||
   url.includes("/users/refresh") ||
   url.includes("/users/forgot-password") ||
@@ -192,7 +193,7 @@ api.interceptors.response.use(
     // Handle global network/connection errors
     if (!error.response) {
       // 1. Client can't reach the Server (Offline, DNS failure, local firewall, server down)
-      const isOffline = !window.navigator.onLine;
+      const isOffline = !isOnline();
       const message = isOffline 
         ? "You're offline. Please check your internet connection." 
         : "Unable to reach the server. Please check your connection.";

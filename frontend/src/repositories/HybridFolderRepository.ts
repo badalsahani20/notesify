@@ -3,6 +3,7 @@ import type { Folder } from "@/store/useFolderStore";
 import type { LocalFolderDataSource } from "@/datasources/local/LocalFolderDataSource";
 import type { RemoteFolderDataSource } from "./api/RemoteFolderDataSource";
 import { db } from "@/database/database";
+import { isOnline } from "@/lib/connectivity";
 import { generateObjectId } from "@/utils/generateObjectId";
 import type { FolderColor } from "@/utils/folderColors";
 
@@ -28,7 +29,7 @@ export class HybridFolderRepository implements IFolderRepository {
             return localFolders;
         }
 
-        if (!navigator.onLine) {
+        if (!isOnline()) {
             return [];
         }
 

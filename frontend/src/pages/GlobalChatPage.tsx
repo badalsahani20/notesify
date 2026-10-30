@@ -60,6 +60,13 @@ const GlobalChatPage = () => {
 
   const isMobile = useMediaQuery("(max-width: 960px)");
   const [sidebarOpen, setSidebarOpen] = useState(() => typeof window !== "undefined" && window.innerWidth > 960);
+  // Preserve the session list after its first mobile open so subsequent drawer
+  // animations do not rebuild every row while the panel is sliding.
+  const [hasOpenedMobileSidebar, setHasOpenedMobileSidebar] = useState(sidebarOpen);
+
+  useEffect(() => {
+    if (sidebarOpen) setHasOpenedMobileSidebar(true);
+  }, [sidebarOpen]);
 
   // Desktop side panel resizable width (percentage)
   const [panelWidth, setPanelWidth] = useState(46);
@@ -85,7 +92,14 @@ const GlobalChatPage = () => {
   const routeInitializedRef = useRef(false);
 
   useEffect(() => {
-    fetchSessions();
+    // On phones the session history lives in the drawer. Do not build and
+    // update that off-screen list while the chat screen is entering.
+    if (!isMobile || sidebarOpen) {
+      void fetchSessions();
+    }
+  }, [fetchSessions, isMobile, sidebarOpen]);
+
+  useEffect(() => {
     // Fetch dynamic prompts
     import("@/lib/api").then(({ default: api }) => {
       api
@@ -100,7 +114,7 @@ const GlobalChatPage = () => {
         })
         .catch(() => {}); // Keep fallbacks on error
     });
-  }, [fetchSessions]);
+  }, []);
 
   useEffect(() => {
     if (sessionId) {
@@ -247,20 +261,41 @@ const GlobalChatPage = () => {
     <div className="gc-shell">
       <SelectionToolbar onAskIris={handleAskIris} />
 
-      <GlobalChatSidebar
-        isMobile={isMobile}
-        sidebarOpen={sidebarOpen}
-        setSidebarOpen={setSidebarOpen}
-        sessions={sessions}
-        sessionsLoading={sessionsLoading}
-        sessionsLoadingMore={sessionsLoadingMore}
-        sessionsHasMore={sessionsHasMore}
-        activeSessionId={activeSessionId}
-        loadSession={handleLoadSession}
-        loadMoreSessions={() => void loadMoreSessions()}
-        deleteSession={deleteSession}
-        startNewChat={handleStartNewChat}
-      />
+      {/* Desktop sidebar: docked and persistent */}
+      {!isMobile && (
+        <GlobalChatSidebar
+          isMobile={false}
+          sidebarOpen={sidebarOpen}
+          setSidebarOpen={setSidebarOpen}
+          sessions={sessions}
+          sessionsLoading={sessionsLoading}
+          sessionsLoadingMore={sessionsLoadingMore}
+          sessionsHasMore={sessionsHasMore}
+          activeSessionId={activeSessionId}
+          loadSession={handleLoadSession}
+          loadMoreSessions={() => void loadMoreSessions()}
+          deleteSession={deleteSession}
+          startNewChat={handleStartNewChat}
+        />
+      )}
+
+      {/* Mobile sidebar: smooth animated overlay drawer */}
+      {isMobile && hasOpenedMobileSidebar && (
+        <GlobalChatSidebar
+          isMobile={true}
+          sidebarOpen={sidebarOpen}
+          setSidebarOpen={setSidebarOpen}
+          sessions={sessions}
+          sessionsLoading={sessionsLoading}
+          sessionsLoadingMore={sessionsLoadingMore}
+          sessionsHasMore={sessionsHasMore}
+          activeSessionId={activeSessionId}
+          loadSession={handleLoadSession}
+          loadMoreSessions={() => void loadMoreSessions()}
+          deleteSession={deleteSession}
+          startNewChat={handleStartNewChat}
+        />
+      )}
 
       {/* ── Main chat area ── */}
       <div className="gc-main relative flex-1 flex flex-col h-full min-h-0 min-w-0 overflow-hidden">

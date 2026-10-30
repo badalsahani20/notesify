@@ -1,21 +1,23 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { User, Type, Info, Keyboard, ChevronLeft, X } from "lucide-react";
+import { User, Type, Info, Keyboard, Brain, ChevronLeft, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useMediaQuery } from "@/hooks/ui/useMediaQuery";
+import { useSettingsUIStore, type SettingsTabId } from "@/store/useSettingsStore";
 
 // Sub-components
 import { AccountTab } from "./AccountTab";
 import { EditorTab } from "./EditorTab";
 import { AboutTab } from "./AboutTab";
 import { ShortcutsTab } from "./ShortcutsTab";
+import { MemoryTab } from "./MemoryTab";
 
-type Tab = "account" | "editor" | "shortcuts" | "about";
+type Tab = SettingsTabId;
 
 interface SettingsDialogProps {
   open: boolean;
@@ -24,15 +26,27 @@ interface SettingsDialogProps {
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "account", label: "Account", icon: <User size={15} /> },
+  { id: "memory", label: "Memory", icon: <Brain size={15} /> },
   { id: "editor", label: "Editor", icon: <Type size={15} /> },
   { id: "shortcuts", label: "Shortcuts", icon: <Keyboard size={15} /> },
   { id: "about", label: "About", icon: <Info size={15} /> },
 ];
 
 export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
+  const settingsTab = useSettingsUIStore((s) => s.settingsTab);
   const [activeTab, setActiveTab] = useState<Tab>("account");
   const [mobileView, setMobileView] = useState<"menu" | "content">("menu");
   const isMobile = useMediaQuery("(max-width: 640px)");
+
+  // Deep links (e.g. Profile → Iris Memory) pick their tab on open.
+  useEffect(() => {
+    if (!open || !settingsTab) return;
+    setActiveTab(settingsTab);
+    if (isMobile) setMobileView("content");
+    // `isMobile` intentionally omitted: it can resolve after mount and would
+    // otherwise snap the user back to the deep-linked tab.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, settingsTab]);
 
   // Reset to menu when dialog opens/closes
   const handleOpenChange = (isOpen: boolean) => {
@@ -151,6 +165,7 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
                 isMobile ? "p-4 pb-8" : "px-8 pb-8"
               )}>
                 {activeTab === "account" && <AccountTab />}
+                {activeTab === "memory" && <MemoryTab />}
                 {activeTab === "editor" && <EditorTab />}
                 {activeTab === "shortcuts" && <ShortcutsTab />}
                 {activeTab === "about" && <AboutTab />}

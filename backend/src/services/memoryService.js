@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import Memory from "../models/Memory.js";
 import GlobalChatSession from "../models/globalChatSession.model.js";
 import { generateEmbedding } from "./embeddingService.js";
@@ -56,7 +57,11 @@ export const searchMemories = async (userId, queryText, precomputedEmbedding = n
     }
 };
 
-export const saveMemory = async (userId, memoryObj) => {
+/**
+ * Save or refresh a memory. Returns `{ memory, created }` so callers can tell a
+ * fresh insert from a deduplicated hit. Returns null when the write fails.
+ */
+export const saveMemoryWithStatus = async (userId, memoryObj) => {
     try {
         const embedding = await generateEmbedding(memoryObj.content);
         if (!embedding) return null;
@@ -83,11 +88,12 @@ export const saveMemory = async (userId, memoryObj) => {
         if (topMatches.length > 0 && topMatches[0].score > DEDUPLICATION_THRESHOLD) {
             // It's a duplicate, just update the timestamp
             const existingMemory = topMatches[0];
+            const updatedCategory = memoryObj.category || existingMemory.category;
             await Memory.findByIdAndUpdate(existingMemory._id, {
                 lastAccessedAt: new Date(),
-                category: memoryObj.category || existingMemory.category // optionally update category
+                category: updatedCategory // optionally update category
             });
-            return existingMemory;
+            return { memory: { ...existingMemory, category: updatedCategory }, created: false };
         }
 
         const validCategories = ["PROFILE", "PREFERENCE", "GOAL", "PROJECT", "SKILL", "OTHER"];
@@ -115,10 +121,40 @@ export const saveMemory = async (userId, memoryObj) => {
             await Memory.deleteMany({ _id: { $in: idsToDelete } });
         }
 
-        return newMemory;
+        return { memory: newMemory, created: true };
     } catch (err) {
         console.error("Error in saveMemory:", err);
         return null;
     }
+};
+
+/** Returns the stored memory document (or null). Kept for existing callers. */
+export const saveMemory = async (userId, memoryObj) => {
+    const result = await saveMemoryWithStatus(userId, memoryObj);
+    return result?.memory ?? null;
+};
+
+/**
+ * List a user's memories newest-access first, without embeddings.
+ * Embeddings are 768 floats and must never leave the server.
+ */
+export const listMemories = async (userId, limit = 500) => {
+    return Memory.find({ user: userId })
+        .select("-embedding")
+        .sort({ lastAccessedAt: -1, createdAt: -1 })
+        .limit(limit)
+        .lean();
+};
+
+/** Delete one memory, scoped to its owner. Returns null when nothing matched. */
+export const deleteMemory = async (userId, memoryId) => {
+    if (!mongoose.Types.ObjectId.isValid(memoryId)) return null;
+    return Memory.findOneAndDelete({ _id: memoryId, user: userId });
+};
+
+/** Delete every memory for a user. Returns the number removed. */
+export const clearMemories = async (userId) => {
+    const result = await Memory.deleteMany({ user: userId });
+    return result.deletedCount ?? 0;
 };
 

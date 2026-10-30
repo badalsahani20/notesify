@@ -1,6 +1,6 @@
 {
   "name": "fullstack-notes-desktop",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "private": true,
   "type": "module",
   "main": "desktop/main.js",
@@ -10,7 +10,10 @@
     "desktop:dev": "concurrently \"npm run backend:dev\" \"npm run frontend:dev\" \"wait-on http://localhost:5173 && electron .\"",
     "build:frontend": "npm run build --prefix frontend",
     "build:backend": "echo \"Backend build not needed for electron-builder yet\"",
-    "build:desktop": "npm run build:desktop --prefix frontend && electron-builder"
+    "build:desktop": "npm run build:desktop --prefix frontend && electron-builder",
+    "android:sync": "npm run android:sync --prefix frontend",
+    "android:open": "npm run android:open --prefix frontend",
+    "android:run": "npm run android:run --prefix frontend"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",

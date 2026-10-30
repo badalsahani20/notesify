@@ -3,6 +3,7 @@ import api from "@/lib/api";
 
 export interface UserStats {
   notesCount: number;
+  memoriesCount?: number;
   aiCount: number;
   limit: number;
   tokensUsed?: number;

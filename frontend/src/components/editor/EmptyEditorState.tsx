@@ -103,7 +103,7 @@ const EmptyEditorState = () => {
         </div>
 
         {/* Hero Title & Subtitle */}
-        <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-[var(--text-strong)]">
+        <h2 className="text-3xl md:text-4xl font-bold tracking-[-0.02em] text-[var(--text-strong)]">
           {isEmptyFolder ? currentFolder?.name || "Folder" : "What are you working on?"}
         </h2>
         <p className="mt-2 text-sm md:text-base text-[var(--muted-text)] max-w-md">
@@ -117,10 +117,10 @@ const EmptyEditorState = () => {
           <button
             type="button"
             onClick={handleCreateNote}
-            className="ignite-button bg-[#2563eb] border-[#2563eb]/20 flex-1 justify-center min-w-[140px]"
+            className="ignite-button !bg-white !text-zinc-950 font-semibold border-white/20 hover:!bg-zinc-200 flex-1 justify-center min-w-[140px] shadow-sm transition-all"
           >
-            <IconPlus size={18} stroke={2} />
-            <span>New Note</span>
+            <IconPlus size={18} stroke={2} className="text-zinc-950" />
+            <span className="text-zinc-950 font-semibold">New Note</span>
           </button>
 
           {!isEmptyFolder && (
@@ -154,12 +154,12 @@ const EmptyEditorState = () => {
                     key={note._id}
                     type="button"
                     onClick={() => handleSelectNote(note)}
-                    className="group flex flex-col justify-between p-4 rounded-xl border border-[var(--divider)] bg-[var(--surface-muted)] hover:bg-[var(--active-surface)] hover:border-[var(--accent-strong)]/40 hover:-translate-y-1 active:translate-y-0 active:scale-[0.98] transition-all duration-200 ease-out text-left shadow-sm hover:shadow-md cursor-pointer"
+                    className="group flex flex-col justify-between p-3.5 rounded-xl border border-[var(--divider)] bg-[var(--note-surface)] hover:bg-[var(--note-surface-hover)] hover:border-[var(--border-strong)] hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99] transition-all duration-200 ease-out text-left shadow-sm hover:shadow-md cursor-pointer"
                   >
                     <div className="flex items-start justify-between gap-2 w-full">
                       <div className="flex items-center gap-2 min-w-0">
-                        <IconFileText size={18} stroke={2} className="text-[var(--accent-strong)] shrink-0 opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all duration-200" />
-                        <h4 className="font-semibold text-sm text-[var(--text-strong)] truncate leading-tight group-hover:text-[var(--accent-strong)] transition-colors">
+                        <IconFileText size={18} stroke={2} className="text-[var(--muted-text)] shrink-0 transition-colors duration-200 group-hover:text-[var(--text-strong)]" />
+                        <h4 className="font-semibold text-sm text-[var(--text-strong)] truncate leading-tight">
                           {note.title || "Untitled Note"}
                         </h4>
                       </div>
@@ -168,7 +168,7 @@ const EmptyEditorState = () => {
                     <div className="mt-3 flex items-center justify-between text-xs text-[var(--muted-text)] w-full">
                       <span>{getRelativeUpdatedLabel(note.updatedAt, stableNow)}</span>
                       {folderName && !isFolderRoute && (
-                        <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-[var(--surface-ghost)] border border-[var(--divider)] text-[var(--muted-text)] group-hover:border-[var(--accent-strong)]/20 truncate max-w-[120px] transition-colors">
+                        <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-[var(--surface-ghost)] border border-[var(--divider)] text-[var(--muted-text)] truncate max-w-[120px]">
                           {folderName}
                         </span>
                       )}

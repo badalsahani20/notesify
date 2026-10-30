@@ -117,7 +117,7 @@ const ActivityBar = () => {
                   (isActive || location.pathname.startsWith("/folders")) && "nav-action-btn-active"
                 )
               }
-              style={{ "--highlight-color": "#3b82f6" } as any}
+              style={{ "--highlight-color": "#ffffff" } as any}
               title="Notebooks"
             >
               <Folders size={18} className="nav-icon" />

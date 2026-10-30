@@ -206,7 +206,9 @@ const ChatMessageRow = memo(({
                 <TextShimmer duration={2.5}>Reading webpage...</TextShimmer>
               )}
               {memoryActivity && (
-                <TextShimmer duration={2.5}>Saving memory...</TextShimmer>
+                <TextShimmer duration={2.5}>
+                  {memoryActivity.status === "success" ? "Memory saved" : "Saving memory..."}
+                </TextShimmer>
               )}
               {recallMemoryActivity && (
                 <TextShimmer duration={2.5}>Recalling memory...</TextShimmer>
@@ -555,7 +557,7 @@ export const GlobalChatMessages = memo(({
         navigationLabel="Chat navigation"
         railClassName={hasActivePrompt ? "!bottom-[360px]" : "!bottom-[104px]"}
         viewportRef={scrollContainerRef}
-        viewportClassName={`gc-messages relative${fullWidthAssistant ? " gc-messages-fullwidth-assistant" : ""} [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden`}
+        viewportClassName={`gc-messages gpu-scroll relative${fullWidthAssistant ? " gc-messages-fullwidth-assistant" : ""} [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden`}
         contentClassName="flex flex-col gap-4 w-full min-w-0"
         className="h-full flex-1 min-h-0 overflow-hidden"
       >

@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { noteRepository } from "@/repositories";
 import api from "@/lib/api";
 import { db } from "@/database/database";
+import { isOnline } from "@/lib/connectivity";
 
 {/* ["notes"] → active notes
 ["notes", "archive"] → archived
@@ -51,7 +52,7 @@ export const useTrashQuery = (enabled = true) => {
     return useQuery({
         queryKey: ["notes", "trash"],
         queryFn: async () => {
-            if (navigator.onLine) {
+            if (isOnline()) {
                 const res = await api.get("/trash/");
                 return res.data;
             }

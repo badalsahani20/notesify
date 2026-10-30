@@ -104,10 +104,14 @@ const ContextualAiPanel = ({
 
   return (
     <motion.aside
-      initial={mobileMode ? { x: "100%" } : { opacity: 0 }}
-      animate={mobileMode ? { x: 0 } : { opacity: 1 }}
+      // On mobile the slide-in is handled by the `assistant-rail-enter` CSS
+      // animation. Framer Motion would leave a `translateX(0)` transform on the
+      // sheet, and a transformed ancestor keeps the nested chat scroller off
+      // Android WebView's fast scrolling path.
+      initial={mobileMode ? false : { opacity: 0 }}
+      animate={mobileMode ? undefined : { opacity: 1 }}
       transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-      className={`assistant-rail relative overflow-hidden bg-[var(--window-bg)] ${mobileMode ? "assistant-rail-mobile" : "flex"}`}
+      className={`assistant-rail relative overflow-hidden ${mobileMode ? "assistant-rail-mobile assistant-rail-enter bg-[#09090b]" : "bg-[var(--window-bg)] flex"}`}
     >
       <SelectionToolbar onAskIris={handleAskIris} />
       {/* Clean background without color tint blur layers */}
@@ -172,23 +176,23 @@ const ContextualAiPanel = ({
         </div>
       ) : null}
 
-      {/* Messages */}
-      <GlobalChatMessages
-        messages={messages as Message[]}
-        messagesLoading={false}
-        streamingMessageId={streamingMessageId}
-        streamedMessageText={streamedMessageText}
-        isStreaming={isStreaming}
-        isSending={isSendingChat}
-        sendMessage={handleSendMessage}
-        prompts={prompts}
-        bottomRef={bottomRef}
-        fullWidthAssistant
-        hasActivePrompt={Boolean(activeQuestions && activeQuestions.length > 0)}
-        onRegenerate={() => void regenerateResponse()}
-      />
+      {/* Messages and Composer Column */}
+      <div className="relative flex-1 flex flex-col h-full min-h-0 min-w-0 overflow-hidden">
+        <GlobalChatMessages
+          messages={messages as Message[]}
+          messagesLoading={false}
+          streamingMessageId={streamingMessageId}
+          streamedMessageText={streamedMessageText}
+          isStreaming={isStreaming}
+          isSending={isSendingChat}
+          sendMessage={handleSendMessage}
+          prompts={prompts}
+          bottomRef={bottomRef}
+          fullWidthAssistant
+          hasActivePrompt={Boolean(activeQuestions && activeQuestions.length > 0)}
+          onRegenerate={() => void regenerateResponse()}
+        />
 
-      <div className="relative">
         <GlobalChatCompose
           input={chatInput}
           setInput={setChatInput}

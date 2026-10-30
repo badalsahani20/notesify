@@ -8,6 +8,7 @@ import { consumeAiChatStream } from "@/utils/consumeAiChatStream";
 import { postAiAssistStream, postAiAssistBlocking } from "@/services/ai/aiAssistApi";
 import { queryClient } from "@/lib/queryClient";
 import { buildNoteContext } from "@/utils/ai/noteContextBuilder";
+import { triggerWarningHaptic } from "@/utils/haptics";
 
 interface UseAiActionsOptions {
   editor: Editor | null;
@@ -153,6 +154,7 @@ export const useAiActions = ({
         || axiosError?.response?.data?.message
         || "AI action failed. Please try again.";
       const status = axiosError?.response?.status;
+      triggerWarningHaptic();
 
       if (status === 429) {
         toast.error("AI Credits Exhausted", {

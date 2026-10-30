@@ -1,13 +1,15 @@
 import {
   Shield, LogOut, Chrome, KeyRound,
-  FileText, Sparkles, TrendingUp,
+  FileText, Sparkles, TrendingUp, Brain, ChevronRight,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import api from "@/lib/api";
+import { logout } from "@/lib/auth";
 import { useAuthStore } from "@/store/useAuthStore";
+import { useSettingsUIStore } from "@/store/useSettingsStore";
 import { useUserStats } from "@/hooks/user/useUserStats";
 import { UserProfileCard } from "@/components/user/UserProfileCard";
+import { getDailyResetDisplay } from "@/utils/quotaUtils";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -43,8 +45,9 @@ function formatTokens(num: number): string {
 
 const ProfilePage = () => {
   const navigate = useNavigate();
-  const { user, clearAuth } = useAuthStore();
+  const { user } = useAuthStore();
   const { data: stats, isLoading } = useUserStats();
+  const openSettingsAt = useSettingsUIStore((s) => s.openSettingsAt);
 
   const provider = stats?.provider ?? user?.provider;
   const tier = (stats?.tier || "free").toLowerCase();
@@ -55,8 +58,7 @@ const ProfilePage = () => {
   const usageColor = getUsageColor(aiUsed, aiLimit);
 
   const handleLogout = async () => {
-    try { await api.post("/users/logout"); } catch { /* ignore */ }
-    clearAuth();
+    await logout();
     navigate("/login");
   };
 
@@ -132,6 +134,32 @@ const ProfilePage = () => {
           </div>
         </div>
 
+        {/* ── Iris memory ── */}
+        <button
+          type="button"
+          onClick={() => openSettingsAt("memory")}
+          className="w-full rounded-2xl p-4 flex items-center gap-3 text-left transition-opacity hover:opacity-80"
+          style={{ background: "var(--window-bg)", border: "1px solid var(--divider)" }}
+        >
+          <div
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-lg"
+            style={{ background: "rgba(99, 102, 241, 0.12)", color: "var(--accent-strong)" }}
+          >
+            <Brain size={16} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold" style={{ color: "var(--text-strong)" }}>
+              Iris Memory
+            </p>
+            <p className="text-xs" style={{ color: "var(--muted-text)" }}>
+              {isLoading
+                ? "Loading…"
+                : `${stats?.memoriesCount ?? 0} ${(stats?.memoriesCount ?? 0) === 1 ? "thing" : "things"} Iris remembers about you`}
+            </p>
+          </div>
+          <ChevronRight size={16} style={{ color: "var(--muted-text)" }} />
+        </button>
+
         {/* ── AI usage progress bar ── */}
         <div
           className="rounded-2xl p-4"
@@ -186,7 +214,7 @@ const ProfilePage = () => {
                 : `${aiUsed.toLocaleString()} of ${aiLimit.toLocaleString()} tokens used`}
             </span>
             <span className="text-xs" style={{ color: "var(--muted-text)" }}>
-              Resets at 00:00 UTC
+              {getDailyResetDisplay().fullText}
             </span>
           </div>
         </div>

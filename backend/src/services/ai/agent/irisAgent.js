@@ -246,6 +246,24 @@ export class IrisAgent {
 
 
 
+    // If the model went silent after a successful memory write, confirm it so the
+    // user isn't left with an empty bubble.
+    if (!finalReply.trim() && stream && res && !res.writableEnded) {
+      const savedMemory = toolCalls.find(
+        (tc) => tc.tool === "save_memory" && tc.status === "success",
+      );
+
+      if (savedMemory) {
+        finalReply =
+          savedMemory.data?.created === false
+            ? "Got it — I already had that saved."
+            : "Got it — I've saved that to my memory.";
+        res.write(
+          `data: ${JSON.stringify({ choices: [{ delta: { content: finalReply } }] })}\n\n`,
+        );
+      }
+    }
+
     return {
       status: "completed",
       finalReply: finalReply || "",

@@ -31,5 +31,6 @@ docs
 *.njsproj
 *.sln
 *.sw?
+*.apk
 learning_platform_todos.md
 authImplementation

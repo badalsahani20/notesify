@@ -31,12 +31,17 @@ const GlobalChatPage = lazy(() => import("./pages/GlobalChatPage"));
 const SharedNotePage = lazy(() => import("./pages/SharedNotePage"));
 
 import WelcomeLoader from "./components/ui/WelcomeLoader";
+import { useCapacitorApp } from "./hooks/useCapacitorApp";
+import { isOnline } from "./lib/connectivity";
 
 const RouteLoader = () => <WelcomeLoader />;
 
 function App() {
-  const { user, accessToken, authChecked } = useAuthStore();
-  const isAuthenticated = Boolean(authChecked && user && (accessToken || !navigator.onLine));
+  useCapacitorApp();
+  const { user, accessToken, authChecked, offlineSession } = useAuthStore();
+  const isAuthenticated = Boolean(
+    authChecked && user && (accessToken || offlineSession || !isOnline()),
+  );
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -74,13 +79,13 @@ function App() {
           {/* Public routes */}
           <Route element={<AuthLayout />}>
             <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Register />} />
             <Route path="/verify-email" element={<VerifyEmailPage />} />
             <Route path="/verify-email/:token" element={<VerifyEmailPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
+            <Route path="/oauth-success" element={<OAuthSuccess />} />
           </Route>
-          <Route path="/signup" element={<Register />} />
-          <Route path="/oauth-success" element={<OAuthSuccess />} />
           <Route path="/shared/:slug" element={<SharedNotePage />} />
 
           {/* Protected routes — requires authentication when online, or local workspace offline */}

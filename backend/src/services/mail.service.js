@@ -293,14 +293,31 @@ export const sendWelcomeEmail = async (email, name) => {
     }
 };
 
-export const sendVerificationEmail = async (email, name, verificationUrl) => {
+export const sendVerificationEmail = async (email, name, verificationUrl, verificationOtp) => {
     const year = new Date().getFullYear();
     const firstName = name ? name.split(" ")[0] : "friend";
+
+    const otpSection = verificationOtp ? `
+          <!-- 6-Digit OTP Box -->
+          <tr>
+            <td style="padding: 0 40px 24px 40px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f8f9fa; border: 1px dashed #d1d5db; border-radius: 12px; text-align: center;">
+                <tr>
+                  <td style="padding: 24px 20px;">
+                    <p style="margin: 0 0 8px 0; font-size: 12px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 1.5px;">Your 6-Digit Verification Code</p>
+                    <div style="font-size: 38px; font-weight: 800; letter-spacing: 10px; color: #0a0a0a; font-family: 'Courier New', Courier, monospace;">${verificationOtp}</div>
+                    <p style="margin: 8px 0 0 0; font-size: 12px; color: #9ca3af;">Enter this code directly in the Notesify app (expires in 15 minutes)</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+    ` : "";
 
     const mailOptions = {
         from: `"Notesify" <${getMailUser()}>`,
         to: email,
-        subject: "Verify your Notesify account 📧",
+        subject: verificationOtp ? `${verificationOtp} is your Notesify verification code 🔑` : "Verify your Notesify account 📧",
         html: `
 <!DOCTYPE html>
 <html lang="en">
@@ -324,21 +341,21 @@ export const sendVerificationEmail = async (email, name, verificationUrl) => {
 
           <!-- Body -->
           <tr>
-            <td style="padding: 40px 40px 24px 40px;">
+            <td style="padding: 40px 40px 16px 40px;">
               <h2 style="margin: 0 0 16px 0; font-size: 24px; font-weight: 700; color: #0a0a0a;">Confirm your email, ${firstName}!</h2>
               <p style="margin: 0 0 12px 0; font-size: 16px; line-height: 1.7; color: #4a4a4a;">
-                Thanks for joining Notesify! Before you can start supercharging your notes with AI, we just need to verify that <strong style="color: #0a0a0a;">${email}</strong> belongs to you.
-              </p>
-              <p style="margin: 0; font-size: 16px; line-height: 1.7; color: #4a4a4a;">
-                Click the button below to verify your account. This link will expire in <strong style="color: #0a0a0a;">24 hours</strong>.
+                Thanks for joining Notesify! Enter the verification code below in your Notesify app, or click the verification link.
               </p>
             </td>
           </tr>
 
-          <!-- CTA Button -->
+${otpSection}
+
+          <!-- Fallback Link CTA Button -->
           <tr>
-            <td style="padding: 8px 40px 32px 40px; text-align: center;">
-              <a href="${verificationUrl}" style="display: inline-block; padding: 16px 48px; background-color: #0a0a0a; color: #ffffff; text-decoration: none; border-radius: 10px; font-size: 16px; font-weight: 700; letter-spacing: 0.3px;">Verify Account →</a>
+            <td style="padding: 0 40px 32px 40px; text-align: center;">
+              <p style="margin: 0 0 12px 0; font-size: 13px; color: #6b7280;">Or verify via browser link:</p>
+              <a href="${verificationUrl}" style="display: inline-block; padding: 14px 40px; background-color: #0a0a0a; color: #ffffff; text-decoration: none; border-radius: 10px; font-size: 15px; font-weight: 700; letter-spacing: 0.3px;">Verify Account Link →</a>
             </td>
           </tr>
 

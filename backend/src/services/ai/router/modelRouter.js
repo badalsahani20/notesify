@@ -11,29 +11,28 @@ export const classifyChatIntent = (
   history = [],
   noteContext = "",
   pdfContext = "",
-  chatMode = "casual",
   enableWeb = false,
   modelTier = null,
   useReasoning = true,
 ) => {
   // Explicit Model Tier Overrides
-  if (modelTier === "fast" || useReasoning === false) {
+  if (modelTier === "fast") {
     console.log(
-      `⚡ [ModelRouter] Fast mode active: Routing to ${QUICK_MODEL} (Qwen 3.7 Flash)`,
+      `⚡ [ModelRouter] Fast mode active: Routing to ${DEFAULT_CHAT_MODEL} (GLM - minimal effort)`,
     );
-    return QUICK_MODEL;
+    return DEFAULT_CHAT_MODEL;
   }
 
   if (modelTier === "thinking") {
     console.log(
-      `🧠 [ModelRouter] Thinking mode active: Routing to ${PRIMARY_MODEL} (DeepSeek)`,
+      `🧠 [ModelRouter] Thinking mode active: Routing to ${DEFAULT_CHAT_MODEL} (GLM - medium effort)`,
     );
-    return PRIMARY_MODEL;
+    return DEFAULT_CHAT_MODEL;
   }
 
   if (modelTier === "pro") {
     console.log(
-      `✨ [ModelRouter] Pro mode active: Routing to ${DEFAULT_CHAT_MODEL} (GLM Max / Flash)`,
+      `✨ [ModelRouter] Pro mode active: Routing to ${DEFAULT_CHAT_MODEL} (GLM - high effort)`,
     );
     return DEFAULT_CHAT_MODEL;
   }
@@ -78,7 +77,7 @@ export const classifyChatIntent = (
   }
 
   // 7. Default chat model
-  return DEFAULT_CHAT_MODEL || COMPLEX_ANALYSIS_MODEL;
+  return DEFAULT_CHAT_MODEL || QUICK_MODEL;
 };
 
 export const selectOptimalModel = classifyChatIntent;

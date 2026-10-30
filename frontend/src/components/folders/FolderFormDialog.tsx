@@ -139,7 +139,7 @@ export const FolderFormDialog = ({
             <button
               type="submit"
               disabled={!trimmedName || isSaving}
-              className="h-9 px-5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-[12px] font-bold flex items-center gap-2 transition-all"
+              className="h-9 px-5 rounded-xl bg-white text-zinc-950 hover:bg-zinc-200 font-semibold disabled:opacity-40 disabled:cursor-not-allowed text-[12px] flex items-center gap-2 transition-all dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200"
             >
               {isSaving && <Loader2 size={13} className="animate-spin" />}
               {isSaving

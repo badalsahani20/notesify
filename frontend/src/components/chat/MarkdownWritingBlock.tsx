@@ -2,7 +2,9 @@ import { useState, useRef, useEffect } from "react";
 import { CheckCheck, Copy, FileText } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import rehypeRaw from "rehype-raw";
+import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
+import { irisSanitizeSchema } from "@/utils/markdownSanitizeSchema";
 
 type MarkdownWritingBlockProps = {
   content: string;
@@ -102,7 +104,10 @@ const MarkdownWritingBlock = ({ content }: MarkdownWritingBlockProps) => {
             title="Click anywhere to edit"
           >
             {localContent ? (
-              <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                rehypePlugins={[rehypeRaw, [rehypeSanitize, irisSanitizeSchema]]}
+              >
                 {localContent}
               </ReactMarkdown>
             ) : (
