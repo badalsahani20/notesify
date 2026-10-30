@@ -22,8 +22,7 @@ A production-grade, full-stack notes and intelligent thinking workspace built on
   - **Thinking:** Balanced, step-by-step problem solving with medium reasoning effort for technical explanations.
   - **Pro:** Maximum computational effort for deep, multi-faceted analysis, logic verification, and complex synthesis.
 - **Resilient Fallback Hierarchy for Default Chat:**
-  - OpenRouter fallback pipeline with immediate high-speed fallback for default chat conversations, ensuring zero interruptions during upstream provider outages.
-
+  - Multi-tier fallback pipeline with immediate high-speed fallback for default chat conversations, ensuring zero interruptions during upstream provider outages.
 ---
 
 ## 📜 Previous Release Highlights
@@ -111,7 +110,7 @@ A production-grade, full-stack notes and intelligent thinking workspace built on
 <details>
 <summary><strong>v1.2.1 — STT Voice Dictation & Chat Polish</strong></summary>
 
-- **STT Voice Dictation:** Hands-free voice transcription inside the Iris compose bar powered by OpenRouter Whisper Large V3 Turbo with automatic language detection.
+- **STT Voice Dictation:** Hands-free voice transcription inside the Iris compose bar with automatic language detection.
 - **Refined Conversation Sidebar:** Clean, minimalist dark conversation history with instant in-place search and quick session switching.
 - **Uncapped Conversations:** Seamlessly load and navigate your complete chat history without artificial session caps.
 </details>
@@ -129,7 +128,7 @@ A production-grade, full-stack notes and intelligent thinking workspace built on
 <summary><strong>v1.1.0 — Offline-First Desktop & DPI-Aware Installer</strong></summary>
 
 - **Offline-First Dexie Workspace:** Packaged Electron app operates completely offline via bundled assets and Dexie.js (IndexedDB) with bidirectional queue synchronization on reconnection.
-- **Gemini 3.5 Flash Lite:** Ultra-low-latency title synthesis and long-term conversation summarization.
+- **Automated Title Synthesis:** Ultra-low-latency topic extraction and long-term conversation summarization.
 </details>
 
 ---
@@ -153,24 +152,24 @@ Every core document carries a monotonic `version` counter:
   - **Smart Merge:** Intelligently combines non-overlapping paragraphs and changes from both versions.
 
 ### 3. Multi-Provider AI Orchestration
-Iris AI dynamically routes conversations, visual analysis, reasoning traces, and note transformations across OpenRouter models with automated multi-tier fallback resilience:
+Iris AI dynamically routes conversations, visual analysis, reasoning traces, and note transformations across integrated multi-provider pipelines with automated fallback resilience:
 
-#### OpenRouter Models
-| Role / Capability | OpenRouter Model ID | Purpose & Architecture |
-|---|---|---|
-| **Default Chat & Adaptive Reasoning** | `z-ai/glm-5.3-flash` | Powers core conversation, visual understanding, and multi-tier reasoning depth (minimal, medium, high) |
-| **Deep Research & Long Context** | `deepseek/deepseek-v4-flash-0731` | Specialized for massive context analysis, live web retrieval, and complex logic |
-| **High-Speed Operations & Note Generation** | `qwen/qwen3.7-flash` | Rapid text generation, `/draft` assistance, and high-speed execution |
-| **Automated Title Synthesis** | `meta-llama/llama-3.1-8b-instruct` | Sub-second topic extraction and conversation title synthesis |
-| **Grammar & Style Audit** | `inclusionai/ling-3.0-flash` | Non-reasoning high-throughput grammatical auditing and proofreading |
-| **Voice Speech-to-Text (STT)** | `openai/whisper-large-v3-turbo` | Multi-lingual voice transcription with automatic language identification |
+#### Core AI Capabilities
+| Role / Capability | Purpose & Architecture |
+|---|---|
+| **Default Chat & Adaptive Reasoning** | Powers core conversations, visual understanding, and multi-tier reasoning depth (Fast, Thinking, Pro) |
+| **Deep Research & Long Context** | Specialized for massive context analysis, live web retrieval, and complex logic verification |
+| **High-Speed Operations & Note Generation** | Rapid text generation, `/draft` assistance, and high-throughput execution |
+| **Automated Title Synthesis** | Sub-second topic extraction and conversation title synthesis |
+| **Grammar & Style Audit** | Non-reasoning high-throughput grammatical auditing and proofreading |
+| **Voice Speech-to-Text (STT)** | Multi-lingual voice transcription with automatic language identification |
 
 #### Cascading Fallback Hierarchy
-To guarantee zero-downtime availability, upstream failures automatically cascade through configured fallbacks:
-- **Tier 1 (Primary):** OpenRouter selected model (`z-ai/glm-5.3-flash` or `deepseek/deepseek-v4-flash-0731`)
-- **Tier 2 (OpenRouter Fallbacks):** `qwen/qwen3.7-flash` (immediate default chat fallback) → `z-ai/glm-5.3-flash` → `deepseek/deepseek-v4-flash-0731`
-- **Tier 3 (Groq Fallbacks):** `openai/gpt-oss-120b` → `openai/gpt-oss-20b`
-- **Tier 4 (Google Gemini Fallback):** `gemini-3.5-flash-lite`
+To guarantee zero-downtime availability, upstream failures automatically cascade across multi-tier failovers:
+- **Tier 1 (Primary Model):** Dynamic routing tailored for user tier and intent with qualitative reasoning effort controls.
+- **Tier 2 (High-Speed Fallbacks):** Immediate low-latency failovers ensuring uninterrupted conversations.
+- **Tier 3 (Multi-Provider Redundancy):** Cross-provider backups ensuring continuous uptime during upstream outages.
+- **Tier 4 (Lightweight Edge Fallback):** Resilient completion engine for mission-critical prompts.
 
 ### 4. Fair-Use Token Budgeting & Tiered Quotas
 To balance heavy AI usage with operational sustainability:
@@ -190,10 +189,7 @@ Iris employs native function calling (`role: "tool"`) within a bounded execution
 Rather than relying on arbitrary message turn counts that fail when conversations include large code snippets or verbose outputs, Notesify implements a strict token-budget sliding window:
 - **8,000-Token Active Budget:** Context resolver evaluates history backwards from the newest message to keep immediate, high-fidelity context within an 8,000-token allowance (configurable via `CHAT_RECENT_HISTORY_TOKEN_BUDGET`).
 - **Provider-Independent Token Estimator:** Accurately models Unicode pieces, CJK glyphs (1:1), words (~4 chars/token), punctuation, and message framing overhead.
-- **3-Tier Consolidated Summarization:** Overflowing older messages outside the budget are automatically summarized and merged into a running technical context snapshot (300–600 words preserving decisions, identifiers, and next steps) via a 3-tier fallback:
-  1. *Tier 1:* Google Gemini 3.5 Flash Lite (`gemini-3.5-flash-lite`, 1M TPM context)
-  2. *Tier 2:* OpenRouter (`inclusionai/ling-3.0-flash` with reasoning stripped for zero latency)
-  3. *Tier 3:* Groq (`openai/gpt-oss-20b`)
+- **Multi-Tier Consolidated Summarization:** Overflowing older messages outside the budget are automatically summarized and merged into a running technical context snapshot (300–600 words preserving decisions, identifiers, and next steps) across an automated multi-provider fallback pipeline.
 
 ### 7. Real-Time Web Search & Source Citations
 - Iris integrates live web retrieval via OpenRouter Exa tools (`openrouter:web_search` and `openrouter:web_fetch`).
@@ -206,7 +202,7 @@ Rather than relying on arbitrary message turn counts that fail when conversation
 
 ### 9. Multi-Tier Cache, OpenRouter Prompt Caching & Deduplication
 - **Upstash Redis:** Caches note listings and folder hierarchies for sub-10ms reads. Automatic cache invalidation on mutation with self-healing re-seeds on cache drift.
-- **OpenRouter Ephemeral KV Prefix Caching (`cache_control`):** Static system instructions for note assist operations (`summarize`, `explain`, `rewrite`, `continue`, `noteCreation`, `grammar`) leverage structured ephemeral cache control. OpenRouter models supporting KV caching (DeepSeek, Claude, Qwen) cache the prompt prefix, cutting repeat assist latency and API costs.
+- **OpenRouter Ephemeral KV Prefix Caching (`cache_control`):** Static system instructions for note assist operations (`summarize`, `explain`, `rewrite`, `continue`, `noteCreation`, `grammar`) leverage structured ephemeral cache control to cache prompt prefixes, cutting repeat assist latency and API costs.
 - **SHA-256 AI Deduplication:** Text transformation requests are hashed with SHA-256; identical prompts return instantly from the MongoDB `AiAssistCache` without invoking downstream LLMs.
 
 ### 10. Core Web Vitals & Render Pipeline Optimization
@@ -241,7 +237,7 @@ To ensure Notesify feels as fast as a native desktop application on the web, the
 - **Floating Selection Toolbar:** Dynamic bubble menu on highlighted text for instant AI operations: *Explain*, *Summarize*, *Rewrite*, and *Ask Iris*.
 - **Grammar Audit Panel:** Scans notes for syntactical and stylistic improvements with one-click corrections.
 - **Multimodal Visual Analysis:** Paste or attach images to discuss diagrams, math problems, or screenshots.
-- **Speech-to-Text Voice Dictation:** Compose prompts hands-free using Whisper Large V3 Turbo with automatic language detection.
+- **Speech-to-Text Voice Dictation:** Compose prompts hands-free using voice transcription with automatic language detection.
 
 <img src="./assets/ai-chat.png" alt="Iris Global AI Chat" width="100%">
 
@@ -293,7 +289,7 @@ To ensure Notesify feels as fast as a native desktop application on the web, the
 | Authentication | Passport.js + JWT (PKCE & Refresh Token Rotation) |
 | Email Service | Nodemailer |
 | AI Services | OpenRouter, Google Gemini, Groq |
-| Audio STT | Whisper Large V3 Turbo |
+| Audio STT | Speech-to-Text (STT) Engine |
 | Media Storage | Cloudinary CDN |
 
 ---
@@ -308,7 +304,7 @@ fullstack-notes/
 │   │   │   ├── ai.controller.js    # Iris AI stream, chat & suggestions
 │   │   │   ├── auth.controller.js  # JWT, refresh rotation, Google OAuth
 │   │   │   ├── notes.controller.js # Notes CRUD & OCC versioning
-│   │   │   ├── stt.controller.js   # Whisper audio transcription
+│   │   │   ├── stt.controller.js   # Audio STT transcription
 │   │   │   ├── user.controller.js  # Profile stats & token quota status
 │   │   │   └── workflow.controller.js
 │   │   ├── middleware/             # Security, auth & rate limiting
@@ -335,7 +331,7 @@ fullstack-notes/
 │   │   │   │   └── transport/      # OpenRouter, Groq & Gemini clients
 │   │   │   ├── memoryService.js    # Long-term indexed vector recall
 │   │   │   ├── notes.service.js    # Notes CRUD & Redis cache sync
-│   │   │   └── title.service.js    # Gemini 3.5 Flash Lite title generator
+│   │   │   └── title.service.js    # Automated title generator
 │   │   └── utils/                  # Diffing, HTML stripping & token budgeting
 │   └── server.js                   # Backend server entry point
 │
@@ -347,7 +343,7 @@ fullstack-notes/
 │   │   │   │   ├── AiUsageContextIndicator.tsx # Quota & token counter
 │   │   │   │   ├── InteractivePromptDialog.tsx # ask_question tool modal
 │   │   │   │   ├── SelectionToolbar.tsx        # Floating editor toolbar
-│   │   │   │   └── VoiceDictationButton.tsx    # Whisper STT button
+│   │   │   │   └── VoiceDictationButton.tsx    # Voice dictation button
 │   │   │   ├── editor/             # TipTap wrappers, slash menu & review bar
 │   │   │   │   ├── InlineCommandMenu.tsx       # Smart boundary-aware slash menu (/)
 │   │   │   │   ├── InlineAiReviewBar.tsx       # Accept/Discard floating review bar
