@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { combineNoteContent, replaceTargetInHtml, ensureBlockHtml } from "./clientToolExecutor";
+import { combineNoteContent } from "./clientToolExecutor";
 
 describe("clientToolExecutor — combineNoteContent & replaceTargetInHtml", () => {
   it("replaces exact target in simple HTML", () => {

@@ -6,7 +6,6 @@ import { aiConcurrencyLimiter, aiBurstLimiter } from "../middleware/aiRateLimit.
 import {
   aiAssistController,
   chatWithAiController,
-  checkGrammarController,
   getChatSessionController,
   getAllSessionsController,
   deleteChatSessionController,
@@ -26,7 +25,6 @@ const upload = multer({
 router.use(authMiddleware);
 router.use(verifiedMiddleware);
 
-router.post("/check-note/:noteId", checkGrammarController);
 router.post("/assist", aiConcurrencyLimiter, aiBurstLimiter, aiAssistController);
 router.post("/chat/attachments", upload.array("files", 40), uploadChatAttachmentController);
 router.post("/chat", aiConcurrencyLimiter, aiBurstLimiter, chatWithAiController);

@@ -207,7 +207,6 @@ export const updateNote = catchAsync(async (req, res) => {
   const finalUpdateData = {
     ...updateData,
     ...(typeof updateData.content === "string" ? { content: sanitizeNoteHtml(updateData.content) } : {}),
-    grammarErrors: [],
   };
   const result = await NoteService.updateNoteWithVersionCheck(
     req.params.id,

@@ -17,7 +17,6 @@ export const actionMeta: Record<Exclude<AiAction, "noteCreation">, { label: stri
 export type AssistResult = {
   action: AiAction;
   suggestion: string;
-  errors: Array<{ start: number; end: number; original: string; suggestion: string | null }>;
   sourceType: "selection" | "note";
   isStreaming?: boolean;
 };

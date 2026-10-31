@@ -73,12 +73,6 @@ const notesSchema = new mongoose.Schema({
         type: Date,
         default: null
     },
-    grammarErrors: [{
-        start: Number,
-        end: Number,
-        original: String,
-        suggestion: String
-    }],
     embedding: {
         type: [Number],
         default: []

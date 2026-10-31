@@ -63,7 +63,7 @@ export const useAiActions = ({
       setLoadingAction(action);
 
       if (isDialogAction) {
-        let response = await postAiAssistStream({
+        const response = await postAiAssistStream({
           noteId: effectiveNoteId,
           action,
           selectedText: customPrompt ? undefined : (selectedText || undefined),
@@ -87,7 +87,6 @@ export const useAiActions = ({
             setResult({
               action,
               suggestion,
-              errors: json?.data?.errors ?? [],
               sourceType: selectedText ? "selection" : "note",
               isStreaming: false,
             });
@@ -106,7 +105,6 @@ export const useAiActions = ({
               setResult({
                 action,
                 suggestion: fullText,
-                errors: [],
                 sourceType: selectedText ? "selection" : "note",
                 isStreaming: true,
               });

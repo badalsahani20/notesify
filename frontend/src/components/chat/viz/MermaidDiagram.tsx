@@ -84,7 +84,7 @@ const sanitizeMermaidCode = (rawCode: string) => {
   // Handles both quoted (`title "Foo 😅"`) and unquoted (`title Foo 😅`) forms.
   cleaned = cleaned.replace(
     /^(\s*title\s+.+)$/gim,
-    (match: string) => match.replace(/[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}\u{2300}-\u{23FF}\u{FE00}-\u{FE0F}]/gu, "").trimEnd()
+    (match: string) => match.replace(/[\u{1F000}-\u{1FFFF}]|[\u{2600}-\u{27BF}]|[\u{2300}-\u{23FF}]|[\u{FE00}-\u{FE0F}]/gu, "").trimEnd()
   );
 
   return cleaned;

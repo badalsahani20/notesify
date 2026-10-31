@@ -209,7 +209,7 @@ const TipTap = ({ noteId, content, onChange, onEditorReady, aiChat, editable = t
         // Prosemirror's DOMParser splits codeBlocks if it encounters <br> or <p> inside <pre>.
         // We replace them with \n so the codeBlock remains intact.
         return html.replace(/<pre[^>]*>([\s\S]*?)<\/pre>/gi, (match, inner) => {
-          let newInner = inner
+          const newInner = inner
             .replace(/[\r\n]*<br\s*\/?>[\r\n]*/gi, "\n")
             .replace(/<(p|div)[^>]*>/gi, "")
             .replace(/[\r\n]*<\/(p|div)>[\r\n]*/gi, "\n");
@@ -243,7 +243,7 @@ const TipTap = ({ noteId, content, onChange, onEditorReady, aiChat, editable = t
               isVsCodeMarkdown = true;
             }
           }
-        } catch (e) {
+        } catch {
           // ignore
         }
 

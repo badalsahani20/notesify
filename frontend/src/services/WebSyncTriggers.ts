@@ -24,7 +24,7 @@ class WebSyncTriggersManager {
             if (this.broadcastChannel) {
                 try {
                     this.broadcastChannel.postMessage({ type: "DEXIE_RECONCILED" });
-                } catch (e) {}
+                } catch { /* best-effort broadcast */ }
             }
         }
     };
@@ -50,7 +50,7 @@ class WebSyncTriggersManager {
                     this.invalidateNotes();
                 }
             };
-        } catch (e) {}
+        } catch { /* BroadcastChannel unavailable */ }
     }
 
     stop(): void {

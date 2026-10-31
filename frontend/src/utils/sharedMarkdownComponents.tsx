@@ -33,7 +33,7 @@ export const MarkdownLink = ({ href, children, ...props }: any) => {
 
   const childText = typeof children === "string" ? children.trim() : "";
   const isNumericCitation = /^\d+$/.test(childText) || /^\[\d+\]$/.test(childText);
-  const label = isNumericCitation ? childText.replace(/[\[\]]/g, "") : (childText || domain);
+  const label = isNumericCitation ? childText.replace(/\D/g, "") : (childText || domain);
   const title = matchedCitation?.title || (childText && !isNumericCitation ? childText : domain) || domain;
   const description = matchedCitation?.content || href;
 

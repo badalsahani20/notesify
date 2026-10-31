@@ -173,6 +173,16 @@ const CARTESIAN_OPTIONS = {
 };
 
 const ChartBlock = ({ data, expanded = false }: ChartBlockProps) => {
+  const parsed = safeParse(data);
+  const valid = parsed && isValidData(parsed) ? parsed : null;
+  const type = valid?.chartType ?? "bar";
+
+  // Hooks must run before any conditional return.
+  const chartData = useMemo(
+    () => (valid ? { labels: valid.labels, datasets: withColors(type, valid.datasets) } : null),
+    [valid, type]
+  );
+
   if (looksLikePlaceholderChart(data)) {
     return (
       <div className="iris-viz-error">
@@ -181,9 +191,7 @@ const ChartBlock = ({ data, expanded = false }: ChartBlockProps) => {
     );
   }
 
-  const parsed = safeParse(data);
-
-  if (!parsed || !isValidData(parsed)) {
+  if (!valid || !chartData) {
     return (
       <div className="iris-viz-error">
         ⚠️ Invalid chart data
@@ -191,13 +199,6 @@ const ChartBlock = ({ data, expanded = false }: ChartBlockProps) => {
       </div>
     );
   }
-
-  const type = parsed.chartType ?? "bar";
-
-  const chartData = useMemo(() => ({
-    labels: parsed.labels,
-    datasets: withColors(type, parsed.datasets),
-  }), [parsed, type]);
 
   const options =
     type === "pie" || type === "doughnut"

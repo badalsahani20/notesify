@@ -45,17 +45,6 @@ const aiAssistCacheSchema = new mongoose.Schema(
         type: String,
         required: true,
       },
-      errors: {
-        type: [
-          {
-            start: Number,
-            end: Number,
-            original: String,
-            suggestion: String,
-          },
-        ],
-        default: [],
-      },
       original: {
         type: String,
         default: "",

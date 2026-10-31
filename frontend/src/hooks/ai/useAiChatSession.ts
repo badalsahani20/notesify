@@ -22,7 +22,7 @@ export const getPersistedHistoryFromMessages = (messages: Message[]) =>
         // user message exists, retain only the completed tool metadata so the
         // prompt cannot reopen after a refresh.
         if (isQuizTool && hasUserMessageAfter && (toolCall.questions || toolCall.quizData)) {
-          const { questions, quizData, ...completedToolCall } = toolCall;
+          const { questions: _questions, quizData: _quizData, ...completedToolCall } = toolCall;
           return { ...completedToolCall, completed: true };
         }
 

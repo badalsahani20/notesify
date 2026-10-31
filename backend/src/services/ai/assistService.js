@@ -1,74 +1,5 @@
 import { generateContentWithFallback } from "./transport/geminiClient.js";
 
-const diffWords = (text1, text2) => {
-  const words1 = text1.split(/(\s+)/);
-  const words2 = text2.split(/(\s+)/);
-
-  const diffs = [];
-  let i = 0;
-  let j = 0;
-
-  while (i < words1.length || j < words2.length) {
-    if (i < words1.length && j < words2.length && words1[i] === words2[j]) {
-      diffs.push({ type: "equal", value: words1[i] });
-      i++;
-      j++;
-    } else {
-      if (i < words1.length && (j >= words2.length || words1[i] !== words2[j])) {
-        diffs.push({ type: "delete", value: words1[i] });
-        i++;
-      }
-      if (j < words2.length && (i >= words1.length || words1[i] !== words2[j])) {
-        diffs.push({ type: "insert", value: words2[j] });
-        j++;
-      }
-    }
-  }
-  return diffs;
-};
-
-const mapDiffsToError = (diffs) => {
-  const errors = [];
-  let currentOffset = 0;
-
-  for (let i = 0; i < diffs.length; i++) {
-    const diff = diffs[i];
-
-    if (diff.type === "equal") {
-      currentOffset += diff.value.length;
-    } else if (diff.type === "delete") {
-      const from = currentOffset;
-      const to = currentOffset + diff.value.length;
-
-      let replacement = "";
-      if (i + 1 < diffs.length && diffs[i + 1].type === "insert") {
-        replacement = diffs[i + 1].value;
-        i++;
-      }
-
-      errors.push({
-        from,
-        to,
-        message: replacement
-          ? `Suggested edit: "${replacement}"`
-          : `Remove extra text`,
-        suggestion: replacement,
-      });
-
-      currentOffset = to;
-    } else if (diff.type === "insert") {
-      errors.push({
-        from: currentOffset,
-        to: currentOffset,
-        message: `Add "${diff.value}"`,
-        suggestion: diff.value,
-      });
-    }
-  }
-
-  return errors;
-};
-
 const GRAMMAR_SYSTEM_PROMPT = `You are an expert note editor. Return only the final Markdown, with no preface or commentary.
 Correct grammar, spelling, punctuation, and awkward phrasing without changing meaning.`;
 
@@ -88,26 +19,6 @@ export const buildGrammarMessages = (text) => [
     content: `Text:\n${text}`,
   },
 ];
-
-export const checkGrammar = async (text) => {
-  const messages = buildGrammarMessages(text);
-
-  try {
-    // Grammar checks are purely syntactic and do not require chain-of-thought tokens
-    const correctedText = await generateContentWithFallback(messages, false, false);
-    const differences = diffWords(text, correctedText);
-    const errorCoordinates = mapDiffsToError(differences);
-
-    return {
-      original: text,
-      corrected: correctedText,
-      errors: errorCoordinates,
-    };
-  } catch (error) {
-    console.error("AI Assist Grammar Error:", error.message);
-    throw error;
-  }
-};
 
 const SUMMARIZE_SYSTEM_PROMPT = `You are an expert note summarizer. Analyze the entire document, including its structure, headings, tables, lists, code blocks, and examples.
 
@@ -203,12 +114,17 @@ export const runAiAssist = async ({ action, text, stream = false }) => {
   }
 
   if (action === "grammar") {
-    const result = await checkGrammar(text);
+    // Grammar checks are purely syntactic and do not require chain-of-thought tokens
+    const correctedText = await generateContentWithFallback(
+      buildGrammarMessages(text),
+      false,
+      false,
+    );
+
     return {
       action: "grammar",
-      suggestion: result.corrected,
-      original: result.original,
-      errors: result.errors,
+      suggestion: correctedText,
+      original: text,
     };
   }
 
@@ -231,7 +147,6 @@ export const runAiAssist = async ({ action, text, stream = false }) => {
       action,
       suggestion,
       original: text,
-      errors: [],
     };
   } catch (error) {
     console.error("AI Assist Error:", error.message);

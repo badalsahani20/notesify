@@ -6,7 +6,6 @@ export default function ImageNodeView(props: NodeViewProps) {
   return (
     <NodeViewWrapper className="relative flex group my-6 w-full max-w-full">
       <div className="relative inline-block max-w-full">
-        {/* eslint-disable-next-line jsx-a11y/alt-text */}
         <img 
           src={props.node.attrs.src} 
           alt={props.node.attrs.alt} 

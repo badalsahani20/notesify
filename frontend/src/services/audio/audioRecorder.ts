@@ -87,7 +87,7 @@ export class AudioRecorder {
         ? { mimeType: this.chosenMimeType }
         : {};
       this.mediaRecorder = new MediaRecorder(this.mediaStream, recorderOptions);
-    } catch (err: any) {
+    } catch {
       // Fallback without explicit mimeType
       this.mediaRecorder = new MediaRecorder(this.mediaStream);
     }

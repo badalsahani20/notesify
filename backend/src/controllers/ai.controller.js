@@ -6,14 +6,12 @@ import AiAssistCache from "../models/aiAssistCache.model.js";
 import catchAsync from "../utils/catchAsync.js";
 import { generateConversationTitle } from "../services/title.service.js";
 import {
-  checkGrammar,
   runAiAssist,
   irisAgent,
   irisStreamHandler,
   resolveChatContext,
 } from "../services/ai.service.js";
 import GlobalChatSession from "../models/globalChatSession.model.js";
-import { stripHtml } from "../utils/stripHtml.js";
 import { parseIrisResponse } from "../utils/parseIrisResponse.js";
 import getEffectiveDailyLimit, {
   getEffectiveDailyLimits,
@@ -29,25 +27,6 @@ import {
 } from "../services/chatAttachment.service.js";
 import { SseStreamParser } from "../utils/sseParser.js";
 
-
-export const checkGrammarController = catchAsync(async (req, res) => {
-  const { noteId } = req.params;
-
-  const note = await Notes.findOne({ _id: noteId, user: req.user._id });
-  if (!note) {
-    return res.status(404).json({ success: false, message: "Note not found" });
-  }
-
-  const sourceText = stripHtml(note.content);
-  const result = await checkGrammar(sourceText);
-  note.grammarErrors = result.errors;
-  await note.save();
-
-  res.status(200).json({
-    success: true,
-    data: result,
-  });
-});
 
 export const aiAssistController = catchAsync(async (req, res) => {
   const { noteId, action, selectedText, noteText, stream } = req.body;
@@ -193,7 +172,6 @@ export const aiAssistController = catchAsync(async (req, res) => {
               action,
               suggestion: finalSuggestion,
               original: sourceText,
-              errors: [],
             },
           },
           { upsert: true, new: true, setDefaultsOnInsert: true },
@@ -222,11 +200,6 @@ export const aiAssistController = catchAsync(async (req, res) => {
 
   // 🛡️ Static Path
   try {
-    if (action === "grammar" && !hasSelection && note) {
-      note.grammarErrors = result.errors;
-      await note.save();
-    }
-
     if (isCacheableAction) {
       await AiAssistCache.findOneAndUpdate(
         {
@@ -246,7 +219,6 @@ export const aiAssistController = catchAsync(async (req, res) => {
           response: {
             action: result.action,
             suggestion: result.suggestion,
-            errors: result.errors || [],
             original: result.original || "",
           },
         },
