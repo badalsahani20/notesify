@@ -92,7 +92,7 @@ Iris uses native tool calling inside a bounded loop, so it can act without runni
 
 Every tool call is schema-validated and the loop has a hard round limit.
 
-Web search is provider-agnostic. Exa and Parallel sit behind one adapter (`backend/src/services/ai/search/searchAdapter.js`) that normalizes results, dedupes by URL, and never throws — a failed provider falls through to the next. With no search key configured, search stays delegated to OpenRouter's built-in tool. If the local adapter returns nothing, OpenRouter's search is re-armed for the next round.
+Web search is provider-agnostic. Exa and Parallel sit behind one adapter (`backend/src/services/ai/search/searchAdapter.js`) that normalizes results, dedupes by URL, and never throws — a failed provider falls through to the next. Each provider can hold several keys: a key that returns 401/402/403/429 rotates to the next one, and the last working key is reused on later requests. With no search key configured, search stays delegated to OpenRouter's built-in tool. If the local adapter returns nothing, OpenRouter's search is re-armed for the next round.
 
 `crawl_url` is a native fetcher (`backend/src/services/ai/search/webFetch.js`): no key, works on every transport, and replaces `openrouter:web_fetch` by default because Groq and Gemini strip provider-specific tools. It refuses localhost, private ranges, and non-http(s) URLs, re-validates every redirect hop, and caps the response at 2 MB / 12k characters. Set `WEB_FETCH_PROVIDER=openrouter` to use the provider tool instead.
 
@@ -198,6 +198,14 @@ GROQ_API_KEY=your_groq_key
 SEARCH_PROVIDER=
 EXA_API_KEY=
 PARALLEL_API_KEY=
+
+# Extra keys per provider. Either form works; numbered slots go up to _10.
+#   EXA_API_KEYS=key1,key2   or   EXA_API_KEY_2=key2
+# A key that is invalid, unpaid, or rate-limited rotates to the next one.
+EXA_API_KEYS=
+EXA_API_KEY_2=
+PARALLEL_API_KEYS=
+PARALLEL_API_KEY_2=
 
 # Optional: native crawl_url vs provider fetch.
 # Unset -> native fetch. WEB_FETCH_PROVIDER=openrouter -> openrouter:web_fetch.

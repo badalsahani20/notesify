@@ -6,6 +6,10 @@
  * to the next provider. A total failure returns an empty array so the caller
  * can degrade to OpenRouter's built-in search or answer without web context.
  *
+ * Each provider can hold several keys. A key that fails with 401/402/403/429
+ * (invalid, unpaid, or rate-limited) rotates to the next key before the
+ * provider itself is considered failed. The last working key is remembered.
+ *
  * Selection:
  *   SEARCH_PROVIDER=exa|parallel  -> use that provider only
  *   SEARCH_PROVIDER=openrouter    -> disable this adapter
@@ -33,9 +37,12 @@ const fetchJson = async (url, options, timeoutMs) => {
     const response = await fetch(url, { ...options, signal: controller.signal });
     if (!response.ok) {
       const body = await response.text().catch(() => "");
-      throw new Error(
+      const error = new Error(
         `HTTP ${response.status}${body ? `: ${body.slice(0, 200)}` : ""}`,
       );
+      // Status drives key rotation; the body stays for logs only.
+      error.status = response.status;
+      throw error;
     }
     return await response.json();
   } catch (error) {
@@ -49,14 +56,14 @@ const fetchJson = async (url, options, timeoutMs) => {
 };
 
 // 1. Exa — semantic retrieval. Content controls must live under `contents`.
-const searchExa = async (query, { limit, timeoutMs }) => {
+const searchExa = async (query, { limit, timeoutMs, apiKey }) => {
   const data = await fetchJson(
     "https://api.exa.ai/search",
     {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": process.env.EXA_API_KEY,
+        "x-api-key": apiKey,
       },
       body: JSON.stringify({
         query,
@@ -82,14 +89,14 @@ const searchExa = async (query, { limit, timeoutMs }) => {
 };
 
 // 2. Parallel — v1 Search API. `search_queries` is required on /v1.
-const searchParallel = async (query, { limit, timeoutMs }) => {
+const searchParallel = async (query, { limit, timeoutMs, apiKey }) => {
   const data = await fetchJson(
     "https://api.parallel.ai/v1/search",
     {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": process.env.PARALLEL_API_KEY,
+        "x-api-key": apiKey,
       },
       body: JSON.stringify({
         search_queries: [query],
@@ -121,18 +128,100 @@ const PROVIDERS = {
   },
 };
 
+const MAX_KEY_SLOTS = 10;
+
+// Failures that mean "this key is used up", not "the provider is down".
+// Rotating on these is safe; rotating on a timeout would just double latency.
+const KEY_ROTATION_STATUSES = new Set([401, 402, 403, 429]);
+
+// Remember the last key that worked so an exhausted key is not retried first
+// on every request. Cleared by resetSearchAdapterState().
+const keyCursor = new Map();
+
+const parseKeyList = (raw) =>
+  (raw || "")
+    .split(/[,\s]+/)
+    .map((key) => key.trim())
+    .filter(Boolean);
+
+/**
+ * Keys for a provider, in priority order and deduped:
+ *   EXA_API_KEY=key1         -> first (the original, stays primary)
+ *   EXA_API_KEYS=key2,key3   -> appended
+ *   EXA_API_KEY_2=key4       -> appended
+ *   EXA_API_KEY_3, ... up to _10
+ */
+export const getProviderKeys = (provider) => {
+  const keys = [];
+  const seen = new Set();
+  const add = (key) => {
+    const clean = typeof key === "string" ? key.trim() : "";
+    if (!clean || seen.has(clean)) return;
+    seen.add(clean);
+    keys.push(clean);
+  };
+
+  add(process.env[provider.keyEnv]);
+  parseKeyList(process.env[`${provider.keyEnv}S`]).forEach(add);
+  for (let slot = 2; slot <= MAX_KEY_SLOTS; slot += 1) {
+    add(process.env[`${provider.keyEnv}_${slot}`]);
+  }
+
+  return keys;
+};
+
+export const resetSearchAdapterState = () => keyCursor.clear();
+
+const searchWithKeyRotation = async (provider, query, options) => {
+  const keys = getProviderKeys(provider);
+  if (keys.length === 0) return [];
+
+  const start = (keyCursor.get(provider.name) || 0) % keys.length;
+  let lastError = null;
+
+  for (let offset = 0; offset < keys.length; offset += 1) {
+    const index = (start + offset) % keys.length;
+
+    try {
+      const results = await provider.search(query, {
+        ...options,
+        apiKey: keys[index],
+      });
+      keyCursor.set(provider.name, index);
+      return results;
+    } catch (error) {
+      lastError = error;
+
+      if (!KEY_ROTATION_STATUSES.has(error.status)) {
+        // Timeout, DNS, or 5xx: another key will not help.
+        throw error;
+      }
+
+      if (offset < keys.length - 1) {
+        console.warn(
+          `🔎 [SearchAdapter] ${provider.name} key ${index + 1}/${keys.length} unusable (${error.message}). Rotating.`,
+        );
+      }
+    }
+  }
+
+  throw lastError;
+};
+
 export const getSearchProviderName = () =>
   (process.env.SEARCH_PROVIDER || "").trim().toLowerCase();
 
 export const getConfiguredProviders = () =>
-  PROVIDER_ORDER.filter((name) => Boolean(process.env[PROVIDERS[name].keyEnv]));
+  PROVIDER_ORDER.filter(
+    (name) => getProviderKeys(PROVIDERS[name]).length > 0,
+  );
 
 export const isLocalSearchConfigured = () => {
   const pinned = getSearchProviderName();
   if (pinned === "openrouter") return false;
   if (pinned) {
     const provider = PROVIDERS[pinned];
-    return Boolean(provider && process.env[provider.keyEnv]);
+    return Boolean(provider && getProviderKeys(provider).length > 0);
   }
   return getConfiguredProviders().length > 0;
 };
@@ -147,7 +236,7 @@ const getCandidateProviders = () => {
       console.warn(`🔎 [SearchAdapter] Unknown SEARCH_PROVIDER "${pinned}".`);
       return [];
     }
-    return process.env[provider.keyEnv] ? [provider] : [];
+    return getProviderKeys(provider).length > 0 ? [provider] : [];
   }
 
   return getConfiguredProviders().map((name) => PROVIDERS[name]);
@@ -183,7 +272,10 @@ export const searchWeb = async (
 
   for (const provider of candidates) {
     try {
-      const results = await provider.search(cleanQuery, { limit, timeoutMs });
+      const results = await searchWithKeyRotation(provider, cleanQuery, {
+        limit,
+        timeoutMs,
+      });
       const normalized = normalizeResults(results, limit);
 
       if (normalized.length > 0) {

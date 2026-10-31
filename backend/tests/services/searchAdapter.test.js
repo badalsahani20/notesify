@@ -1,11 +1,22 @@
 import { jest } from "@jest/globals";
 
-const ENV_KEYS = ["EXA_API_KEY", "PARALLEL_API_KEY", "SEARCH_PROVIDER"];
+const ENV_KEYS = [
+  "EXA_API_KEY",
+  "EXA_API_KEYS",
+  "EXA_API_KEY_2",
+  "EXA_API_KEY_3",
+  "PARALLEL_API_KEY",
+  "PARALLEL_API_KEYS",
+  "PARALLEL_API_KEY_2",
+  "SEARCH_PROVIDER",
+];
 
 const {
   searchWeb,
   isLocalSearchConfigured,
   getConfiguredProviders,
+  getProviderKeys,
+  resetSearchAdapterState,
 } = await import("../../src/services/ai/search/searchAdapter.js");
 
 const originalEnv = { ...process.env };
@@ -21,6 +32,7 @@ const jsonResponse = (body, { ok = true, status = 200 } = {}) => ({
 describe("searchAdapter", () => {
   beforeEach(() => {
     for (const key of ENV_KEYS) delete process.env[key];
+    resetSearchAdapterState();
     global.fetch = jest.fn();
     jest.spyOn(console, "warn").mockImplementation(() => {});
     jest.spyOn(console, "log").mockImplementation(() => {});
@@ -234,5 +246,127 @@ describe("searchAdapter", () => {
     expect(results[0].source).toBe("parallel");
     expect(global.fetch).toHaveBeenCalledTimes(1);
     expect(global.fetch.mock.calls[0][0]).toBe("https://api.parallel.ai/v1/search");
+  });
+
+  describe("key rotation", () => {
+    const exaOk = (url = "https://example.com/ok") =>
+      jsonResponse({
+        results: [{ title: "Exa", url, highlights: ["ok"] }],
+      });
+
+    const keyOfCall = (index) =>
+      global.fetch.mock.calls[index][1].headers["x-api-key"];
+
+    it("collects numbered slots and comma-separated lists, deduped and trimmed", () => {
+      process.env.EXA_API_KEY = " k1 ";
+      process.env.EXA_API_KEY_2 = "k2";
+      process.env.EXA_API_KEYS = "k3, k1";
+
+      expect(getProviderKeys({ keyEnv: "EXA_API_KEY" })).toEqual([
+        "k1",
+        "k3",
+        "k2",
+      ]);
+    });
+
+    it("rotates to the next key when the first is rate-limited", async () => {
+      process.env.EXA_API_KEY = "k1";
+      process.env.EXA_API_KEY_2 = "k2";
+
+      global.fetch
+        .mockResolvedValueOnce(
+          jsonResponse({ error: "quota" }, { ok: false, status: 429 }),
+        )
+        .mockResolvedValueOnce(exaOk());
+
+      const results = await searchWeb("rotate");
+
+      expect(results[0].source).toBe("exa");
+      expect(global.fetch).toHaveBeenCalledTimes(2);
+      expect(keyOfCall(0)).toBe("k1");
+      expect(keyOfCall(1)).toBe("k2");
+    });
+
+    it("rotates on an invalid key (401)", async () => {
+      process.env.EXA_API_KEY = "bad";
+      process.env.EXA_API_KEY_2 = "good";
+
+      global.fetch
+        .mockResolvedValueOnce(
+          jsonResponse({ error: "unauthorized" }, { ok: false, status: 401 }),
+        )
+        .mockResolvedValueOnce(exaOk());
+
+      await searchWeb("rotate on 401");
+
+      expect(keyOfCall(1)).toBe("good");
+    });
+
+    it("starts from the last working key on the next request", async () => {
+      process.env.EXA_API_KEY = "k1";
+      process.env.EXA_API_KEY_2 = "k2";
+
+      global.fetch
+        .mockResolvedValueOnce(
+          jsonResponse({ error: "quota" }, { ok: false, status: 429 }),
+        )
+        .mockResolvedValueOnce(exaOk())
+        .mockResolvedValueOnce(exaOk("https://example.com/second"));
+
+      await searchWeb("first");
+      await searchWeb("second");
+
+      expect(global.fetch).toHaveBeenCalledTimes(3);
+      expect(keyOfCall(2)).toBe("k2");
+    });
+
+    it("does not rotate on a network error", async () => {
+      process.env.EXA_API_KEY = "k1";
+      process.env.EXA_API_KEY_2 = "k2";
+
+      global.fetch.mockRejectedValue(new Error("ECONNRESET"));
+
+      await expect(searchWeb("offline")).resolves.toEqual([]);
+
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("moves to the next provider when every key is exhausted", async () => {
+      process.env.EXA_API_KEY = "k1";
+      process.env.EXA_API_KEY_2 = "k2";
+      process.env.PARALLEL_API_KEY = "p1";
+
+      global.fetch
+        .mockResolvedValueOnce(
+          jsonResponse({ error: "quota" }, { ok: false, status: 429 }),
+        )
+        .mockResolvedValueOnce(
+          jsonResponse({ error: "quota" }, { ok: false, status: 402 }),
+        )
+        .mockResolvedValueOnce(
+          jsonResponse({
+            results: [
+              {
+                title: "Parallel",
+                url: "https://example.com/p",
+                excerpts: ["ok"],
+              },
+            ],
+          }),
+        );
+
+      const results = await searchWeb("all keys spent");
+
+      expect(results[0].source).toBe("parallel");
+      expect(global.fetch).toHaveBeenCalledTimes(3);
+    });
+
+    it("ignores blank keys when deciding whether a provider is configured", () => {
+      process.env.EXA_API_KEY = "   ";
+      process.env.EXA_API_KEY_2 = "k2";
+
+      expect(isLocalSearchConfigured()).toBe(true);
+      expect(getConfiguredProviders()).toEqual(["exa"]);
+    });
   });
 });
