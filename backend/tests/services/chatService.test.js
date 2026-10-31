@@ -27,7 +27,7 @@ jest.unstable_mockModule("../../src/services/ai/config/aiModels.js", () => ({
 const { executeOpenRouter } = await import(
   "../../src/services/ai/transport/openRouterClient.js"
 );
-const { chatWithAi } = await import(
+const { chatWithAi, getTemporalContext } = await import(
   "../../src/services/ai/chatService.js"
 );
 
@@ -292,5 +292,40 @@ describe("chatService - web tool assembly", () => {
     expect(
       tools.some((t) => t.type?.startsWith("openrouter:") && t.cache_control),
     ).toBe(false);
+  });
+});
+
+describe("chatService - temporal context", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    executeOpenRouter.mockResolvedValue("temporal ok");
+  });
+
+  it("formats current date and timezone in getTemporalContext", () => {
+    const context = getTemporalContext("Asia/Kolkata");
+    expect(context).toContain("## Temporal Anchor");
+    expect(context).toContain("Today's date:");
+    expect(context).toContain("Asia/Kolkata");
+    expect(context).toContain("reference for the current year and relative dates");
+    // Verifies YYYY-MM-DD pattern
+    expect(context).toMatch(/\d{4}-\d{2}-\d{2}/);
+  });
+
+  it("injects temporalContext directly into the cached system prompt", async () => {
+    await chatWithAi({
+      message: "What is today's date?",
+      enableWeb: false,
+      stream: false,
+    });
+
+    expect(executeOpenRouter).toHaveBeenCalledTimes(1);
+    const messages = executeOpenRouter.mock.calls[0][1];
+
+    // Message 0 is the cached system prompt containing the constitution AND the temporal anchor
+    expect(messages[0].role).toBe("system");
+    expect(messages[0].content[0].cache_control).toEqual({ type: "ephemeral" });
+    expect(messages[0].content[0].text).toContain("## Temporal Anchor");
+    expect(messages[0].content[0].text).toContain("Today's date:");
+    expect(messages[0].content[0].text).toContain("Asia/Kolkata");
   });
 });

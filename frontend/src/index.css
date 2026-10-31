@@ -3049,8 +3049,8 @@ html.is-capacitor.keyboard-transitioning .lmi-border {
   .ProseMirror {
     min-height: 50dvh;
     padding: 0 0.1rem 5.5rem;
-    font-size: 16px;
-    line-height: 1.72;
+    font-size: var(--editor-font-size, 16px);
+    line-height: var(--editor-line-height, 1.72);
   }
 
   .assistant-rail {
@@ -4673,7 +4673,7 @@ span[data-ai-ghost] {
 }
 
 /* --- Mobile Floating Create Button --- */
-@media (max-width: 600px) {
+@media (max-width: 768px) {
   .mobile-create-button {
     position: fixed;
     right: 1.25rem;
@@ -4687,7 +4687,7 @@ span[data-ai-ghost] {
     align-items: center;
     justify-content: center;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
-    z-index: 500;
+    z-index: 40;
     transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     border: 1px solid rgba(255, 255, 255, 0.15);
   }
@@ -5921,7 +5921,7 @@ html:not(.dark) .iris-viz-modal-body {
   }
 }
 
-@media (max-width: 600px) {
+@media (max-width: 768px) {
   .iris-viz-block {
     margin-top: 0.6rem;
     padding: 0.65rem;
@@ -6089,7 +6089,7 @@ html:not(.dark) .iris-viz-modal-body {
   }
 }
 
-@media (max-width: 600px) {
+@media (max-width: 768px) {
   .dock-toolbar-mobile {
     bottom: calc(env(safe-area-inset-bottom) + 8px);
   }

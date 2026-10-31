@@ -20,7 +20,8 @@ dist-desktop-new
 .env
 .agents
 benchmarks/
-docs
+docs/*
+!docs/releases.md
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

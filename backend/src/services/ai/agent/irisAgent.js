@@ -20,7 +20,7 @@ export class IrisAgent {
     stream = false,
     modelTier = null,
     useReasoning = false,
-    enableWeb = false,
+    enableWeb = true,
     chatMode = "casual",
     tools = null,
     isNoteScoped = false,

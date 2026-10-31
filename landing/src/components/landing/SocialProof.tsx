@@ -1,4 +1,4 @@
-import { Star, Users, Cpu } from 'lucide-react';
+import { Star, Cpu } from 'lucide-react';
 
 export const SocialProof = () => {
   return (
@@ -22,21 +22,11 @@ export const SocialProof = () => {
             <div className="hidden sm:block h-5 w-px bg-white/10" />
 
             <div className="group flex items-center gap-2 text-sm text-stone-300 cursor-default">
-              <div className="p-1 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-                <Users className="h-3.5 w-3.5" />
-              </div>
-              <span className="font-medium text-white">500+</span>
-              <span className="text-stone-400">Early Adopters</span>
-            </div>
-
-            <div className="hidden sm:block h-5 w-px bg-white/10" />
-
-            <div className="group flex items-center gap-2 text-sm text-stone-300 cursor-default">
               <div className="p-1 rounded-md bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
                 <Cpu className="h-3.5 w-3.5" />
               </div>
-              <span className="font-medium text-white">DeepSeek & OpenRouter</span>
-              <span className="text-xs text-stone-400 font-mono">AI Engine</span>
+              <span className="font-medium text-white">OpenRouter</span>
+              <span className="text-xs text-stone-400 font-mono">AI Provider</span>
             </div>
           </div>
         </div>

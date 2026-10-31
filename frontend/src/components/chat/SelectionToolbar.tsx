@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Copy, Check } from "lucide-react";
+import { copyToClipboard } from "@/utils/clipboard";
 
 interface SelectionToolbarProps {
   /** Optional container ref to constrain selection checking */
@@ -170,16 +171,17 @@ export const SelectionToolbar = ({
 
   const handleCopyClick = async () => {
     if (!selectedText) return;
-    try {
-      await navigator.clipboard.writeText(selectedText);
-      setCopied(true);
-      if (copyTimeoutRef.current) window.clearTimeout(copyTimeoutRef.current);
-      copyTimeoutRef.current = window.setTimeout(() => {
-        setCopied(false);
-      }, 1500);
-    } catch (err) {
-      console.error("Failed to copy selected text:", err);
+    const copied = await copyToClipboard(selectedText);
+    if (!copied) {
+      console.error("Failed to copy selected text");
+      return;
     }
+
+    setCopied(true);
+    if (copyTimeoutRef.current) window.clearTimeout(copyTimeoutRef.current);
+    copyTimeoutRef.current = window.setTimeout(() => {
+      setCopied(false);
+    }, 1500);
   };
 
   if (!position || !selectedText) {

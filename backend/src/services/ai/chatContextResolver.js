@@ -124,7 +124,7 @@ export const sanitizeMessageForSummary = (message) => {
             content: m.content,
           }));
         }
-      } else if (tc.tool === "create_note" || tc.tool === "update_note") {
+      } else if (tc.tool === "create_note" || tc.tool === "update_note" || tc.tool === "delete_note") {
         sanitized.noteId = tc.args?.noteId || tc.data?.noteId;
         sanitized.title = tc.args?.title || tc.data?.title;
         sanitized.mode = tc.args?.mode;

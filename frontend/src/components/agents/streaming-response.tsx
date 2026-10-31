@@ -23,6 +23,7 @@ import {
 import { AgentDisclosure } from "@/components/agents/agent-disclosure";
 import { EASE_OUT, SPRING_PRESS, SPRING_SWAP } from "@/lib/ease";
 import { cn } from "@/lib/utils";
+import { copyToClipboard } from "@/utils/clipboard";
 
 export type StreamingResponseStatus = "streaming" | "complete" | "error";
 export type StreamingResponseFeedback = "up" | "down" | null;
@@ -33,8 +34,8 @@ export interface StreamingResponseProps {
   status?: StreamingResponseStatus;
   /** Plain-text value copied by the built-in copy action. */
   copyText?: string;
-  /** Overrides the built-in clipboard action. */
-  onCopy?: () => void | Promise<void>;
+  /** Overrides the built-in clipboard action. Return false to signal failure. */
+  onCopy?: () => void | boolean | Promise<void | boolean>;
   onRetry?: () => void;
   /** Optional sources shown as a compact footer disclosure after streaming. */
   sources?: CitationItem[];
@@ -131,8 +132,11 @@ export function StreamingResponse({
   );
 
   const handleCopy = useCallback(async () => {
-    if (onCopy) await onCopy();
-    else if (copyText) await navigator.clipboard?.writeText(copyText);
+    const result = onCopy
+      ? await onCopy()
+      : await copyToClipboard(copyText ?? "");
+
+    if (result === false) return;
 
     setCopied(true);
     if (copyTimer.current) window.clearTimeout(copyTimer.current);

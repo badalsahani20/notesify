@@ -95,12 +95,12 @@ type GlobalChatStore = {
   imageDisabled: boolean;
   modelTier: "fast" | "thinking" | "pro";
   useReasoning: boolean;
-  useWebSearch: boolean;
   chatMode: "study" | "casual";
 
   // Artifacts (split panel for notes, pdfs, etc.)
   activeArtifact: ChatArtifact | null;
   setActiveArtifact: (artifact: ChatArtifact | null) => void;
+  updateAssistantMessage: (updater: (message: ChatMessage) => ChatMessage) => void;
 
   // Actions
   fetchSessions: (options?: { silent?: boolean }) => Promise<void>;
@@ -117,7 +117,6 @@ type GlobalChatStore = {
   uploadDoc: (files: File[]) => Promise<void>;
   setModelTier: (tier: "fast" | "thinking" | "pro") => void;
   setUseReasoning: (val: boolean) => void;
-  setUseWebSearch: (val: boolean) => void;
   setChatMode: (mode: "study" | "casual") => void;
   syncSessionTitle: (sessionId: string, attempt?: number, maxAttempts?: number) => void;
   reset: () => void;
@@ -139,10 +138,10 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
   imageDisabled: false,
   modelTier: "fast",
   useReasoning: false,
-  useWebSearch: false,
   chatMode: "casual",
   activeArtifact: null,
   setActiveArtifact: (artifact) => set({ activeArtifact: artifact }),
+  updateAssistantMessage: (updater) => set((state) => ({ messages: state.messages.map((message) => message.role === "assistant" ? updater(message) : message) })),
 
   fetchSessions: async (options?: { silent?: boolean }) => {
     if (!options?.silent) {
@@ -540,7 +539,6 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
         messages,
         modelTier: get().modelTier,
         useReasoning: get().useReasoning,
-        enableWeb: get().useWebSearch,
         chatMode: get().chatMode,
         signal: abortController.signal,
       });
@@ -741,7 +739,6 @@ export const useGlobalChatStore = create<GlobalChatStore>((set, get) => ({
       useReasoning: tier !== "fast",
     }),
   setUseReasoning: (val) => set({ useReasoning: val }),
-  setUseWebSearch: (val) => set({ useWebSearch: val }),
   setChatMode: (mode) => set({ chatMode: mode }),
   syncSessionTitle: (sessionId: string, attempt = 0, maxAttempts = 8) => {
     if (!sessionId || attempt >= maxAttempts) return;

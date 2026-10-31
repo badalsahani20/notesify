@@ -90,7 +90,7 @@ Iris uses native tool calling inside a bounded loop, so it can act without runni
 - `search_web` for live web results when a search provider is configured.
 - `crawl_url` for reading one public page in full, decided by the model.
 
-Every tool call is schema-validated and the loop has a hard round limit.
+Every tool call is schema-validated and the loop has a hard round limit. There is no manual web toggle: web tools are always offered and Iris decides when a question needs them.
 
 Web search is provider-agnostic. Exa and Parallel sit behind one adapter (`backend/src/services/ai/search/searchAdapter.js`) that normalizes results, dedupes by URL, and never throws — a failed provider falls through to the next. Each provider can hold several keys: a key that returns 401/402/403/429 rotates to the next one, and the last working key is reused on later requests. With no search key configured, search stays delegated to OpenRouter's built-in tool. If the local adapter returns nothing, OpenRouter's search is re-armed for the next round.
 

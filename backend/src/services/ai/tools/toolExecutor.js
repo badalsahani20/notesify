@@ -1,4 +1,4 @@
-import { getNoteContentForUser, searchNote } from "../../notes.service.js";
+import { getNoteContentForUser, searchNote, findNotesById, removeNote } from "../../notes.service.js";
 import { saveMemoryWithStatus, searchMemories } from "../../memoryService.js";
 import { stripHtml } from "../../../utils/stripHtml.js";
 import { searchWeb } from "../search/searchAdapter.js";
@@ -26,6 +26,31 @@ export class ToolExecutor {
         return { error: `Failed to fetch note: ${err.message}` };
       }
     }
+    if (toolName === "delete_note") {
+      const noteId = args?.noteId || fallbackNoteId;
+      if (!noteId) {
+        return { error: "Missing noteId for delete_note." };
+      }
+      try {
+        const existing = await findNotesById(noteId, userId);
+        if (!existing) {
+          return { error: `Note "${noteId}" not found or unauthorized.` };
+        }
+        const result = await removeNote(noteId, userId, existing.version);
+        if (!result || result.conflict) {
+          return { error: "Failed to delete note due to version conflict or deletion failure." };
+        }
+        return {
+          deleted: true,
+          noteId,
+          title: existing.title || "Untitled",
+          message: `Note "${existing.title || "Untitled"}" moved to trash.`,
+        };
+      } catch (err) {
+        return { error: `Failed to delete note: ${err.message}` };
+      }
+    }
+
     if (toolName === "save_memory") {
       if (!userId) {
         return { error: "Missing userId for save_memory." };

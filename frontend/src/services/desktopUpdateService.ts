@@ -96,7 +96,7 @@ interface ElectronWindow extends Window {
 /**
  * Retrieves the currently running application version.
  */
-export async function getInstalledAppVersion(fallbackVersion = "1.3.3"): Promise<string> {
+export async function getInstalledAppVersion(fallbackVersion = "1.3.4"): Promise<string> {
   if (typeof window !== "undefined") {
     const win = window as unknown as ElectronWindow;
     if (win.electronAPI?.getAppVersion) {

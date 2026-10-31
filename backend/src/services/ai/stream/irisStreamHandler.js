@@ -160,6 +160,17 @@ export class IrisStreamHandler {
                       execution: "local",
                     })}\n\n`,
                   )
+                } else if(normalizedTool === "delete_note" && !state.emitted) {
+                  state.emitted = true;
+                  res.write(
+                    `data: ${JSON.stringify({
+                      type: "tool_call",
+                      id: state.id,
+                      tool: "delete_note",
+                      args: parsed,
+                      execution: "local",
+                    })}\n\n`,
+                  )
                 } else if(normalizedTool === "get_note_content" && !state.emitted) {
                   state.emitted = true;
                   res.write(
@@ -276,6 +287,18 @@ export class IrisStreamHandler {
                 type: "tool_call",
                 id: state.id,
                 tool: "update_note",
+                args: parsed,
+                execution: "local",
+              })}\n\n`,
+            );
+          } else if(normalizedTool === "delete_note") {
+            state.emitted = true;
+            state.parsedArgs = parsed;
+            res.write(
+              `data: ${JSON.stringify({
+                type: "tool_call",
+                id: state.id,
+                tool: "delete_note",
                 args: parsed,
                 execution: "local",
               })}\n\n`,
@@ -414,7 +437,7 @@ export class IrisStreamHandler {
 
           if (!finalReply.trim()) {
             const noteTitle = parsedArgs.title ? `**${parsedArgs.title}**` : "your note";
-            finalReply = `I've created ${noteTitle} in your workspace!`;
+            finalReply = `I've drafted ${noteTitle}. Would you like me to create this note?`;
             res.write(
               `data: ${JSON.stringify({ choices: [{ delta: { content: finalReply } }] })}\n\n`,
             );
@@ -442,6 +465,30 @@ export class IrisStreamHandler {
             res.write(
               `data: ${JSON.stringify({ choices: [{ delta: { content: finalReply } }] })}\n\n`
             )
+          }
+        }
+      } else if (normalizedTool === "delete_note") {
+        let parsedArgs = state.parsedArgs;
+        if (!parsedArgs && state.rawArgs) {
+          try {
+            parsedArgs = JSON.parse(state.rawArgs);
+          } catch (_) {}
+        }
+
+        if (parsedArgs) {
+          toolCalls.push({
+            id: state.id,
+            tool: "delete_note",
+            args: parsedArgs,
+            execution: "local",
+          });
+
+          if (!finalReply.trim()) {
+            const noteTitle = parsedArgs.title ? `**${parsedArgs.title}**` : "the note";
+            finalReply = `Would you like me to move ${noteTitle} to the trash?`;
+            res.write(
+              `data: ${JSON.stringify({ choices: [{ delta: { content: finalReply } }] })}\n\n`,
+            );
           }
         }
       } else if (normalizedTool === "get_note_content") {

@@ -11,9 +11,7 @@ export const classifyChatIntent = (
   history = [],
   noteContext = "",
   pdfContext = "",
-  enableWeb = false,
   modelTier = null,
-  useReasoning = true,
 ) => {
   // Explicit Model Tier Overrides
   if (modelTier === "fast") {
@@ -43,30 +41,29 @@ export const classifyChatIntent = (
   const hasAttachedImage = !!imageBase64;
   if (hasAttachedImage) return DEFAULT_CHAT_MODEL || COMPLEX_ANALYSIS_MODEL;
 
-  // Calculate total context size
-  const historyText = history
-    .map((h) =>
-      typeof h.content === "string" ? h.content : JSON.stringify(h.content),
-    )
-    .join(" ");
-  const totalContextLength =
-    (noteContext?.length || 0) +
-    (pdfContext?.length || 0) +
-    historyText.length +
-    message.length;
+  // // Calculate total context size
+  // const historyText = history
+  //   .map((h) =>
+  //     typeof h.content === "string" ? h.content : JSON.stringify(h.content),
+  //   )
+  //   .join(" ");
+  // const totalContextLength =
+  //   (noteContext?.length || 0) +
+  //   (pdfContext?.length || 0) +
+  //   historyText.length +
+  //   message.length;
 
   // 2. LARGE CONTEXT OVERRIDE
-  if (totalContextLength > 150000) {
-    console.log(
-      `📦 Large context detected (${totalContextLength} characters). Overriding routing to use ${PRIMARY_MODEL} (DeepSeek).`,
-    );
-    return DEFAULT_CHAT_MODEL || PRIMARY_MODEL || COMPLEX_ANALYSIS_MODEL;
-  }
+  // if (totalContextLength > 150000) {
+  //   console.log(
+  //     `📦 Large context detected (${totalContextLength} characters). Overriding routing to use ${PRIMARY_MODEL} (DeepSeek).`,
+  //   );
+  //   return DEFAULT_CHAT_MODEL || PRIMARY_MODEL || COMPLEX_ANALYSIS_MODEL;
+  // }
 
-  // 3. Current, research-heavy requests, or when Web search is toggled ON benefit from the primary model.
+  // 3. Current and research-heavy requests benefit from the primary model.
   const isResearchRequest =
-    enableWeb === true ||
-    / (latest|today|current|recent|news|research|sources?|cite|citation|according to|compare) /.test(
+    /\b(latest|today|current|recent|news|research|sources?|cite|citation|according to|compare)\b/i.test(
       msg,
     );
   if (isResearchRequest) {

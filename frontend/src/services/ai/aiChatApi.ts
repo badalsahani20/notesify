@@ -15,7 +15,6 @@ interface ChatStreamPayload {
   pdfContext: string | null;
   modelTier?: "fast" | "thinking" | "pro";
   useReasoning: boolean;
-  enableWeb: boolean;
   chatMode: "study" | "casual";
   signal?: AbortSignal;
 }

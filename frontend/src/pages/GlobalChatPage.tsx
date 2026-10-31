@@ -9,7 +9,7 @@ import { motion, AnimatePresence } from "framer-motion";
 
 import { GlobalChatSidebar } from "@/components/chat/GlobalChatSidebar";
 import { GlobalChatMessages } from "@/components/chat/GlobalChatMessages";
-import { GlobalChatCompose } from "@/components/chat/GlobalChatCompose";
+import { GlobalChatCompose, type LiquidChatComposeHandle } from "@/components/chat/GlobalChatCompose";
 import { ChatArtifactViewer } from "@/components/chat/ChatArtifactViewer";
 import { InteractivePromptDialog } from "@/components/chat/InteractivePromptDialog";
 import { SelectionToolbar } from "@/components/chat/SelectionToolbar";
@@ -44,8 +44,6 @@ const GlobalChatPage = () => {
     setModelTier,
     useReasoning,
     setUseReasoning,
-    useWebSearch,
-    setUseWebSearch,
     activeArtifact,
     setActiveArtifact,
     regenerateResponse,
@@ -85,6 +83,7 @@ const GlobalChatPage = () => {
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const composeRef = useRef<LiquidChatComposeHandle>(null);
 
   const { sessionId } = useParams<{ sessionId?: string }>();
   const navigate = useNavigate();
@@ -158,9 +157,9 @@ const GlobalChatPage = () => {
     [loadSession, navigate],
   );
 
-  const handleSend = () => {
-    if (!input.trim() && !attachedImage && !attachedDoc) return;
-    const toSend = input;
+  const handleSend = useCallback((text?: string) => {
+    const toSend = text ?? input;
+    if (!toSend.trim() && !attachedImage && !attachedDoc) return;
     const imageToSend = attachedImage;
     const docId = attachedDoc?.id;
     setInput("");
@@ -170,7 +169,19 @@ const GlobalChatPage = () => {
       textareaRef.current.style.height = "auto";
     }
     sendMessage(toSend, imageToSend, docId);
-  };
+  }, [input, attachedImage, attachedDoc, sendMessage, setInput, setAttachedImage, setAttachedDoc]);
+
+  const handleRegenerate = useCallback(() => {
+    void regenerateResponse();
+  }, [regenerateResponse]);
+
+  const handleLoadMoreSessions = useCallback(() => {
+    void loadMoreSessions();
+  }, [loadMoreSessions]);
+
+  const handleClearDoc = useCallback(() => {
+    setAttachedDoc(null);
+  }, [setAttachedDoc]);
 
   const lastAssistantMsg = messages.length > 0 ? messages[messages.length - 1] : null;
   const activePromptToolCall = useMemo(() => {
@@ -249,13 +260,31 @@ const GlobalChatPage = () => {
 
   const handleAskIris = useCallback((quotedText: string) => {
     const formattedQuote = `> ${quotedText.replace(/\n/g, "\n> ")}\n\n`;
-    setInput((prev) => (prev ? `${prev.trim()}\n\n${formattedQuote}` : formattedQuote));
+    composeRef.current?.appendText(formattedQuote);
     setTimeout(() => {
-      textareaRef.current?.focus();
-      const len = textareaRef.current?.value.length ?? 0;
-      textareaRef.current?.setSelectionRange(len, len);
+      composeRef.current?.focusEnd();
     }, 50);
   }, []);
+
+  const topSlot = useMemo(
+    () =>
+      hasActivePrompt && activeQuestions ? (
+        <InteractivePromptDialog
+          questions={activeQuestions}
+          purpose={activePromptToolCall?.purpose ?? pendingInteraction?.purpose ?? undefined}
+          onSubmit={handlePromptSubmit}
+          onDismiss={handlePromptDismiss}
+        />
+      ) : null,
+    [
+      hasActivePrompt,
+      activeQuestions,
+      activePromptToolCall,
+      pendingInteraction,
+      handlePromptSubmit,
+      handlePromptDismiss,
+    ],
+  );
 
   return (
     <div className="gc-shell">
@@ -273,7 +302,7 @@ const GlobalChatPage = () => {
           sessionsHasMore={sessionsHasMore}
           activeSessionId={activeSessionId}
           loadSession={handleLoadSession}
-          loadMoreSessions={() => void loadMoreSessions()}
+          loadMoreSessions={handleLoadMoreSessions}
           deleteSession={deleteSession}
           startNewChat={handleStartNewChat}
         />
@@ -291,7 +320,7 @@ const GlobalChatPage = () => {
           sessionsHasMore={sessionsHasMore}
           activeSessionId={activeSessionId}
           loadSession={handleLoadSession}
-          loadMoreSessions={() => void loadMoreSessions()}
+          loadMoreSessions={handleLoadMoreSessions}
           deleteSession={deleteSession}
           startNewChat={handleStartNewChat}
         />
@@ -329,18 +358,18 @@ const GlobalChatPage = () => {
               bottomRef={bottomRef}
               fullWidthAssistant={!!activeArtifact}
               hasActivePrompt={hasActivePrompt}
-              onRegenerate={() => void regenerateResponse()}
+              onRegenerate={handleRegenerate}
             />
 
             {/* Active interactive prompt (Claude-style docked dialog above input box) */}
             <GlobalChatCompose
+              ref={composeRef}
               input={input}
-              setInput={setInput}
               attachedImage={attachedImage}
               setAttachedImage={setAttachedImage}
               attachedDoc={attachedDoc}
               onDocUpload={uploadDoc}
-              onClearDoc={() => setAttachedDoc(null)}
+              onClearDoc={handleClearDoc}
               isSending={isSending}
               imageDisabled={imageDisabled}
               handleSend={handleSend}
@@ -351,18 +380,7 @@ const GlobalChatPage = () => {
               setModelTier={setModelTier}
               useReasoning={useReasoning}
               setUseReasoning={setUseReasoning}
-              useWebSearch={useWebSearch}
-              setUseWebSearch={setUseWebSearch}
-              topSlot={
-                hasActivePrompt && activeQuestions ? (
-                  <InteractivePromptDialog
-                    questions={activeQuestions}
-                    purpose={activePromptToolCall?.purpose ?? pendingInteraction?.purpose ?? undefined}
-                    onSubmit={handlePromptSubmit}
-                    onDismiss={handlePromptDismiss}
-                  />
-                ) : null
-              }
+              topSlot={topSlot}
             />
           </div>
 

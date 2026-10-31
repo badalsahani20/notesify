@@ -4,6 +4,7 @@ import { FileText, FileEdit, ArrowRight, ExternalLink, Loader2, AlertCircle, Tra
 import { useGlobalChatStore } from "@/store/useGlobalChatStore";
 import { noteRepository } from "@/repositories";
 import { queryClient } from "@/lib/queryClient";
+import { addNoteToList } from "@/hooks/notes/useNotesMutations";
 import { toast } from "sonner";
 import type { Note } from "@/store/useNoteStore";
 
@@ -11,7 +12,7 @@ interface IrisNoteCreatedCardProps {
   noteId?: string;
   title?: string;
   content?: string;
-  variant?: "created" | "updated";
+  variant?: "created" | "updated" | "deleted";
   state?: "pending" | "running" | "completed" | "error";
   error?: string;
 }
@@ -28,8 +29,11 @@ export const IrisNoteCreatedCard: React.FC<IrisNoteCreatedCardProps> = ({
   const { setActiveArtifact, activeArtifact } = useGlobalChatStore();
   const [isDiscarded, setIsDiscarded] = useState(false);
   const [isDiscarding, setIsDiscarding] = useState(false);
+  const [isRestored, setIsRestored] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
 
   const isUpdate = variant === "updated";
+  const isDeleted = variant === "deleted";
 
   // Strip HTML or Markdown tags for clean preview snippet
   const previewText = useMemo(() => {
@@ -42,7 +46,6 @@ export const IrisNoteCreatedCard: React.FC<IrisNoteCreatedCardProps> = ({
       .replace(/^[#*`_~\s\p{Emoji}]+/u, "")
       .trim();
 
-    // If the note body starts by repeating the title, strip it from the snippet preview
     const cleanTitle = title.replace(/[^\w]/g, "").toLowerCase();
     const cleanLeading = plain
       .slice(0, title.length + 20)
@@ -97,10 +100,75 @@ export const IrisNoteCreatedCard: React.FC<IrisNoteCreatedCardProps> = ({
     }
   };
 
+  const handleRestore = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!noteId || isRestoring) return;
+    setIsRestoring(true);
+    try {
+      const restored = await noteRepository.restoreNote(noteId);
+      queryClient.setQueryData<Note[]>(["notes"], (old = []) => addNoteToList(old, restored));
+      queryClient.setQueryData(["note", noteId], restored);
+      queryClient.invalidateQueries({ queryKey: ["notes", "trash"] });
+      setIsRestored(true);
+      toast.success("Note restored from trash");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to restore note");
+    } finally {
+      setIsRestoring(false);
+    }
+  };
+
   const isOpenInPanel =
     activeArtifact?.type === "note" &&
     ((noteId && activeArtifact.id === noteId) ||
       (!noteId && activeArtifact.title === title));
+
+  // Deleted note variant
+  if (isDeleted) {
+    if (state === "running" || state === "pending") {
+      return (
+        <div className="my-2 px-3 py-2 rounded-lg border border-[var(--divider)] bg-[var(--surface-muted)]/50 text-xs text-[var(--muted-text)] flex items-center gap-2.5 max-w-md animate-in fade-in duration-150">
+          <Loader2 size={13} className="animate-spin text-rose-500 shrink-0" />
+          <span className="truncate">Moving &quot;{title}&quot; to trash...</span>
+        </div>
+      );
+    }
+
+    if (state === "error") {
+      return (
+        <div className="my-2 px-3 py-2 rounded-lg border border-rose-500/30 bg-rose-500/10 text-xs text-rose-600 dark:text-rose-400 flex items-center gap-2 max-w-md">
+          <AlertCircle size={13} className="shrink-0" />
+          <span className="truncate">
+            Failed to delete &quot;{title}&quot;{error ? `: ${error}` : ""}
+          </span>
+        </div>
+      );
+    }
+
+    return (
+      <div className="my-2 p-3 rounded-lg border border-[var(--divider)] bg-[var(--surface-muted)]/40 text-xs max-w-md select-none animate-in fade-in duration-150">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 text-rose-500/90 font-medium">
+            <Trash2 size={13} />
+            <span>{isRestored ? "Note restored" : "Moved to trash"}</span>
+          </div>
+          {noteId && !isRestored && (
+            <button
+              type="button"
+              onClick={handleRestore}
+              disabled={isRestoring}
+              className="text-[11px] font-medium text-[var(--accent-strong)] hover:underline px-1.5 py-0.5 rounded hover:bg-[var(--surface-ghost)] transition-colors"
+            >
+              {isRestoring ? "Restoring..." : "Restore"}
+            </button>
+          )}
+        </div>
+        <div className="mt-1.5 font-semibold text-[var(--text-strong)] line-clamp-1 opacity-80">
+          {title}
+        </div>
+      </div>
+    );
+  }
 
   // Discarded state
   if (isDiscarded) {
@@ -215,4 +283,3 @@ export const IrisNoteCreatedCard: React.FC<IrisNoteCreatedCardProps> = ({
 };
 
 export default IrisNoteCreatedCard;
-

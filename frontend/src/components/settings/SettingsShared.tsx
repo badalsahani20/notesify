@@ -61,13 +61,13 @@ export function OptionChip<T extends string>({
       type="button"
       onClick={() => onSelect(value)}
       className={cn(
-        "relative flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-all duration-150",
+        "relative flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-all duration-150 cursor-pointer",
         isSelected
-          ? "border-indigo-500/60 bg-indigo-500/10 text-indigo-300 shadow-[0_0_0_1px_rgba(99,102,241,0.3)]"
+          ? "border-white bg-white text-zinc-950 font-semibold shadow-sm"
           : "border-white/8 bg-white/4 text-zinc-400 hover:border-white/15 hover:text-zinc-200"
       )}
     >
-      {isSelected && <CheckCircle2 size={12} className="text-indigo-400 shrink-0" />}
+      {isSelected && <CheckCircle2 size={13} className="text-zinc-950 shrink-0" />}
       {label}
     </button>
   );

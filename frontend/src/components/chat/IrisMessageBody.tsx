@@ -13,6 +13,7 @@ import { CitationsContext } from "@/context/CitationsContext";
 import { linkifyCitations } from "@/utils/linkifyCitations";
 import { sanitizeStream } from "@/utils/streamSanitizer";
 import { normalizeIrisDirectives } from "@/utils/irisMarkdown";
+import { extractSvgDimensions } from "@/utils/svgSanitizer";
 
 interface IrisMessageBodyProps {
   segments: IrisSegment[];
@@ -66,6 +67,53 @@ const streamingPlugins = { code, math, cjk };
  * Replaces the open fence with a valid placeholder so the diagram engine is not
  * executed on partial, broken code before the closing ``` has arrived.
  */
+/**
+ * Catches unclosed SVG code blocks or raw unclosed <svg> tags midway through streaming.
+ * Replaces with %%iris-streaming-svg to reserve space and prevent layout shifts.
+ * Also wraps completed raw <svg>...</svg> blocks outside code fences into ```svg ... ```
+ * so they are rendered uniformly through SvgPreviewCard.
+ */
+export const catchStreamingSvg = (text: string): string => {
+  if (!text.includes("<svg") && !text.includes("```svg")) return text;
+
+  const parts = text.split("```");
+  const isInsideCodeBlock = parts.length % 2 === 0;
+
+  if (isInsideCodeBlock) {
+    const lastBlock = parts[parts.length - 1];
+    const lang = (lastBlock.split("\n")[0] || "").toLowerCase().trim();
+    if (lang === "svg" || (["xml", "html", ""].includes(lang) && lastBlock.includes("<svg"))) {
+      const { aspectRatio } = extractSvgDimensions(lastBlock);
+      parts[parts.length - 1] = "svg\n%%iris-streaming-svg:aspectRatio=" + aspectRatio.toFixed(3) + "\n";
+      return parts.join("```") + "```";
+    }
+  } else {
+    const lastPart = parts[parts.length - 1];
+    const svgIndex = lastPart.search(/<svg\b/i);
+    if (svgIndex !== -1) {
+      const rest = lastPart.slice(svgIndex);
+      if (!rest.includes("</svg>")) {
+        const { aspectRatio } = extractSvgDimensions(rest);
+        parts[parts.length - 1] =
+          lastPart.slice(0, svgIndex) +
+          "\n```svg\n%%iris-streaming-svg:aspectRatio=" +
+          aspectRatio.toFixed(3) +
+          "\n```\n";
+        return parts.join("```");
+      }
+    }
+  }
+
+  // Wrap completed raw inline <svg>...</svg> outside code blocks
+  for (let i = 0; i < parts.length; i += 2) {
+    if (parts[i].includes("<svg") && parts[i].includes("</svg>")) {
+      parts[i] = parts[i].replace(/(<svg\b[\s\S]*?<\/svg>)/gi, "\n```svg\n$1\n```\n");
+    }
+  }
+
+  return parts.join("```");
+};
+
 const catchUnclosedMermaid = (content: string): string => {
   const openFenceMatch = content.match(/(```mermaid)(?![\s\S]*?```)[\s\S]*$/i);
   if (!openFenceMatch || openFenceMatch.index === undefined) {
@@ -85,7 +133,7 @@ const StreamingMessageText = React.memo(({ text }: { text: string }) => {
   const linkified = React.useMemo(() => linkifyCitations(text, citations), [text, citations]);
 
   // Catch unclosed mermaid blocks while streaming so diagrams don't fail midway
-  const contentToStream = React.useMemo(() => catchUnclosedMermaid(linkified), [linkified]);
+  const contentToStream = React.useMemo(() => catchStreamingSvg(catchUnclosedMermaid(linkified)), [linkified]);
 
   // Once a complete semantic directive arrives, use the canonical renderer so
   // the callout/table is interactive and visually identical to the final state.
@@ -109,7 +157,7 @@ const StreamingMessageText = React.memo(({ text }: { text: string }) => {
 const MemoizedMarkdown = React.memo(({ content }: MarkdownProps) => {
   const citations = React.useContext(CitationsContext);
   const linkified = linkifyCitations(content, citations);
-  const sanitized = sanitizeStream(linkified);
+  const sanitized = sanitizeStream(catchStreamingSvg(linkified));
 
   return <IrisMarkdownRenderer content={sanitized} />;
 });

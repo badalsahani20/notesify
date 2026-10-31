@@ -1,7 +1,7 @@
 {
   "name": "frontend",
   "private": true,
-  "version": "1.3.3",
+  "version": "1.3.4",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -107,8 +107,8 @@
     "zustand": "^5.0.11"
   },
   "devDependencies": {
-    "@capacitor/android": "^8.5.3",
-    "@capacitor/cli": "^8.5.3",
+    "@capacitor/android": "^8.6.0",
+    "@capacitor/cli": "^8.6.0",
     "@eslint/js": "^9.36.0",
     "@types/diff": "^7.0.2",
     "@types/lodash.debounce": "^4.0.9",

@@ -1,6 +1,7 @@
 import { noteRepository } from "@/repositories";
 import { queryClient } from "@/lib/queryClient";
-import { addNoteToList } from "@/hooks/notes/useNotesMutations";
+import { addNoteToList, removeNoteFromList } from "@/hooks/notes/useNotesMutations";
+import { useGlobalChatStore } from "@/store/useGlobalChatStore";
 import { markdownToHtml } from "@/utils/markdownToHtml";
 import type { Note } from "@/store/useNoteStore";
 
@@ -255,6 +256,8 @@ export async function executeClientTool(tool: string, args: Record<string, any> 
       return await executeCreateNote(args);
     case "update_note":
       return await executeUpdateNote(args);
+    case "delete_note":
+      return await executeDeleteNote(args);
     default: 
       return {
         success: false,
@@ -361,6 +364,63 @@ async function executeUpdateNote(args: Record<string, any>): Promise<ToolExecuti
       success: false,
       tool: "update_note",
       error: err.message || "Failed to update note locally",
+    };
+  }
+}
+
+async function executeDeleteNote(args: Record<string, any>): Promise<ToolExecutionResult> {
+  try {
+    const noteId = args.noteId || args.id;
+    if (!noteId) {
+      return {
+        success: false,
+        tool: "delete_note",
+        error: "Missing noteId for delete_note",
+      };
+    }
+
+    let version = typeof args.version === "number" ? args.version : undefined;
+    let title = typeof args.title === "string" ? args.title : "";
+
+    if (version === undefined) {
+      const cachedNote =
+        queryClient.getQueryData<Note>(["note", noteId]) ||
+        queryClient.getQueryData<Note[]>(["notes"])?.find((n) => n._id === noteId);
+      if (cachedNote) {
+        version = cachedNote.version ?? 1;
+        if (!title) title = cachedNote.title || "";
+      } else {
+        version = 1;
+      }
+    }
+
+    await noteRepository.deleteNote(noteId, version);
+
+    queryClient.removeQueries({ queryKey: ["note", noteId] });
+    queryClient.setQueryData<Note[]>(["notes"], (old = []) =>
+      removeNoteFromList(old, noteId)
+    );
+    queryClient.invalidateQueries({ queryKey: ["notes", "trash"] });
+
+    const activeArtifact = useGlobalChatStore.getState().activeArtifact;
+    if (activeArtifact?.id === noteId) {
+      useGlobalChatStore.getState().setActiveArtifact(null);
+    }
+
+    return {
+      success: true,
+      tool: "delete_note",
+      data: {
+        _id: noteId,
+        title: title || "Untitled Note",
+      },
+    };
+  } catch (err: any) {
+    console.error("❌ [LOCAL EXECUTOR] delete_note failed:", err);
+    return {
+      success: false,
+      tool: "delete_note",
+      error: err.message || "Failed to delete note locally",
     };
   }
 }

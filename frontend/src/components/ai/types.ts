@@ -26,7 +26,7 @@ export type SelectionRange = { from: number; to: number } | null;
 export interface VizSegment {
   id?: string;
   kind: "viz";
-  type: "mermaid" | "chart" | "math";
+  type: "mermaid" | "chart" | "math" | "svg";
   title: string;
   data: string;
   isStreaming?: boolean;
@@ -77,7 +77,7 @@ export type ToolCallRecord = {
   execution?: "local" | "server" | "client";
   purpose?: "quiz" | "clarification" | "preference" | "ranking";
   data?: any;
-  status?: "pending" | "executing" | "success" | "error";
+  status?: "pending" | "executing" | "success" | "error" | "approval-requested" | "denied";
   quizData?: any[];
   questions?: InteractiveQuestion[];
   title?: string;

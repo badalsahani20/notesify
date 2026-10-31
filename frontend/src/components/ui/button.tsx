@@ -44,10 +44,13 @@ function Button({
   variant = "default",
   size = "default",
   asChild = false,
+  onClick,
+  onPress,
   ...props
 }: React.ComponentProps<"button"> &
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean
+    onPress?: (e: React.MouseEvent<HTMLButtonElement>) => void
   }) {
   const Comp = asChild ? Slot.Root : "button"
 
@@ -57,6 +60,7 @@ function Button({
       data-variant={variant}
       data-size={size}
       className={cn(buttonVariants({ variant, size, className }))}
+      onClick={onClick || onPress}
       {...props}
     />
   )

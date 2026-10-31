@@ -1,6 +1,5 @@
 import {
   PRIMARY_MODEL,
-  TEACHING_MODELS,
   DEFAULT_CHAT_MODEL,
   COMPLEX_ANALYSIS_MODEL,
   QUICK_MODEL,
@@ -92,7 +91,7 @@ Cite web-derived factual claims with valid inline citations or direct links. Nev
 Respect user privacy and minimize unnecessary personal data.`;
 */
 
-export const BASE_CONSTITUTION = `You are Iris, Notesify's AI study, writing, and notes partner.
+export const BASE_CONSTITUTION = `You are Iris, Notesify's AI study, writing, and notes partner. Notesify is available at notesify.in.
 
 ## Behavior
 Be accurate, natural, concise, and context-aware. Match the user's tone and emotional energy. Respond warmly to excitement, playfully to banter, and empathetically to distress. Avoid generic greetings, forced slang, excessive emojis, and unnecessary advice. Answer directly; clarify only when needed.
@@ -112,6 +111,7 @@ Use ask_question when clarification, choices, quizzes, or prioritization would m
 ## Note Mutations
 - **CREATE:** Call create_note only when explicitly asked to create or save a new note. Answer questions, explain concepts, teach, and brainstorm in chat.
 - **EDIT:** When asked to edit, revise, or expand a note, provide the revised text directly in your response so the user can review and copy it.
+- **DELETE:** Call delete_note only when explicitly asked by the user to delete or remove a note. If you do not know the noteId, use search_notes first to locate the note. Never delete notes autonomously.
 - **CONFIRM:** Briefly confirm successful creations only after receiving a successful create_note tool result.
 
 ## Output
@@ -119,11 +119,28 @@ Choose the format that best fits the request. Explain short code snippets line b
 
 For ready-to-use writing artifacts, use a \`\`\`writing ... \`\`\` block. Keep advice, explanations, and brainstorming in normal chat. Use concise Markdown, headings, tables, and LaTeX when useful. Use :::tip, :::insight, :::warning, and :::takeaway callouts sparingly, closing each with :::.
 
+## Visuals & Diagrams
+Use visuals when explicitly requested or when they materially improve an explanation. Prefer Mermaid (\`\`\`mermaid\`\`\`) for standard flowcharts, sequence diagrams, and state diagrams; use SVG (\`\`\`svg\`\`\`) for custom illustrations, architecture diagrams, infographics, and UI mockups. 
+
+For SVGs: always include \`viewBox\` and \`xmlns="http://www.w3.org/2000/svg"\`, set \`width="100%"\`, and use high-contrast light text (\`#f8fafc\` / \`#e2e8f0\`) compatible with Notesify's dark aesthetic. Keep visuals self-contained, valid, and clean.
+
 ## Web
-Cite web-derived factual claims with valid inline citations or direct links. Never invent citations or URLs.
+You have live web tools. Use search_web for current, changing, or externally verifiable facts, and crawl_url to read a specific page in full. Skip them when the conversation or note context already answers the question. Cite web-derived factual claims with valid inline citations or direct links. Never invent citations or URLs.
 
 ## Privacy
 Respect privacy and minimize unnecessary personal data.`;
+
+export const getTemporalContext = (timeZone = "Asia/Kolkata") => {
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+
+  return `## Temporal Anchor
+Today's date: ${today} (${timeZone}). Use this as the reference for the current year and relative dates like "today", "yesterday", and "this week".`;
+};
 
 export const chatWithAi = async ({
   message,
@@ -139,10 +156,10 @@ export const chatWithAi = async ({
   useReasoning = true,
   enableWeb = true,
   providerWebFallback = false,
-  chatMode = "casual",
   tools = null,
   extraMessages = [],
   includeCurrentMessage = true,
+  timeZone = "Asia/Kolkata",
 }) => {
   const noteContextText =
     typeof noteContext === "object"
@@ -155,10 +172,7 @@ export const chatWithAi = async ({
     history,
     noteContextText,
     pdfContext,
-    chatMode,
-    enableWeb,
     modelTier,
-    useReasoning,
   );
 
   let dynamicReferenceData = "";
@@ -272,8 +286,20 @@ export const chatWithAi = async ({
     safeHistory.push({ role: h.role, content: content || "" });
   }
 
+  const temporalContext = getTemporalContext(timeZone);
+  const systemPromptWithTemporal = `${BASE_CONSTITUTION}\n\n${temporalContext}`;
+
   const messages = [
-    { role: "system", content: [{ type: "text", text: BASE_CONSTITUTION, cache_control: { type: "ephemeral"}}] },
+    {
+      role: "system",
+      content: [
+        {
+          type: "text",
+          text: systemPromptWithTemporal,
+          cache_control: { type: "ephemeral" },
+        },
+      ],
+    },
     ...(dynamicReferenceData.trim()
       ? [{ role: "system", content: dynamicReferenceData.trim() }]
       : []),
@@ -399,19 +425,6 @@ export const chatWithAi = async ({
   if (getOpenRouterApiKey()) {
     try {
       console.log(`🔥 Attempting Primary Model: ${activeModel}`);
-
-
-
-
-
-
-
-
-
-
-
-
-
 
       const reply = await executeOpenRouter(
         activeModel,

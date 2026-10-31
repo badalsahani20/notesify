@@ -24,7 +24,7 @@ const sortNotes = (notes: Note[]) => {
 const updateNoteInList = (list: Note[], updated: Partial<Note> & { _id: string }) =>
     sortNotes(list.map((n) => (n._id === updated._id ? { ...n, ...updated } as Note : n)));
 
-const removeNoteFromList = (list: Note[], noteId: string) =>
+export const removeNoteFromList = (list: Note[], noteId: string) =>
     list.filter((n) => n._id !== noteId);
 
 export const addNoteToList = (list: Note[], note: Note) =>

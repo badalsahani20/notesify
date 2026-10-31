@@ -24,7 +24,7 @@ export const Hero = () => {
             {/* Live Iris indicator pip */}
             <div className="absolute -bottom-1 -right-1 z-20 flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-neutral-900 border border-white/10 text-[9px] font-mono text-emerald-400">
               <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span>v1.3.2</span>
+              <span>v1.3.4</span>
             </div>
           </div>
         </FadeIn>

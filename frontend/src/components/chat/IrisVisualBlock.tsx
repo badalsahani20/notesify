@@ -6,6 +6,7 @@ import type { IrisSegment } from "@/store/useGlobalChatStore";
 const MermaidDiagram = lazy(() => import("./viz/MermaidDiagram"));
 const ChartBlock = lazy(() => import("./viz/ChartBlock"));
 const MathBlock = lazy(() => import("./viz/MathBlock"));
+const SvgPreviewCard = lazy(() => import("./viz/SvgPreviewCard"));
 
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
@@ -34,6 +35,8 @@ const IrisVisualBlock = ({ visualization: v }: IrisVisualBlockProps) => {
         return <ChartBlock data={v.data} expanded={expanded} />;
       case "math":
         return <MathBlock formula={v.data} />;
+      case "svg":
+        return <SvgPreviewCard svgCode={v.data} />;
       default:
         return (
           <div className="iris-viz-error">

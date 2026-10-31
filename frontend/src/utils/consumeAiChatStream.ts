@@ -14,7 +14,7 @@ export type ToolCallEvent = {
   args?: Record<string, any>;
   execution?: "local" | "server" | "client";
   purpose?: "quiz" | "clarification" | "preference" | "ranking";
-  status?: "pending" | "executing" | "success" | "error";
+  status?: "pending" | "executing" | "success" | "error" | "approval-requested" | "denied";
   data?: any;
   error?: string;
   quizData?: any;

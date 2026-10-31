@@ -164,4 +164,21 @@ describe('IrisStreamHandler web tools', () => {
     expect(result.serverToolCalls).toEqual([]);
     expect(result.toolCalls[0]).toMatchObject({ tool: 'crawl_url' });
   });
+  describe('IrisStreamHandler delete_note', () => {
+    it('marks delete_note as local execution and provides fallback confirmation', async () => {
+      const { result, res } = await handleWith([
+        sseChunk(toolCallDelta(0, 'call_del', 'delete_note', { noteId: 'note_123', title: 'Old Draft' })),
+      ]);
+
+      expect(result.serverToolCalls).toEqual([]);
+      expect(result.toolCalls[0]).toMatchObject({
+        id: 'call_del',
+        tool: 'delete_note',
+        args: { noteId: 'note_123', title: 'Old Draft' },
+        execution: 'local',
+      });
+      expect(result.finalReply).toContain('Old Draft');
+      expect(res.writes.some((w) => w.includes('"tool":"delete_note"') && w.includes('"execution":"local"'))).toBe(true);
+    });
+  });
 });

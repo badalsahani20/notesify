@@ -24,7 +24,7 @@ const MobileCreateButton = () => {
     <button
       type="button"
       onClick={() => void handleCreateNote()}
-      className="mobile-create-button md:hidden"
+      className="mobile-create-button z-40 md:hidden"
       aria-label="Create note"
       title="Create note"
     >

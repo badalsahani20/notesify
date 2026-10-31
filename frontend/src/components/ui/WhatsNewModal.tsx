@@ -137,7 +137,7 @@ export const WhatsNewModal: React.FC<WhatsNewModalProps> = ({ isOpen, onDismiss 
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
           {/* Backdrop */}
           <motion.div
             key="wn-backdrop"

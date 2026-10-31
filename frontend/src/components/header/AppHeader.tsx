@@ -1,4 +1,4 @@
-import { Moon, Plus, Sun } from "lucide-react";
+import { Menu, Moon, Plus, Sun } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import UserMenu from "@/components/header/UserMenu";
 import HeaderSearch from "@/components/header/HeaderSearch";
@@ -48,33 +48,48 @@ const AppHeader = ({ theme, onToggleTheme, onMenuOpen }: AppHeaderProps) => {
       className={`desktop-header ${isDesktop ? "is-desktop-app" : ""}`}
       style={isDesktop ? { paddingRight: "clamp(140px, 9.5rem, 160px)" } : undefined}
     >
-      <Link
-        to="/"
-        className={`desktop-brand ${onMenuOpen ? "mobile-menu-trigger" : ""}`}
-        onClick={(e) => {
-          if (onMenuOpen) {
-            e.preventDefault();
-            onMenuOpen();
-          }
-        }}
-        aria-label={onMenuOpen ? "Open menu" : "Notesify home"}
-      >
-        <div className="relative shrink-0">
-          <div className="absolute inset-0 bg-white/5 blur-md" />
-          <div className="relative w-8 h-8 rounded-lg overflow-hidden bg-zinc-900 border border-white/10 shadow-[0_0_15px_rgba(255,255,255,0.05)] flex items-center justify-center">
-            <img
-              src={notesifyLogo}
-              alt="Notesify"
-              width={26}
-              height={26}
-              className="w-6.5 h-6.5 object-contain"
-            />
+      {onMenuOpen ? (
+        <div className="flex items-center gap-2.5">
+          <button
+            type="button"
+            onClick={onMenuOpen}
+            className="flex h-8.5 w-8.5 items-center justify-center rounded-lg border border-white/10 bg-zinc-900/90 text-zinc-300 hover:text-white hover:bg-zinc-800 transition-all cursor-pointer active:scale-95 shadow-sm"
+            aria-label="Toggle sidebar"
+            title="Toggle sidebar"
+          >
+            <Menu size={19} />
+          </button>
+          <button
+            type="button"
+            onClick={onMenuOpen}
+            className="text-[1.05rem] font-semibold tracking-[-0.03em] whitespace-nowrap text-white hover:text-zinc-200 transition-colors cursor-pointer text-left"
+          >
+            Notesify
+          </button>
+        </div>
+      ) : (
+        <Link
+          to="/"
+          className="desktop-brand"
+          aria-label="Notesify home"
+        >
+          <div className="relative shrink-0">
+            <div className="absolute inset-0 bg-white/5 blur-md" />
+            <div className="relative w-8 h-8 rounded-lg overflow-hidden bg-zinc-900 border border-white/10 shadow-[0_0_15px_rgba(255,255,255,0.05)] flex items-center justify-center">
+              <img
+                src={notesifyLogo}
+                alt="Notesify"
+                width={26}
+                height={26}
+                className="w-6.5 h-6.5 object-contain"
+              />
+            </div>
           </div>
-        </div>
-        <div className="shrink-0">
-          <h1 className="text-[1.05rem] font-semibold tracking-[-0.03em] whitespace-nowrap md:text-[1.15rem]">Notesify</h1>
-        </div>
-      </Link>
+          <div className="shrink-0">
+            <h1 className="text-[1.05rem] font-semibold tracking-[-0.03em] whitespace-nowrap md:text-[1.15rem]">Notesify</h1>
+          </div>
+        </Link>
+      )}
 
       <div className="desktop-header-search-slot">
         <HeaderSearch />

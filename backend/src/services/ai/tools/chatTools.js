@@ -110,6 +110,31 @@ export const createNoteTool = {
   },
 };
 
+
+export const deleteNoteTool = {
+  type: "function",
+  function: {
+    name: "delete_note",
+    description:
+      "Move a note to trash when explicitly requested by the user. Requires noteId.",
+    parameters: {
+      type: "object",
+      properties: {
+        noteId: {
+          type: "string",
+          description: "ID of the note to move to trash.",
+        },
+        title: {
+          type: "string",
+          description: "Title of the note being deleted (optional, for confirmation).",
+        },
+      },
+      required: ["noteId"],
+      additionalProperties: false,
+    },
+  },
+};
+
 export const getNoteContentTool = {
   type: "function",
   function: {
@@ -236,6 +261,7 @@ export const CHAT_TOOLS = [
   searchNotesTool,
   getNoteContentTool,
   createNoteTool,
+  deleteNoteTool,
   // updateNoteTool, // Temporarily commented out to avoid simultaneous edit conflict issues
   askQuestionTool,
 ];

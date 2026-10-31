@@ -1,7 +1,7 @@
 const BLOCK_REGEX = /\[(?:IRIS_VIZ|\/IRIS_VIZ(?=\s|:))([^\]]*)\]([\s\S]*?)\[\/IRIS_VIZ\]/gi;
 const ATTR_REGEX = /(\w+)=["']([^"']*)["']/g;
 const FENCED_MERMAID_REGEX = /```mermaid\s*\n([\s\S]*?)\n```/gi;
-const ALLOWED_TYPES = new Set(["mermaid", "chart", "math"]);
+const ALLOWED_TYPES = new Set(["mermaid", "chart", "math", "svg"]);
 
 const parseAttributes = (rawAttributes = "") => {
   const attrs = {};

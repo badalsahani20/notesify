@@ -11,7 +11,7 @@ type ChatToolHandlerOptions = {
   effectiveSessionId: string | null;
   getTargetSessionId: () => string | null;
   setPendingInteraction: (interaction: PendingInteraction) => void;
-  setActiveArtifact: (artifact: ChatArtifact) => void;
+  setActiveArtifact: (artifact: ChatArtifact | null) => void;
   updateAssistantMessage: UpdateAssistantMessage;
 };
 
@@ -121,7 +121,10 @@ export const createChatToolHandler = ({
   }
 
   if (execution === "local" && args) {
-    void executeClientTool(tool, args).then((result) => {
+    if (tool === "create_note" || tool === "delete_note") {
+      event.status = "approval-requested";
+    } else {
+      void executeClientTool(tool, args).then((result) => {
       const targetSessionId = getTargetSessionId() || effectiveSessionId;
       if (targetSessionId) {
         void fetch(`${apiBaseUrl}/ai/chat/tool-result`, {
@@ -148,6 +151,8 @@ export const createChatToolHandler = ({
           title: result.data.title,
           content: result.data.content,
         });
+      } else if (result.data && tool === "delete_note") {
+        setActiveArtifact(null);
       }
 
       updateAssistantMessage((message) => {
@@ -165,6 +170,7 @@ export const createChatToolHandler = ({
         return { ...message, toolCalls: updated };
       });
     });
+    }
   }
 
   updateAssistantMessage((message) => {

@@ -5,6 +5,8 @@ import mongoose from 'mongoose';
 jest.unstable_mockModule('../../src/services/notes.service.js', () => ({
   getNoteContentForUser: jest.fn(),
   searchNote: jest.fn(),
+  findNotesById: jest.fn(),
+  removeNote: jest.fn(),
 }));
 
 jest.unstable_mockModule('../../src/services/memoryService.js', () => ({
@@ -13,7 +15,7 @@ jest.unstable_mockModule('../../src/services/memoryService.js', () => ({
 }));
 
 // Dynamic imports
-const { getNoteContentForUser, searchNote } = await import('../../src/services/notes.service.js');
+const { getNoteContentForUser, searchNote, findNotesById, removeNote } = await import('../../src/services/notes.service.js');
 const { searchMemories, saveMemoryWithStatus } = await import('../../src/services/memoryService.js');
 const { toolExecutor } = await import('../../src/services/ai/tools/toolExecutor.js');
 const { CHAT_TOOLS, searchNotesTool } = await import('../../src/services/ai/tools/chatTools.js');
@@ -159,6 +161,54 @@ describe('ToolExecutor - search_notes & chat tools', () => {
 
       expect(getNoteContentForUser).toHaveBeenCalledWith(fallbackId, userId);
       expect(result.title).toBe('Active Note');
+    });
+  });
+
+
+  describe('delete_note execution', () => {
+    it('returns error when noteId is missing', async () => {
+      const result = await toolExecutor.execute({
+        toolName: 'delete_note',
+        args: {},
+        userId,
+      });
+      expect(result.error).toMatch(/missing noteId/i);
+    });
+
+    it('returns error when note is not found or unauthorized', async () => {
+      findNotesById.mockResolvedValue(null);
+
+      const result = await toolExecutor.execute({
+        toolName: 'delete_note',
+        args: { noteId: 'note123' },
+        userId,
+      });
+
+      expect(result.error).toMatch(/not found or unauthorized/i);
+      expect(removeNote).not.toHaveBeenCalled();
+    });
+
+    it('moves note to trash on success', async () => {
+      findNotesById.mockResolvedValue({
+        _id: 'note123',
+        title: 'Meeting Notes',
+        version: 2,
+      });
+      removeNote.mockResolvedValue({
+        _id: 'note123',
+        isDeleted: true,
+        version: 3,
+      });
+
+      const result = await toolExecutor.execute({
+        toolName: 'delete_note',
+        args: { noteId: 'note123' },
+        userId,
+      });
+
+      expect(result.deleted).toBe(true);
+      expect(result.title).toBe('Meeting Notes');
+      expect(removeNote).toHaveBeenCalledWith('note123', userId, 2);
     });
   });
 

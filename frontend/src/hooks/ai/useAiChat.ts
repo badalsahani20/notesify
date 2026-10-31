@@ -38,7 +38,6 @@ export const useAiChat = (noteId: string, noteContent: string, editor: Editor | 
   const [pdfInjected, setPdfInjected] = useState(false);
   const [modelTier, setModelTier] = useState<"fast" | "thinking" | "pro">("fast");
   const [useReasoning, setUseReasoning] = useState(false);
-  const [useWebSearch, setUseWebSearch] = useState(false);
 
   const isNew = noteId === "new" || !noteId;
   const effectiveNoteId = isNew ? null : noteId;
@@ -188,7 +187,6 @@ export const useAiChat = (noteId: string, noteContent: string, editor: Editor | 
         pdfContext: pdfInjected ? null : pdfContext,
         modelTier,
         useReasoning,
-        enableWeb: useWebSearch,
         chatMode,
         signal: abortControllerRef.current.signal,
       });
@@ -314,8 +312,6 @@ export const useAiChat = (noteId: string, noteContent: string, editor: Editor | 
     setModelTier,
     useReasoning,
     setUseReasoning,
-    useWebSearch,
-    setUseWebSearch,
     chatMode,
     setChatMode,
   };

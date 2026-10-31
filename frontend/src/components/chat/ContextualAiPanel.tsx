@@ -3,7 +3,7 @@ import { useLocation } from "react-router-dom";
 import { FileText, Type, X, RefreshCcw, Pencil } from "lucide-react";
 import { motion } from "framer-motion";
 import { GlobalChatMessages } from "@/components/chat/GlobalChatMessages";
-import { GlobalChatCompose } from "@/components/chat/GlobalChatCompose";
+import { GlobalChatCompose, type LiquidChatComposeHandle } from "@/components/chat/GlobalChatCompose";
 import { InteractivePromptDialog } from "@/components/chat/InteractivePromptDialog";
 import { SelectionToolbar } from "@/components/chat/SelectionToolbar";
 import { isDesktopApp } from "@/lib/desktop";
@@ -50,14 +50,13 @@ const ContextualAiPanel = ({
     setModelTier,
     useReasoning,
     setUseReasoning,
-    useWebSearch,
-    setUseWebSearch,
     regenerateResponse,
   } = aiChat;
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const composeRef = useRef<LiquidChatComposeHandle>(null);
 
   const prompts = useMemo(() => ({ students: [], devs: [] }), []);
 
@@ -80,20 +79,52 @@ const ContextualAiPanel = ({
 
   const handleSendMessage = useCallback(
     (text?: string) => {
-      void sendChatMessage(text);
+      setChatInput("");
+      void sendChatMessage(text ?? "");
     },
-    [sendChatMessage]
+    [sendChatMessage, setChatInput]
   );
 
   const handleAskIris = useCallback((quotedText: string) => {
     const formattedQuote = `> ${quotedText.replace(/\n/g, "\n> ")}\n\n`;
-    setChatInput((prev) => (prev ? `${prev.trim()}\n\n${formattedQuote}` : formattedQuote));
+    composeRef.current?.appendText(formattedQuote);
     setTimeout(() => {
-      textareaRef.current?.focus();
-      const len = textareaRef.current?.value.length ?? 0;
-      textareaRef.current?.setSelectionRange(len, len);
+      composeRef.current?.focusEnd();
     }, 50);
-  }, [setChatInput]);
+  }, []);
+
+  const handleRegenerate = useCallback(() => {
+    void regenerateResponse();
+  }, [regenerateResponse]);
+
+  const handleClearDoc = useCallback(() => {
+    setAttachedDoc(null);
+  }, [setAttachedDoc]);
+
+  const handlePromptSubmit = useCallback(
+    (formatted: string) => {
+      if (lastAssistantMsg) setDismissedPromptId(lastAssistantMsg.id);
+      void sendChatMessage(formatted);
+    },
+    [lastAssistantMsg, sendChatMessage],
+  );
+
+  const handlePromptDismiss = useCallback(() => {
+    if (lastAssistantMsg) setDismissedPromptId(lastAssistantMsg.id);
+  }, [lastAssistantMsg]);
+
+  const topSlot = useMemo(
+    () =>
+      activeQuestions && activeQuestions.length > 0 ? (
+        <InteractivePromptDialog
+          questions={activeQuestions}
+          purpose={activePromptToolCall?.purpose}
+          onSubmit={handlePromptSubmit}
+          onDismiss={handlePromptDismiss}
+        />
+      ) : null,
+    [activeQuestions, activePromptToolCall, handlePromptSubmit, handlePromptDismiss],
+  );
 
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
@@ -190,20 +221,20 @@ const ContextualAiPanel = ({
           bottomRef={bottomRef}
           fullWidthAssistant
           hasActivePrompt={Boolean(activeQuestions && activeQuestions.length > 0)}
-          onRegenerate={() => void regenerateResponse()}
+          onRegenerate={handleRegenerate}
         />
 
         <GlobalChatCompose
+          ref={composeRef}
           input={chatInput}
-          setInput={setChatInput}
           attachedImage={attachedImage}
           setAttachedImage={setAttachedImage}
           attachedDoc={attachedDoc}
           onDocUpload={uploadDoc}
-          onClearDoc={() => setAttachedDoc(null)}
+          onClearDoc={handleClearDoc}
           isSending={isSendingChat}
           imageDisabled={false}
-          handleSend={() => void sendChatMessage()}
+          handleSend={handleSendMessage}
           textareaRef={textareaRef}
           fileRef={fileRef}
           placeholder="Ask about this note or anything..."
@@ -212,24 +243,8 @@ const ContextualAiPanel = ({
           setModelTier={setModelTier}
           useReasoning={useReasoning}
           setUseReasoning={setUseReasoning}
-          useWebSearch={useWebSearch}
-          setUseWebSearch={setUseWebSearch}
           compact
-          topSlot={
-            activeQuestions && activeQuestions.length > 0 ? (
-              <InteractivePromptDialog
-                questions={activeQuestions}
-                purpose={activePromptToolCall?.purpose}
-                onSubmit={(formatted) => {
-                  if (lastAssistantMsg) setDismissedPromptId(lastAssistantMsg.id);
-                  void sendChatMessage(formatted);
-                }}
-                onDismiss={() => {
-                  if (lastAssistantMsg) setDismissedPromptId(lastAssistantMsg.id);
-                }}
-              />
-            ) : null
-          }
+          topSlot={topSlot}
         />
       </div>
     </motion.aside>

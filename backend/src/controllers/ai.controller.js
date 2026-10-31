@@ -556,7 +556,9 @@ export const chatWithAiController = catchAsync(async (req, res) => {
 
   // 2. Open SSE early so the browser isn't waiting blind
   const isStreaming = !!stream;
-  const shouldSearchWeb = enableWeb === true; // Only enable web tools when explicitly toggled on
+  // Web tools are always available; the model decides whether to use them.
+  // An explicit `enableWeb: false` still disables them.
+  const shouldSearchWeb = enableWeb !== false;
 
   if (isStreaming) {
     openSseConnection(res, activeSessionId);
@@ -1320,7 +1322,7 @@ export const answerInteractionController = catchAsync(async (req, res) => {
       pdfContext: state.pdfContext || "",
       stream: true,
       useReasoning: Boolean(state.useReasoning),
-      enableWeb: Boolean(state.enableWeb),
+      enableWeb: state.enableWeb !== false,
       chatMode: state.chatMode || "casual",
       tools: state.tools || null,
       isNoteScoped: Boolean(state.isNoteScoped),

@@ -40,6 +40,8 @@ const MainLayout = ({ middlePanel }: Pops) => {
   } = useNotesLayout();
   const { fetchFolders } = useFolderStore();
   const { isMobileDrawerOpen, setMobileDrawerOpen } = usePanelStore();
+  const isCapacitor = typeof window !== "undefined" && document.documentElement.classList.contains("is-capacitor");
+  const canOpenMobileDrawer = isMobile || isCapacitor;
   const [theme, setTheme] = useState<"light" | "dark">(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("notesify_theme");
@@ -167,7 +169,7 @@ const MainLayout = ({ middlePanel }: Pops) => {
           <AppHeader
             theme={theme}
             onToggleTheme={onToggleTheme}
-            onMenuOpen={isMobile ? () => setMobileDrawerOpen(true) : undefined}
+            onMenuOpen={canOpenMobileDrawer ? () => setMobileDrawerOpen(true) : undefined}
           />
         }
         activityBar={
@@ -192,7 +194,7 @@ const MainLayout = ({ middlePanel }: Pops) => {
           </ErrorBoundary>
         }
       />
-      {isMobile && (
+      {canOpenMobileDrawer && (
         <MobileDrawer open={isMobileDrawerOpen} onClose={() => setMobileDrawerOpen(false)} />
       )}
       {isWhatsNewOpen && (

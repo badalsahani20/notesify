@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useLayoutEffect, useCallback, useState } from "react";
+import React, { forwardRef, useImperativeHandle, useRef, useEffect, useLayoutEffect, useCallback, useState } from "react";
 import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
 import { createPortal } from "react-dom";
 import {
@@ -13,7 +13,7 @@ import {
   IconFileDescription,
   IconSquare,
 } from "@tabler/icons-react";
-import { Globe, FileText, BrainCircuit, Search } from "lucide-react";
+import { FileText, BrainCircuit, Search } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useUserStats } from "@/hooks/user/useUserStats";
@@ -83,7 +83,6 @@ const MODELS: ReadonlyArray<{
 
 export interface LiquidChatComposeProps {
   input: string;
-  setInput: (val: string) => void;
   attachedImage: string | null;
   setAttachedImage: (val: string | null) => void;
   attachedDoc?: ChatAttachmentBundle | null;
@@ -91,7 +90,7 @@ export interface LiquidChatComposeProps {
   onClearDoc?: () => void;
   isSending: boolean;
   imageDisabled: boolean;
-  handleSend: () => void;
+  handleSend: (text?: string) => void;
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
   fileRef: React.RefObject<HTMLInputElement | null>;
   topSlot?: React.ReactNode;
@@ -101,16 +100,20 @@ export interface LiquidChatComposeProps {
   setModelTier?: (tier: LiquidModelType) => void;
   useReasoning?: boolean;
   setUseReasoning?: (val: boolean) => void;
-  useWebSearch?: boolean;
-  setUseWebSearch?: (val: boolean) => void;
   minHeight?: number;
   maxHeight?: number;
   compact?: boolean;
 }
 
-export const LiquidChatCompose = ({
+export interface LiquidChatComposeHandle {
+  /** Append text to the draft, preserving whatever the user already typed. */
+  appendText: (text: string) => void;
+  /** Focus the textarea and move the caret to the end. */
+  focusEnd: () => void;
+}
+
+export const LiquidChatCompose = forwardRef<LiquidChatComposeHandle, LiquidChatComposeProps>(({
   input,
-  setInput,
   attachedImage,
   setAttachedImage,
   attachedDoc = null,
@@ -128,22 +131,36 @@ export const LiquidChatCompose = ({
   setModelTier,
   useReasoning = false,
   setUseReasoning,
-  useWebSearch = false,
-  setUseWebSearch,
   minHeight = 44,
   maxHeight = 220,
   compact,
-}: LiquidChatComposeProps) => {
+}: LiquidChatComposeProps, ref) => {
   const composeContainerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState<number>(600);
+
+  // The draft lives here so typing does not re-render the page that owns the
+  // compose (the note editor and the global chat shell are both heavy). The
+  // parent only hears about the text when a send happens or when it injects
+  // text programmatically (e.g. "explain this part").
+  const [draft, setDraft] = useState(input);
+  const lastExternalInputRef = useRef(input);
+
+  useEffect(() => {
+    if (input !== lastExternalInputRef.current) {
+      lastExternalInputRef.current = input;
+      setDraft(input);
+    }
+  }, [input]);
 
   useEffect(() => {
     const el = composeContainerRef.current;
     if (!el || typeof ResizeObserver === "undefined") return;
     const ro = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        if (entry.contentRect.width > 0) {
-          setContainerWidth(entry.contentRect.width);
+        const width = entry.contentRect.width;
+        if (width > 0) {
+          // Ignore sub-pixel jitter so typing never triggers a re-render storm.
+          setContainerWidth((prev) => (Math.abs(prev - width) < 2 ? prev : width));
         }
       }
     });
@@ -159,6 +176,23 @@ export const LiquidChatCompose = ({
 
   const internalTextareaRef = useRef<HTMLTextAreaElement>(null);
   const textareaRef = externalTextareaRef || internalTextareaRef;
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      appendText: (text: string) => {
+        setDraft((prev) => (prev ? `${prev.trim()}\n\n${text}` : text));
+      },
+      focusEnd: () => {
+        const textarea = textareaRef.current;
+        if (!textarea) return;
+        textarea.focus();
+        const end = textarea.value.length;
+        textarea.setSelectionRange(end, end);
+      },
+    }),
+    [textareaRef],
+  );
 
   const [dragOver, setDragOver] = useState(false);
   const dragCounter = useRef(0);
@@ -203,9 +237,13 @@ export const LiquidChatCompose = ({
     [minHeight, maxHeight, textareaRef]
   );
 
-  useLayoutEffect(() => {
-    adjustHeight();
-  }, [adjustHeight, input]);
+  useEffect(() => {
+    // Defer the auto-resize to the next frame. Measuring scrollHeight inside
+    // the keydown/input handler forces a synchronous layout on every keystroke,
+    // which is the main source of typing lag on slower devices.
+    const frame = requestAnimationFrame(() => adjustHeight());
+    return () => cancelAnimationFrame(frame);
+  }, [adjustHeight, draft]);
 
   useEffect(() => {
     const handleResize = () => adjustHeight();
@@ -319,8 +357,8 @@ export const LiquidChatCompose = ({
   };
 
   // ── Slash Commands ──────────────────────────────────────────────────────────
-  const isCommandQuery = input.startsWith("/") && !input.includes(" ") && !input.includes("\n");
-  const filterQuery = isCommandQuery ? input.trim().toLowerCase() : "";
+  const isCommandQuery = draft.startsWith("/") && !draft.includes(" ") && !draft.includes("\n");
+  const filterQuery = isCommandQuery ? draft.trim().toLowerCase() : "";
   const filteredSuggestions = DEFAULT_COMMANDS.filter(
     (s) =>
       filterQuery.length <= 1 ||
@@ -334,11 +372,11 @@ export const LiquidChatCompose = ({
       setActiveSuggestion(0);
     } else {
       setShowCommandPalette(false);
-      if (!input.startsWith("/")) {
+      if (!draft.startsWith("/")) {
         setUserDismissedCommands(false);
       }
     }
-  }, [isCommandQuery, userDismissedCommands, filteredSuggestions.length, input]);
+  }, [isCommandQuery, userDismissedCommands, filteredSuggestions.length, draft]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (showCommandPalette && filteredSuggestions.length > 0) {
@@ -358,9 +396,9 @@ export const LiquidChatCompose = ({
         if (selectedCommand) {
           if (selectedCommand.onSelect) {
             selectedCommand.onSelect();
-            setInput("");
+            setDraft("");
           } else {
-            setInput(selectedCommand.prefix + " ");
+            setDraft(selectedCommand.prefix + " ");
           }
           setShowCommandPalette(false);
         }
@@ -376,9 +414,10 @@ export const LiquidChatCompose = ({
 
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      if (!input.trim() && !attachedImage && !attachedDoc) return;
+      if (!draft.trim() && !attachedImage && !attachedDoc) return;
       if (isSending || isLimitReached) return;
-      handleSend();
+      handleSend(draft);
+      setDraft("");
       adjustHeight(true);
     }
   };
@@ -545,8 +584,8 @@ export const LiquidChatCompose = ({
             <div className="relative z-20 w-full flex flex-col">
               <textarea
                 ref={textareaRef as any}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder={
                   isLimitReached
@@ -556,7 +595,7 @@ export const LiquidChatCompose = ({
                 disabled={isLimitReached || isSending || isUploadingDoc}
                 rows={1}
                 aria-label="AI message input"
-                className="w-full resize-none bg-transparent px-2.5 py-1 text-[15px] sm:text-[15.5px] leading-relaxed text-white outline-none placeholder:text-muted-foreground/60 custom-scrollbar disabled:opacity-50 transition-[height] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]"
+                className="w-full resize-none bg-transparent px-2.5 py-1 text-[15px] sm:text-[15.5px] leading-relaxed text-white outline-none placeholder:text-muted-foreground/60 custom-scrollbar disabled:opacity-50"
                 style={{
                   minHeight: `${minHeight}px`,
                   maxHeight: `${maxHeight}px`,
@@ -586,9 +625,9 @@ export const LiquidChatCompose = ({
                           onClick={() => {
                             if (cmd.onSelect) {
                               cmd.onSelect();
-                              setInput("");
+                              setDraft("");
                             } else {
-                              setInput(cmd.prefix + " ");
+                              setDraft(cmd.prefix + " ");
                             }
                             setShowCommandPalette(false);
                           }}
@@ -636,25 +675,6 @@ export const LiquidChatCompose = ({
                 >
                   <IconPaperclip size={17} />
                 </button>
-
-                {/* Web Search Button */}
-                {setUseWebSearch && (
-                  <button
-                    type="button"
-                    onClick={() => setUseWebSearch(!useWebSearch)}
-                    className={cn(
-                      "rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer text-xs font-medium shrink-0",
-                      isCompact ? "h-8 w-8 justify-center p-0" : "p-1.5 sm:px-2.5 sm:py-1",
-                      useWebSearch
-                        ? "bg-neutral-900 text-white dark:bg-white dark:text-black shadow-sm font-semibold hover:opacity-90"
-                        : "text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5"
-                    )}
-                    title={useWebSearch ? "Web Search Enabled" : "Enable Web Search"}
-                  >
-                    <Globe className="w-3.5 h-3.5 shrink-0" />
-                    {!isCompact && <span className="hidden sm:inline">Web</span>}
-                  </button>
-                )}
               </div>
 
               {/* Right Action Controls */}
@@ -672,7 +692,7 @@ export const LiquidChatCompose = ({
                 {/* Voice Dictation */}
                 <VoiceDictationButton
                   onTranscript={(text) => {
-                    setInput(input ? `${input.trim()} ${text}` : text);
+                    setDraft(draft ? `${draft.trim()} ${text}` : text);
                     setTimeout(() => {
                       textareaRef.current?.focus();
                     }, 60);
@@ -695,8 +715,11 @@ export const LiquidChatCompose = ({
                 ) : (
                   <motion.button
                     type="button"
-                    onClick={handleSend}
-                    disabled={(!input.trim() && !attachedImage && !attachedDoc) || isLimitReached || isUploadingDoc}
+                    onClick={() => {
+                      handleSend(draft);
+                      setDraft("");
+                    }}
+                    disabled={(!draft.trim() && !attachedImage && !attachedDoc) || isLimitReached || isUploadingDoc}
                     aria-label="Send prompt"
                     whileTap={{ scale: 0.92 }}
                     className={cn(
@@ -764,7 +787,7 @@ export const LiquidChatCompose = ({
       </div>
     </div>
   );
-};
+});
 
 /* ───────────────────────── Liquid Model Menu ───────────────────────── */
 

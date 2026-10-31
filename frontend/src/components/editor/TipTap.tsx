@@ -40,6 +40,7 @@ import { cn } from "@/lib/utils";
 import { formatMarkDownNodes } from "@/utils/FormatMarkdownNodes";
 import { useEditorUIStore } from "@/store/useEditorUIStore";
 import { BlockIdExtension } from "@/extensions/blockIdExtension";
+import { useMediaQuery } from "@/hooks/ui/useMediaQuery";
 import { triggerSuccessHaptic } from "@/utils/haptics";
 
 const PLACEHOLDERS = [
@@ -144,6 +145,10 @@ const TipTap = ({ noteId, content, onChange, onEditorReady, aiChat, editable = t
 
 
   const { editorFont, editorFontSize, spellCheck, editorWidth, lineSpacing } = useSettingsStore();
+  const isMobile = useMediaQuery("(max-width: 960px)");
+  const resolvedLineHeight = isMobile
+    ? lineSpacing === "relaxed" ? "2.15" : "1.72"
+    : lineSpacing === "relaxed" ? "2.4" : "2.02";
 
   const fontSizeMap = {
     sm: "15px",
@@ -512,7 +517,7 @@ const TipTap = ({ noteId, content, onChange, onEditorReady, aiChat, editable = t
       style={{
         ["--editor-font-size" as string]: fontSizeMap[editorFontSize],
         ["--editor-font-family" as string]: resolvedFontFamily,
-        ["--editor-line-height" as string]: lineSpacing === "relaxed" ? "2.4" : "2.02",
+        ["--editor-line-height" as string]: resolvedLineHeight,
       }}
     >
       {editable && aiChat && (

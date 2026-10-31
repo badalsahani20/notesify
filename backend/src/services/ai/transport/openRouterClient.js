@@ -19,8 +19,6 @@ export const executeOpenRouter = async (
 
   const isGlm = modelId.toLowerCase().includes("glm");
   const isDeepseek = modelId.toLowerCase().includes("deepseek");
-  const isLing = modelId.toLowerCase().includes("ling");
-  const isQwen = modelId.toLowerCase().includes("qwen");
 
   const bodyPayload = {
     model: modelId,
@@ -37,10 +35,10 @@ export const executeOpenRouter = async (
   if (isGlm) {
     bodyPayload.provider = {
       order: [
-        "relace",
         "open-inference/fp4",
+        "relace",
+        "wafer/us",
         "wafer/nvfp4",
-        "sail-research/fp4",
         "gmicloud/fp8",
       ],
       allow_fallbacks: true,

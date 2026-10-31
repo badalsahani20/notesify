@@ -1,6 +1,8 @@
 import { memo, useMemo, useState, lazy, Suspense } from "react";
 import { CheckCheck, Copy, Code2, Loader2 } from "lucide-react";
 import IrisVisualBlock from "./IrisVisualBlock";
+import { StreamingSvgPlaceholder } from "@/components/chat/viz/StreamingSvgPlaceholder";
+import { SvgPreviewCard } from "@/components/chat/viz/SvgPreviewCard";
 
 const ComparisonBlock = lazy(() => import("@/components/chat/viz/ComparisonBlock"));
 
@@ -170,6 +172,19 @@ const MarkdownCodeBlock = ({ code, language, isStreaming: _isStreaming }: Markdo
         <ComparisonBlock data={code} />
       </Suspense>
     );
+  }
+
+  if (
+    normalizedLanguage === "svg" ||
+    ((normalizedLanguage === "xml" || normalizedLanguage === "html") && code.includes("<svg"))
+  ) {
+    const isSvgStreaming = code.includes("%%iris-streaming-svg");
+    if (isSvgStreaming) {
+      const ratioMatch = code.match(/aspectRatio=([0-9.]+)/);
+      const aspectRatio = ratioMatch ? parseFloat(ratioMatch[1]) : 16 / 9;
+      return <StreamingSvgPlaceholder aspectRatio={aspectRatio} />;
+    }
+    return <SvgPreviewCard svgCode={code} />;
   }
 
 

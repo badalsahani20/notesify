@@ -4,12 +4,18 @@ import { GlobalChatEmptyState } from "@/components/chat/GlobalChatEmptyState";
 import type { Message } from "@/components/ai/types";
 import IrisMessageBody from "./IrisMessageBody";
 import { IrisNoteCreatedCard } from "./IrisNoteCreatedCard";
+import { ToolApprovalCard } from "./ToolApprovalCard";
+import { useGlobalChatStore } from "@/store/useGlobalChatStore";
+import { executeClientTool } from "@/services/ai/clientToolExecutor";
+import { API_BASE_URL } from "@/lib/api";
+import { useAuthStore } from "@/store/useAuthStore";
 import { parseIrisResponse } from "@/utils/parseIrisResponse";
 import { useEffect, useState, useRef, memo, useCallback, useMemo } from "react";
 import { TextShimmer } from "@/components/ui/text-shimmer";
 import { Source, SourceTrigger, SourceContent } from "@/components/ui/source";
 import { Reasoning, ReasoningTrigger, ReasoningContent } from "@/components/ui/reasoning";
 import { MessageScroller } from "@/components/agents/message-scroller";
+import { copyToClipboard } from "@/utils/clipboard";
 import { StreamingResponse } from "@/components/agents/streaming-response";
 
 import { useStreamingTextStore } from "@/store/useStreamingTextStore";
@@ -136,6 +142,114 @@ const ChatMessageRow = memo(({
     isActiveStream && s.streamingMessageId === msg.id ? s.thinkingTime : undefined
   );
 
+  const handleApproveTool = async (messageId: string, tc: any) => {
+    const tool = tc.tool;
+    const args = tc.args || {};
+    const toolCallId = tc.id;
+    const targetSessionId = useGlobalChatStore.getState().activeSessionId;
+
+    useGlobalChatStore.getState().updateAssistantMessage((message: any) => {
+      if (message.id !== messageId) return message;
+      const existing = message.toolCalls ?? [];
+      const index = existing.findIndex((t: any) => (toolCallId ? t.id === toolCallId : t.tool === tool));
+      if (index === -1) return message;
+
+      const updated = [...existing];
+      updated[index] = { ...updated[index], status: "executing" };
+      return { ...message, toolCalls: updated };
+    });
+
+    const result = await executeClientTool(tool, args);
+
+    if (targetSessionId) {
+      const accessToken = useAuthStore.getState().accessToken;
+      void fetch(`${API_BASE_URL}/ai/chat/tool-result`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          sessionId: targetSessionId,
+          toolCallId,
+          tool,
+          status: result.success ? "success" : "error",
+          data: result.data ? { _id: result.data._id, title: result.data.title } : undefined,
+          error: result.error,
+        }),
+      }).catch(() => {});
+    }
+
+    if (result.success && result.data && tool === "create_note") {
+      useGlobalChatStore.getState().setActiveArtifact({
+        type: "note",
+        id: result.data._id,
+        title: result.data.title,
+        content: result.data.content,
+      });
+    } else if (result.success && tool === "delete_note") {
+      const active = useGlobalChatStore.getState().activeArtifact;
+      if (active?.id === (result.data?._id || args.noteId)) {
+        useGlobalChatStore.getState().setActiveArtifact(null);
+      }
+    }
+
+    useGlobalChatStore.getState().updateAssistantMessage((message: any) => {
+      if (message.id !== messageId) return message;
+      const existing = message.toolCalls ?? [];
+      const index = existing.findIndex((t: any) => (toolCallId ? t.id === toolCallId : t.tool === tool));
+      if (index === -1) return message;
+
+      const updated = [...existing];
+      updated[index] = {
+        ...updated[index],
+        status: result.success ? "success" : "error",
+        data: result.data ?? updated[index].data,
+        error: result.error ?? updated[index].error,
+      };
+      return { ...message, toolCalls: updated };
+    });
+  };
+
+  const handleDenyTool = (messageId: string, tc: any) => {
+    const tool = tc.tool;
+    const toolCallId = tc.id;
+    const targetSessionId = useGlobalChatStore.getState().activeSessionId;
+
+    if (targetSessionId) {
+      const accessToken = useAuthStore.getState().accessToken;
+      void fetch(`${API_BASE_URL}/ai/chat/tool-result`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          sessionId: targetSessionId,
+          toolCallId,
+          tool,
+          status: "error",
+          error: "Action denied by user",
+        }),
+      }).catch(() => {});
+    }
+
+    useGlobalChatStore.getState().updateAssistantMessage((message: any) => {
+      if (message.id !== messageId) return message;
+      const existing = message.toolCalls ?? [];
+      const index = existing.findIndex((t: any) => (toolCallId ? t.id === toolCallId : t.tool === tool));
+      if (index === -1) return message;
+
+      const updated = [...existing];
+      updated[index] = {
+        ...updated[index],
+        status: "denied",
+        error: "Action denied by user",
+      };
+      return { ...message, toolCalls: updated };
+    });
+  };
+
   if (msg.role === "assistant") {
     const isThinking = (msg as any).isThinking ?? false;
     const thinkingTime = (msg as any).thinkingTime as number | undefined;
@@ -155,7 +269,7 @@ const ChatMessageRow = memo(({
       quizData?: any[];
       tasks?: any[];
       task?: any;
-      status?: "pending" | "executing" | "success" | "error";
+      status?: "pending" | "executing" | "success" | "error" | "approval-requested" | "denied";
       data?: any;
       args?: any;
       error?: string;
@@ -173,8 +287,9 @@ const ChatMessageRow = memo(({
     const askQuestionActivity = (toolCalls ?? []).find(
       (tc) => tc.tool === "ask_question" || tc.tool === "render_quiz" || tc.tool === "generate_quiz"
     );
+    const deleteNoteActivity = (toolCalls ?? []).find((tc) => tc.tool === "delete_note");
     const hasAgenticTask = Boolean(
-      noteReadActivity || noteSearchActivity || searchActivity || crawlActivity || memoryActivity || recallMemoryActivity || askQuestionActivity
+      noteReadActivity || noteSearchActivity || searchActivity || crawlActivity || memoryActivity || recallMemoryActivity || askQuestionActivity || deleteNoteActivity
     );
 
     return (
@@ -216,6 +331,11 @@ const ChatMessageRow = memo(({
               {askQuestionActivity && (
                 <TextShimmer duration={2.5}>Generating questions...</TextShimmer>
               )}
+              {deleteNoteActivity && (
+                <TextShimmer duration={2.5}>
+                  {deleteNoteActivity.status === "success" ? "Note moved to trash" : "Moving note to trash..."}
+                </TextShimmer>
+              )}
             </div>
           )}
 
@@ -234,7 +354,6 @@ const ChatMessageRow = memo(({
               <StreamingResponse
                 status={isActiveStream && isStreaming ? "streaming" : "complete"}
                 copyText={effectiveDisplayText}
-                onCopy={() => onCopy(effectiveDisplayText, msg.id)}
                 onRetry={isLastAssistantMessage && !isStreaming && !isSending ? onRegenerate : undefined}
                 className="w-full"
               >
@@ -297,7 +416,47 @@ const ChatMessageRow = memo(({
             ) {
               return null;
             }
-            if (tc.tool === "create_note" || tc.tool === "update_note") {
+            if (tc.tool === "create_note" || tc.tool === "delete_note") {
+              const noteId = tc.data?._id || tc.args?.noteId || tc.args?.id;
+              const title = tc.data?.title || tc.args?.title || "Untitled Note";
+              const content = tc.data?.content || tc.args?.content;
+
+              if (
+                tc.status === "approval-requested" ||
+                tc.status === "pending" ||
+                tc.status === "denied" ||
+                (!tc.data && tc.status !== "success")
+              ) {
+                return (
+                  <ToolApprovalCard
+                    key={`approval-${idx}`}
+                    toolCallId={tc.id}
+                    tool={tc.tool}
+                    args={tc.args || tc.data || {}}
+                    state={tc.status === "denied" ? "denied" : tc.status === "error" ? "error" : "approval-requested"}
+                    error={tc.error}
+                    onApprove={() => handleApproveTool(msg.id, tc)}
+                    onDeny={() => handleDenyTool(msg.id, tc)}
+                  />
+                );
+              }
+
+              const toolState = tc.status === "error" ? "error" : "completed";
+              const variant = tc.tool === "delete_note" ? "deleted" : "created";
+              return (
+                <IrisNoteCreatedCard
+                  key={`note-tool-${idx}`}
+                  noteId={noteId}
+                  title={title}
+                  content={content}
+                  variant={variant}
+                  state={toolState}
+                  error={tc.error}
+                />
+              );
+            }
+
+            if (tc.tool === "update_note") {
               const noteId = tc.data?._id || tc.args?.noteId || tc.args?.id;
               const title = tc.data?.title || tc.args?.title || "Untitled Note";
               const content = tc.data?.content || tc.args?.content;
@@ -306,14 +465,13 @@ const ChatMessageRow = memo(({
                 : tc.status === "pending" || tc.status === "executing"
                   ? "running"
                   : "completed";
-              const isUpdate = tc.tool === "update_note";
               return (
                 <IrisNoteCreatedCard
                   key={`note-tool-${idx}`}
                   noteId={noteId}
                   title={title}
                   content={content}
-                  variant={isUpdate ? "updated" : "created"}
+                  variant="updated"
                   state={toolState}
                   error={tc.error}
                 />
@@ -373,7 +531,7 @@ const ChatMessageRow = memo(({
 
         {/* Hover Copy Button */}
         {msg.text && (
-          <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 absolute -bottom-2 -right-2 flex items-center bg-[#181818] border border-white/10 shadow-xl p-0.5 rounded-md z-10 cursor-pointer">
+          <div className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200 absolute -bottom-2 -right-2 flex items-center bg-[#181818] border border-white/10 shadow-xl p-0.5 rounded-md z-10 cursor-pointer">
             <button
               onClick={() => onCopy(msg.text, msg.id)}
               className="p-1 rounded hover:bg-white/10 text-white/50 hover:text-white transition-colors flex items-center justify-center cursor-pointer"
@@ -437,7 +595,7 @@ export const GlobalChatMessages = memo(({
     const result = new Map<string, any[]>();
     const nextCache = new Map<string, { toolCalls?: Message["toolCalls"]; citations: any[] }>();
 
-    messages.forEach((message) => {
+    messages.forEach((message: any) => {
       const cached = citationCacheRef.current.get(message.id);
       if (cached && cached.toolCalls === message.toolCalls) {
         result.set(message.id, cached.citations);
@@ -472,15 +630,15 @@ export const GlobalChatMessages = memo(({
   // Keep measurement effects from rerunning on every streamed token
   const userMessageMeasureKey = useMemo(
     () => messages
-      .filter((message) => message.role === "user")
-      .map((message) => `${message.id}:${message.text.length}`)
+      .filter((message: any) => message.role === "user")
+      .map((message: any) => `${message.id}:${message.text.length}`)
       .join("\u0001"),
     [messages],
   );
 
   useEffect(() => {
     const nextLongMessageIds = new Set<string>();
-    messages.forEach((message) => {
+    messages.forEach((message: any) => {
       if (message.role !== "user") return;
       const element = userMessageRefs.current[message.id];
       if (!element) return;
@@ -512,11 +670,15 @@ export const GlobalChatMessages = memo(({
     }
   }, [hasActivePrompt, bottomRef]);
 
-  const handleCopy = useCallback((text: string, id: string) => {
+  const handleCopy = useCallback(async (text: string, id: string) => {
     if (!text) return;
-    navigator.clipboard.writeText(text).catch((err) => {
-      console.error("Failed to copy text:", err);
-    });
+
+    const copied = await copyToClipboard(text);
+    if (!copied) {
+      console.error("Failed to copy text");
+      return;
+    }
+
     setCopiedId(id);
     setTimeout(() => {
       setCopiedId(null);

@@ -70,7 +70,6 @@ export const startGlobalChatRequest = async ({
   messages,
   modelTier,
   useReasoning,
-  enableWeb,
   chatMode,
   signal,
 }: {
@@ -82,7 +81,6 @@ export const startGlobalChatRequest = async ({
   messages: ChatMessage[];
   modelTier?: "fast" | "thinking" | "pro";
   useReasoning: boolean;
-  enableWeb: boolean;
   chatMode: "study" | "casual";
   signal: AbortSignal;
 }): Promise<GlobalChatRequest> => {
@@ -104,7 +102,6 @@ export const startGlobalChatRequest = async ({
       stream: true,
       modelTier,
       useReasoning,
-      enableWeb,
       chatMode,
       currentNote: currentNoteContext,
       clientToolResults,
