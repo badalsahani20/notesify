@@ -132,6 +132,63 @@ export function normalizeGitHubRelease(raw: any): NormalizedRelease {
 // Built-in fallback snapshot if offline or GitHub API is unavailable
 export const FALLBACK_RELEASES: NormalizedRelease[] = [
   {
+    id: 393800000,
+    version: 'v1.3.4',
+    tagName: 'v1.3.4',
+    name: '⚡ Notesify Desktop v1.3.4 — Autonomous Web Search, Tool Approval Cards & Live SVG Visuals',
+    publishedAt: '2026-10-31T00:00:00Z',
+    publishedDateFormatted: 'Oct 31, 2026',
+    htmlUrl: 'https://github.com/badalsahani20/notesify/releases/tag/v1.3.4',
+    body: `## ⚡ Notesify Desktop v1.3.4 — Autonomous Web Search, Tool Approval Cards & Live SVG Visuals\\n\\nNotesify v1.3.4 brings autonomous web research to the desktop workspace, interactive confirmation cards for safe note mutations, live vector SVG rendering, and 24-hour persistent prompt caching.\\n\\n### ✨ What's New\\n\\n- **Autonomous Web Search & Crawling** — Iris automatically decides when queries need live web facts or public URL crawling without requiring manual toggle switching.\\n- **Interactive Tool Approval Cards** — Note creation and deletion actions require explicit one-click confirmation before execution.\\n- **Live Vector SVG Visualizations** — Clean, sanitized architectural diagrams, schematics, and UI mockups rendered directly in chat responses.\\n- **24-Hour Temporal Prompt Caching** — Date-level temporal anchoring stabilizes system prompt prefixes for 24-hour windows, slashing AI response latency.\\n- **Universal Clipboard Integration** — Seamless copy actions across desktop windows with automatic fallback for unfocused document contexts.\\n- **Offline-First Resilience** — Uninterrupted note taking and flashcard testing with local Dexie storage and automatic reconciliation.`,
+    highlights: [
+      {
+        title: 'Autonomous Web Search',
+        tag: 'Live Web',
+        description: 'Instant web retrieval and page crawling decided autonomously by Iris based on query context.',
+      },
+      {
+        title: 'Interactive Tool Approvals',
+        tag: 'Security',
+        description: 'Client-side confirmation cards prevent unintended note creations and deletions.',
+      },
+      {
+        title: 'Live SVG Rendering',
+        tag: 'Visualization',
+        description: 'High-contrast, sanitized vector graphics and architecture diagrams rendered directly in responses.',
+      },
+      {
+        title: '24-Hour Prompt Caching',
+        tag: 'Architecture',
+        description: 'Ephemeral prompt caching cuts token overhead and latency on repeated chat sessions.',
+      },
+      {
+        title: 'Offline-First Engine',
+        tag: 'Local First',
+        description: 'Full Dexie local persistence with optimistic concurrency and side-by-side visual conflict diffing.',
+      },
+      {
+        title: 'Universal Clipboard',
+        tag: 'Desktop UI',
+        description: 'Reliable cross-window copying for code snippets and Markdown blocks.',
+      },
+    ],
+    technicalNotes: [
+      'Eliminated manual enableWeb toggling; Iris agent loop autonomously decides tool invocation with multi-key Exa/Parallel failover.',
+      'Constructed client-side ToolApprovalCard component for bounded mutation verification.',
+      'Integrated DOMPurify-based vector sanitizer for safe SVG rendering in dark mode.',
+      'Stabilized OpenRouter KV prefix caching by switching from second-level timestamps to 24-hour ISO date anchors.',
+      'Engineered copyToClipboard with document.execCommand fallback for Electron desktop windows.',
+    ],
+    assets: [
+      {
+        name: 'Notesify.Setup.1.3.4.exe',
+        size: 104500000,
+        sizeFormatted: '99.6 MB',
+        downloadUrl: 'https://github.com/badalsahani20/notesify/releases/download/v1.3.4/Notesify.Setup.1.3.4.exe',
+      },
+    ],
+  },
+  {
     id: 393700000,
     version: 'v1.3.2',
     tagName: 'v1.3.2',
