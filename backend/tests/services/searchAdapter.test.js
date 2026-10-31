@@ -1,11 +1,6 @@
 import { jest } from "@jest/globals";
 
-const ENV_KEYS = [
-  "BRAVE_API_KEY",
-  "EXA_API_KEY",
-  "PARALLEL_API_KEY",
-  "SEARCH_PROVIDER",
-];
+const ENV_KEYS = ["EXA_API_KEY", "PARALLEL_API_KEY", "SEARCH_PROVIDER"];
 
 const {
   searchWeb,
@@ -48,7 +43,7 @@ describe("searchAdapter", () => {
   });
 
   it("is disabled when SEARCH_PROVIDER=openrouter even with a key", () => {
-    process.env.BRAVE_API_KEY = "brave-key";
+    process.env.EXA_API_KEY = "exa-key";
     process.env.SEARCH_PROVIDER = "openrouter";
 
     expect(isLocalSearchConfigured()).toBe(false);
@@ -56,43 +51,19 @@ describe("searchAdapter", () => {
 
   it("auto-detects configured providers in priority order", () => {
     process.env.PARALLEL_API_KEY = "p";
-    process.env.BRAVE_API_KEY = "b";
+    process.env.EXA_API_KEY = "e";
 
-    expect(getConfiguredProviders()).toEqual(["brave", "parallel"]);
+    expect(getConfiguredProviders()).toEqual(["exa", "parallel"]);
     expect(isLocalSearchConfigured()).toBe(true);
   });
 
-  it("uses the Brave endpoint and subscription header", async () => {
-    process.env.BRAVE_API_KEY = "brave-key";
-    global.fetch.mockResolvedValue(
-      jsonResponse({
-        web: {
-          results: [
-            {
-              title: "Brave result",
-              url: "https://example.com/a",
-              description: "Snippet A",
-            },
-          ],
-        },
-      }),
-    );
+  it("ignores a pinned provider that no longer exists", async () => {
+    process.env.EXA_API_KEY = "exa-key";
+    process.env.SEARCH_PROVIDER = "brave";
 
-    const results = await searchWeb("test query");
-
-    expect(results).toEqual([
-      {
-        title: "Brave result",
-        url: "https://example.com/a",
-        snippet: "Snippet A",
-        source: "brave",
-      },
-    ]);
-
-    const [url, options] = global.fetch.mock.calls[0];
-    expect(url).toContain("https://api.search.brave.com/res/v1/web/search");
-    expect(url).toContain("q=test+query");
-    expect(options.headers["X-Subscription-Token"]).toBe("brave-key");
+    expect(isLocalSearchConfigured()).toBe(false);
+    await expect(searchWeb("anything")).resolves.toEqual([]);
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 
   it("uses Exa with contents.highlights and no deprecated params", async () => {
@@ -157,18 +128,18 @@ describe("searchAdapter", () => {
   });
 
   it("falls through to the next provider when one returns nothing", async () => {
-    process.env.BRAVE_API_KEY = "brave-key";
     process.env.EXA_API_KEY = "exa-key";
+    process.env.PARALLEL_API_KEY = "parallel-key";
 
     global.fetch
-      .mockResolvedValueOnce(jsonResponse({ web: { results: [] } }))
+      .mockResolvedValueOnce(jsonResponse({ results: [] }))
       .mockResolvedValueOnce(
         jsonResponse({
           results: [
             {
-              title: "Exa fallback",
+              title: "Parallel fallback",
               url: "https://example.com/d",
-              highlights: ["fallback"],
+              excerpts: ["fallback"],
             },
           ],
         }),
@@ -177,13 +148,13 @@ describe("searchAdapter", () => {
     const results = await searchWeb("fallback");
 
     expect(results).toHaveLength(1);
-    expect(results[0].source).toBe("exa");
+    expect(results[0].source).toBe("parallel");
     expect(global.fetch).toHaveBeenCalledTimes(2);
   });
 
   it("skips a provider that returns an HTTP error", async () => {
-    process.env.BRAVE_API_KEY = "brave-key";
     process.env.EXA_API_KEY = "exa-key";
+    process.env.PARALLEL_API_KEY = "parallel-key";
 
     global.fetch
       .mockResolvedValueOnce(
@@ -192,26 +163,32 @@ describe("searchAdapter", () => {
       .mockResolvedValueOnce(
         jsonResponse({
           results: [
-            { title: "Exa", url: "https://example.com/e", highlights: ["ok"] },
+            {
+              title: "Parallel",
+              url: "https://example.com/e",
+              excerpts: ["ok"],
+            },
           ],
         }),
       );
 
     const results = await searchWeb("rate limited");
 
-    expect(results[0].source).toBe("exa");
+    expect(results[0].source).toBe("parallel");
   });
 
   it("dedupes repeated URLs", async () => {
-    process.env.BRAVE_API_KEY = "brave-key";
+    process.env.EXA_API_KEY = "exa-key";
     global.fetch.mockResolvedValue(
       jsonResponse({
-        web: {
-          results: [
-            { title: "One", url: "https://example.com/x", description: "a" },
-            { title: "One again", url: "https://example.com/x", description: "b" },
-          ],
-        },
+        results: [
+          { title: "One", url: "https://example.com/x", highlights: ["a"] },
+          {
+            title: "One again",
+            url: "https://example.com/x",
+            highlights: ["b"],
+          },
+        ],
       }),
     );
 
@@ -222,36 +199,40 @@ describe("searchAdapter", () => {
   });
 
   it("returns an empty list instead of throwing when every provider fails", async () => {
-    process.env.BRAVE_API_KEY = "brave-key";
+    process.env.EXA_API_KEY = "exa-key";
     global.fetch.mockRejectedValue(new Error("network down"));
 
     await expect(searchWeb("offline")).resolves.toEqual([]);
   });
 
   it("returns an empty list for a blank query", async () => {
-    process.env.BRAVE_API_KEY = "brave-key";
+    process.env.EXA_API_KEY = "exa-key";
 
     await expect(searchWeb("   ")).resolves.toEqual([]);
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
   it("respects a pinned SEARCH_PROVIDER", async () => {
-    process.env.BRAVE_API_KEY = "brave-key";
     process.env.EXA_API_KEY = "exa-key";
-    process.env.SEARCH_PROVIDER = "exa";
+    process.env.PARALLEL_API_KEY = "parallel-key";
+    process.env.SEARCH_PROVIDER = "parallel";
 
     global.fetch.mockResolvedValue(
       jsonResponse({
         results: [
-          { title: "Exa only", url: "https://example.com/f", highlights: ["x"] },
+          {
+            title: "Parallel only",
+            url: "https://example.com/f",
+            excerpts: ["x"],
+          },
         ],
       }),
     );
 
     const results = await searchWeb("pinned");
 
-    expect(results[0].source).toBe("exa");
+    expect(results[0].source).toBe("parallel");
     expect(global.fetch).toHaveBeenCalledTimes(1);
-    expect(global.fetch.mock.calls[0][0]).toBe("https://api.exa.ai/search");
+    expect(global.fetch.mock.calls[0][0]).toBe("https://api.parallel.ai/v1/search");
   });
 });

@@ -7,17 +7,17 @@
  * can degrade to OpenRouter's built-in search or answer without web context.
  *
  * Selection:
- *   SEARCH_PROVIDER=brave|exa|parallel  -> use that provider only
- *   SEARCH_PROVIDER=openrouter          -> disable this adapter
- *   unset                               -> use every provider with a key,
- *                                          in PROVIDER_ORDER
+ *   SEARCH_PROVIDER=exa|parallel  -> use that provider only
+ *   SEARCH_PROVIDER=openrouter    -> disable this adapter
+ *   unset                         -> use every provider with a key,
+ *                                    in PROVIDER_ORDER
  */
 
 const DEFAULT_TIMEOUT_MS = 8000;
 const DEFAULT_LIMIT = 5;
 const MAX_SNIPPET_CHARS = 600;
 
-const PROVIDER_ORDER = ["brave", "exa", "parallel"];
+const PROVIDER_ORDER = ["exa", "parallel"];
 
 const clipText = (value, max = MAX_SNIPPET_CHARS) => {
   if (typeof value !== "string") return "";
@@ -48,33 +48,7 @@ const fetchJson = async (url, options, timeoutMs) => {
   }
 };
 
-// 1. Brave — independent index, single GET.
-const searchBrave = async (query, { limit, timeoutMs }) => {
-  const params = new URLSearchParams({
-    q: query,
-    count: String(Math.min(limit, 20)),
-  });
-
-  const data = await fetchJson(
-    `https://api.search.brave.com/res/v1/web/search?${params.toString()}`,
-    {
-      headers: {
-        Accept: "application/json",
-        "X-Subscription-Token": process.env.BRAVE_API_KEY,
-      },
-    },
-    timeoutMs,
-  );
-
-  return (data.web?.results || []).map((item) => ({
-    title: clipText(item.title, 200) || "Untitled source",
-    url: item.url,
-    snippet: clipText(item.description),
-    source: "brave",
-  }));
-};
-
-// 2. Exa — semantic retrieval. Content controls must live under `contents`.
+// 1. Exa — semantic retrieval. Content controls must live under `contents`.
 const searchExa = async (query, { limit, timeoutMs }) => {
   const data = await fetchJson(
     "https://api.exa.ai/search",
@@ -107,7 +81,7 @@ const searchExa = async (query, { limit, timeoutMs }) => {
   });
 };
 
-// 3. Parallel — v1 Search API. `search_queries` is required on /v1.
+// 2. Parallel — v1 Search API. `search_queries` is required on /v1.
 const searchParallel = async (query, { limit, timeoutMs }) => {
   const data = await fetchJson(
     "https://api.parallel.ai/v1/search",
@@ -139,7 +113,6 @@ const searchParallel = async (query, { limit, timeoutMs }) => {
 };
 
 const PROVIDERS = {
-  brave: { name: "brave", keyEnv: "BRAVE_API_KEY", search: searchBrave },
   exa: { name: "exa", keyEnv: "EXA_API_KEY", search: searchExa },
   parallel: {
     name: "parallel",

@@ -183,7 +183,7 @@ describe("chatService - web tool assembly", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     executeOpenRouter.mockResolvedValue("ok");
-    delete process.env.BRAVE_API_KEY;
+    delete process.env.EXA_API_KEY;
     delete process.env.EXA_API_KEY;
     delete process.env.PARALLEL_API_KEY;
     delete process.env.SEARCH_PROVIDER;
@@ -192,7 +192,7 @@ describe("chatService - web tool assembly", () => {
 
   afterAll(() => {
     for (const key of [
-      "BRAVE_API_KEY",
+      "EXA_API_KEY",
       "EXA_API_KEY",
       "PARALLEL_API_KEY",
       "SEARCH_PROVIDER",
@@ -233,7 +233,7 @@ describe("chatService - web tool assembly", () => {
   });
 
   it("uses the local search adapter instead of openrouter:web_search when configured", async () => {
-    process.env.BRAVE_API_KEY = "brave-key";
+    process.env.EXA_API_KEY = "exa-key";
 
     await chatWithAi({
       message: "hello",
@@ -248,7 +248,7 @@ describe("chatService - web tool assembly", () => {
   });
 
   it("re-arms openrouter:web_search when the adapter came back empty", async () => {
-    process.env.BRAVE_API_KEY = "brave-key";
+    process.env.EXA_API_KEY = "exa-key";
 
     await chatWithAi({
       message: "hello",
