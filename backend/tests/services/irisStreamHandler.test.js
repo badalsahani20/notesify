@@ -103,3 +103,65 @@ describe('IrisStreamHandler save_memory', () => {
     expect(result.finalReply).toBe('');
   });
 });
+
+describe('IrisStreamHandler web tools', () => {
+  const handleWith = async (chunks) => {
+    const executor = { execute: jest.fn() };
+    const handler = new IrisStreamHandler({ toolExecutor: executor });
+    const res = makeRes();
+
+    const result = await handler.handle({
+      stream: makeStream(chunks),
+      res,
+      noteFetched: false,
+      userId: 'user_1',
+      fallbackNoteId: null,
+    });
+
+    return { result, res, executor };
+  };
+
+  it('queues a native search_web call for the agent loop', async () => {
+    const { result } = await handleWith([
+      sseChunk(toolCallDelta(0, 'call_1', 'search_web', { query: 'latest Node LTS' })),
+    ]);
+
+    expect(result.serverToolCalls).toEqual([
+      { id: 'call_1', tool: 'search_web', args: { query: 'latest Node LTS' } },
+    ]);
+    expect(result.toolCalls[0]).toMatchObject({ tool: 'search_web' });
+  });
+
+  it('does not re-queue a provider-executed openrouter:web_search call', async () => {
+    const { result } = await handleWith([
+      sseChunk(
+        toolCallDelta(0, 'call_1', 'openrouter:web_search', { query: 'latest Node LTS' }),
+      ),
+    ]);
+
+    expect(result.serverToolCalls).toEqual([]);
+    expect(result.toolCalls[0]).toMatchObject({ tool: 'search_web' });
+  });
+
+  it('queues a native crawl_url call for the agent loop', async () => {
+    const { result } = await handleWith([
+      sseChunk(toolCallDelta(0, 'call_1', 'crawl_url', { url: 'https://example.com/a' })),
+    ]);
+
+    expect(result.serverToolCalls).toEqual([
+      { id: 'call_1', tool: 'crawl_url', args: { url: 'https://example.com/a' } },
+    ]);
+    expect(result.toolCalls[0]).toMatchObject({ tool: 'crawl_url' });
+  });
+
+  it('does not re-queue a provider-executed openrouter:web_fetch call', async () => {
+    const { result } = await handleWith([
+      sseChunk(
+        toolCallDelta(0, 'call_1', 'openrouter:web_fetch', { url: 'https://example.com/a' }),
+      ),
+    ]);
+
+    expect(result.serverToolCalls).toEqual([]);
+    expect(result.toolCalls[0]).toMatchObject({ tool: 'crawl_url' });
+  });
+});

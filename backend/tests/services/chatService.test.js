@@ -157,3 +157,140 @@ describe("chatService - chatWithAi", () => {
     expect(executeOpenRouter.mock.calls[1][0]).toBe("test/quick-model");
   });
 });
+
+describe("chatService - web tool assembly", () => {
+  const originalEnv = { ...process.env };
+
+  const localTools = [
+    {
+      type: "function",
+      function: {
+        name: "search_web",
+        parameters: { type: "object", properties: {} },
+      },
+    },
+    {
+      type: "function",
+      function: {
+        name: "crawl_url",
+        parameters: { type: "object", properties: {} },
+      },
+    },
+  ];
+
+  const passedTools = () => executeOpenRouter.mock.calls.at(-1)[5];
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    executeOpenRouter.mockResolvedValue("ok");
+    delete process.env.BRAVE_API_KEY;
+    delete process.env.EXA_API_KEY;
+    delete process.env.PARALLEL_API_KEY;
+    delete process.env.SEARCH_PROVIDER;
+    delete process.env.WEB_FETCH_PROVIDER;
+  });
+
+  afterAll(() => {
+    for (const key of [
+      "BRAVE_API_KEY",
+      "EXA_API_KEY",
+      "PARALLEL_API_KEY",
+      "SEARCH_PROVIDER",
+      "WEB_FETCH_PROVIDER",
+    ]) {
+      if (originalEnv[key] === undefined) delete process.env[key];
+      else process.env[key] = originalEnv[key];
+    }
+  });
+
+  it("drops openrouter:web_fetch when native crawl_url is active", async () => {
+    await chatWithAi({
+      message: "hello",
+      tools: localTools,
+      enableWeb: true,
+      stream: false,
+    });
+
+    const tools = passedTools();
+    expect(tools.some((t) => t.function?.name === "crawl_url")).toBe(true);
+    expect(tools.some((t) => t.type === "openrouter:web_fetch")).toBe(false);
+    expect(tools.some((t) => t.type === "openrouter:web_search")).toBe(true);
+  });
+
+  it("keeps openrouter:web_fetch when WEB_FETCH_PROVIDER=openrouter", async () => {
+    process.env.WEB_FETCH_PROVIDER = "openrouter";
+
+    await chatWithAi({
+      message: "hello",
+      tools: localTools,
+      enableWeb: true,
+      stream: false,
+    });
+
+    expect(
+      passedTools().some((t) => t.type === "openrouter:web_fetch"),
+    ).toBe(true);
+  });
+
+  it("uses the local search adapter instead of openrouter:web_search when configured", async () => {
+    process.env.BRAVE_API_KEY = "brave-key";
+
+    await chatWithAi({
+      message: "hello",
+      tools: localTools,
+      enableWeb: true,
+      stream: false,
+    });
+
+    const tools = passedTools();
+    expect(tools.some((t) => t.function?.name === "search_web")).toBe(true);
+    expect(tools.some((t) => t.type === "openrouter:web_search")).toBe(false);
+  });
+
+  it("re-arms openrouter:web_search when the adapter came back empty", async () => {
+    process.env.BRAVE_API_KEY = "brave-key";
+
+    await chatWithAi({
+      message: "hello",
+      tools: localTools,
+      enableWeb: true,
+      providerWebFallback: true,
+      stream: false,
+    });
+
+    const tools = passedTools();
+    expect(tools.some((t) => t.type === "openrouter:web_search")).toBe(true);
+    // Exactly one search tool per round.
+    expect(tools.some((t) => t.function?.name === "search_web")).toBe(false);
+  });
+
+  it("removes local web tools when web search is disabled", async () => {
+    await chatWithAi({
+      message: "hello",
+      tools: localTools,
+      enableWeb: false,
+      stream: false,
+    });
+
+    expect(passedTools()).toBeNull();
+  });
+
+  it("tags the last function tool as the cache breakpoint", async () => {
+    await chatWithAi({
+      message: "hello",
+      tools: localTools,
+      enableWeb: true,
+      stream: false,
+    });
+
+    const tools = passedTools();
+    const tagged = tools.filter((t) => t.cache_control);
+
+    expect(tagged).toHaveLength(1);
+    // crawl_url is the last local tool; provider tools must stay untouched.
+    expect(tagged[0].function.name).toBe("crawl_url");
+    expect(
+      tools.some((t) => t.type?.startsWith("openrouter:") && t.cache_control),
+    ).toBe(false);
+  });
+});

@@ -369,12 +369,33 @@ export class IrisStreamHandler {
           tool: "search_web",
           query: state.parsedQuery,
         });
+
+        // `search_web` (our function tool) must run server-side. The
+        // `openrouter:web_search` variant has already executed provider-side,
+        // so only the raw local name is queued for the agent loop.
+        if (state.name === "search_web") {
+          serverToolCalls.push({
+            id: state.id,
+            tool: "search_web",
+            args: { query: state.parsedQuery },
+          });
+        }
       } else if (normalizedTool === "crawl_url" && state.parsedUrl) {
         toolCalls.push({
           id: state.id,
           tool: "crawl_url",
           url: state.parsedUrl,
         });
+
+        // Native fetch runs server-side. `openrouter:web_fetch` already ran
+        // provider-side, so only the raw local name is queued.
+        if (state.name === "crawl_url") {
+          serverToolCalls.push({
+            id: state.id,
+            tool: "crawl_url",
+            args: { url: state.parsedUrl },
+          });
+        }
       } else if (normalizedTool === "create_note") {
         let parsedArgs = state.parsedArgs;
         if (!parsedArgs && state.rawArgs) {

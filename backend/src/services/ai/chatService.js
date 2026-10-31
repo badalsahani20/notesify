@@ -12,6 +12,8 @@ import { executeOpenRouter } from "./transport/openRouterClient.js";
 import { executeGroq } from "./transport/groqClient.js";
 import { executeGemini } from "./transport/geminiClient.js";
 import { classifyChatIntent } from "./router/modelRouter.js";
+import { isLocalSearchConfigured } from "./search/searchAdapter.js";
+import { isNativeFetchEnabled } from "./search/webFetch.js";
 
 /**
  * Formats a StructuredNoteContext into a clear, LLM-readable prompt section.
@@ -136,6 +138,7 @@ export const chatWithAi = async ({
   modelTier = null,
   useReasoning = true,
   enableWeb = true,
+  providerWebFallback = false,
   chatMode = "casual",
   tools = null,
   extraMessages = [],
@@ -304,39 +307,79 @@ export const chatWithAi = async ({
   const shouldOfferLocalTools = true;
   let localTools = shouldOfferLocalTools && Array.isArray(tools) ? [...tools] : [];
 
-  // Enable prompt caching on tools for Anthropic / OpenRouter by tagging the last tool
-  if (localTools.length > 0) {
-    localTools = localTools.map((t, idx) => {
-      if (idx === localTools.length - 1) {
-        return { ...t, cache_control: { type: "ephemeral" } };
-      }
-      return t;
-    });
+  // A configured local provider replaces OpenRouter's server-side search.
+  // OpenRouter's search is re-armed for a single round when the local adapter
+  // returns nothing, so a provider outage still gets a web-backed answer.
+  const localSearchActive = enableWeb === true && isLocalSearchConfigured();
+  const useProviderSearch =
+    enableWeb === true && (!localSearchActive || providerWebFallback === true);
+  // On the fallback round the provider tool replaces the local one; offering
+  // both would make the model pick unpredictably.
+  const providerSearchArmed = useProviderSearch && localSearchActive;
+
+  // Native crawl_url replaces openrouter:web_fetch: it works on every
+  // transport, while the provider tool is stripped by Groq and Gemini.
+  const nativeFetchActive = enableWeb === true && isNativeFetchEnabled();
+  const useProviderFetch = enableWeb === true && !nativeFetchActive;
+
+  // Web tools must not be offered when web search is disabled, even though the
+  // caller may have built the tool list before the toggle was known.
+  if (enableWeb !== true || providerSearchArmed) {
+    localTools = localTools.filter(
+      (tool) => tool.function?.name !== "search_web",
+    );
+  }
+  if (enableWeb !== true) {
+    localTools = localTools.filter(
+      (tool) => tool.function?.name !== "crawl_url",
+    );
   }
 
   const openRouterWebTools =
     enableWeb === true
       ? [
-          {
-            type: "openrouter:web_search",
-            parameters: {
-              engine: "auto",
-              max_results: 4,
-              max_total_results: 8,
-              search_context_size: "medium",
-            },
-          },
-          {
-            type: "openrouter:web_fetch",
-            parameters: {
-              engine: "openrouter",
-              max_content_tokens: 4000,
-            },
-          },
+          ...(useProviderSearch
+            ? [
+                {
+                  type: "openrouter:web_search",
+                  parameters: {
+                    engine: "auto",
+                    max_results: 4,
+                    max_total_results: 8,
+                    search_context_size: "medium",
+                  },
+                },
+              ]
+            : []),
+          ...(useProviderFetch
+            ? [
+                {
+                  type: "openrouter:web_fetch",
+                  parameters: {
+                    engine: "openrouter",
+                    max_content_tokens: 4000,
+                  },
+                },
+              ]
+            : []),
         ]
       : [];
 
   const effectiveTools = [...localTools, ...openRouterWebTools];
+
+  // Tag the last standard function tool. Provider tools (`openrouter:*`) are
+  // passed through with their own schema, so they must stay untouched; the
+  // function-tool array is the part worth caching and it is stable per config.
+  const lastFunctionToolIndex = effectiveTools.findLastIndex(
+    (tool) => tool.type === "function" || !tool.type,
+  );
+  if (lastFunctionToolIndex !== -1) {
+    effectiveTools[lastFunctionToolIndex] = {
+      ...effectiveTools[lastFunctionToolIndex],
+      cache_control: { type: "ephemeral" },
+    };
+  }
+
   const finalTools = effectiveTools.length > 0 ? effectiveTools : null;
   const maxToolCalls = finalTools ? 4 : null;
 

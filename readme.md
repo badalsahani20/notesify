@@ -87,8 +87,16 @@ Iris uses native tool calling inside a bounded loop, so it can act without runni
 - `create_note` and `update_note` for authoring from chat.
 - `ask_question` for clarification and self-quizzing, rendered as an interactive dialog.
 - `save_memory` for preferences that should survive the session.
+- `search_web` for live web results when a search provider is configured.
+- `crawl_url` for reading one public page in full, decided by the model.
 
 Every tool call is schema-validated and the loop has a hard round limit.
+
+Web search is provider-agnostic. Brave, Exa, and Parallel sit behind one adapter (`backend/src/services/ai/search/searchAdapter.js`) that normalizes results, dedupes by URL, and never throws — a failed provider falls through to the next. With no search key configured, search stays delegated to OpenRouter's built-in tool. If the local adapter returns nothing, OpenRouter's search is re-armed for the next round.
+
+`crawl_url` is a native fetcher (`backend/src/services/ai/search/webFetch.js`): no key, works on every transport, and replaces `openrouter:web_fetch` by default because Groq and Gemini strip provider-specific tools. It refuses localhost, private ranges, and non-http(s) URLs, re-validates every redirect hop, and caps the response at 2 MB / 12k characters. Set `WEB_FETCH_PROVIDER=openrouter` to use the provider tool instead.
+
+The system prompt and tool list are cached: the constitution carries a block-level `cache_control` breakpoint and the last tool overall carries one too. Because the tool array is part of the cached prefix, `getChatTools()` keeps its shape stable per configuration — adding or removing a tool invalidates that prefix.
 
 ### Context budgeting
 
@@ -183,6 +191,18 @@ UPSTASH_REDIS_REST_TOKEN=your_upstash_token
 OPENROUTER_API_KEY=your_openrouter_key
 GEMINI_API_KEY=your_gemini_key
 GROQ_API_KEY=your_groq_key
+
+# Optional: provider-agnostic web search.
+# Unset -> use any provider that has a key (brave -> exa -> parallel).
+# SEARCH_PROVIDER=openrouter -> always use OpenRouter's built-in search.
+SEARCH_PROVIDER=
+BRAVE_API_KEY=
+EXA_API_KEY=
+PARALLEL_API_KEY=
+
+# Optional: native crawl_url vs provider fetch.
+# Unset -> native fetch. WEB_FETCH_PROVIDER=openrouter -> openrouter:web_fetch.
+WEB_FETCH_PROVIDER=
 
 CLOUDINARY_CLOUD_NAME=your_cloud_name
 CLOUDINARY_API_KEY=your_cloudinary_key

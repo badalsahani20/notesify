@@ -39,6 +39,9 @@ export class IrisAgent {
     const extraMessages = [...initialExtraMessages];
     let pdfContextToEmit = pdfContext || "";
     let currentRound = startRound;
+    // Armed for one round when the local search adapter yields nothing, so the
+    // next completion can fall back to OpenRouter's server-side search.
+    let providerWebFallback = false;
     let totalUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0, cachedTokens: 0 };
     let lastModel = null;
 
@@ -66,6 +69,7 @@ export class IrisAgent {
           modelTier,
           useReasoning,
           enableWeb,
+          providerWebFallback,
           chatMode,
           tools,
           extraMessages,
@@ -152,6 +156,7 @@ export class IrisAgent {
         ) {
           const roundAssistantToolCalls = [];
           const roundToolResponses = [];
+          let localSearchFailed = false;
 
           for (const st of serverToolsToRun) {
             const toolExecResult = await executeServerTool(
@@ -160,6 +165,13 @@ export class IrisAgent {
               userId,
               activeNoteId,
             );
+
+            if (
+              st.tool === "search_web" &&
+              (toolExecResult?.error || toolExecResult?.count === 0)
+            ) {
+              localSearchFailed = true;
+            }
 
             // Keep the existing SSE payload exactly as-is.
             res.write(
@@ -205,6 +217,8 @@ export class IrisAgent {
             },
             ...roundToolResponses
           );
+
+          providerWebFallback = localSearchFailed;
 
           // Continue the agentic loop with the server tool result.
           continue;

@@ -1,3 +1,6 @@
+import { isLocalSearchConfigured } from "../search/searchAdapter.js";
+import { isNativeFetchEnabled } from "../search/webFetch.js";
+
 export const saveMemoryTool = {
   type: "function",
   function: {
@@ -187,6 +190,46 @@ export const searchNotesTool = {
   },
 };
 
+export const searchWebTool = {
+  type: "function",
+  function: {
+    name: "search_web",
+    description:
+      "Search the live web for current information. Use it when the answer depends on recent events, prices, releases, or facts that are not in the user's notes.",
+    parameters: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description: "Search query. Be specific about the topic and time window.",
+        },
+      },
+      required: ["query"],
+      additionalProperties: false,
+    },
+  },
+};
+
+export const crawlUrlTool = {
+  type: "function",
+  function: {
+    name: "crawl_url",
+    description:
+      "Fetch one public web page and return its readable text. Use it after search_web when a specific result needs to be read in full. Only public http(s) URLs are allowed.",
+    parameters: {
+      type: "object",
+      properties: {
+        url: {
+          type: "string",
+          description: "Absolute http(s) URL to read.",
+        },
+      },
+      required: ["url"],
+      additionalProperties: false,
+    },
+  },
+};
+
 export const CHAT_TOOLS = [
   saveMemoryTool,
   recallMemoryTool,
@@ -197,4 +240,18 @@ export const CHAT_TOOLS = [
   askQuestionTool,
 ];
 
-export const getChatTools = () => CHAT_TOOLS;
+/**
+ * Web tools are added by capability, not by model:
+ *   - search_web needs a configured search provider
+ *   - crawl_url is native and needs no key
+ * Otherwise the equivalent work stays delegated to OpenRouter.
+ *
+ * Keep this list stable across a conversation: the tool array is part of the
+ * cached prompt prefix, so adding or removing a tool invalidates the cache.
+ */
+export const getChatTools = () => {
+  const tools = [...CHAT_TOOLS];
+  if (isLocalSearchConfigured()) tools.push(searchWebTool);
+  if (isNativeFetchEnabled()) tools.push(crawlUrlTool);
+  return tools;
+};

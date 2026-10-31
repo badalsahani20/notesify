@@ -108,6 +108,14 @@ export const sanitizeMessageForSummary = (message) => {
             url: c.url,
           }));
         }
+      } else if (tc.tool === "crawl_url") {
+        // Keep the page identity and a short excerpt; the full text is too
+        // large to replay in every later turn.
+        sanitized.url = tc.args?.url || tc.data?.url;
+        if (tc.data?.title) sanitized.title = tc.data.title;
+        if (tc.data?.text) {
+          sanitized.contentExcerpt = tc.data.text.slice(0, 600);
+        }
       } else if (tc.tool === "recall_memory") {
         sanitized.query = tc.args?.query;
         if (Array.isArray(tc.data)) {

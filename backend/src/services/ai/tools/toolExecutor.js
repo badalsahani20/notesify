@@ -1,6 +1,8 @@
 import { getNoteContentForUser, searchNote } from "../../notes.service.js";
 import { saveMemoryWithStatus, searchMemories } from "../../memoryService.js";
 import { stripHtml } from "../../../utils/stripHtml.js";
+import { searchWeb } from "../search/searchAdapter.js";
+import { fetchPage } from "../search/webFetch.js";
 
 export class ToolExecutor {
   async execute({
@@ -101,6 +103,47 @@ export class ToolExecutor {
         return { count: notes.length, notes };
       } catch (error) {
         return { error: `Failed to search notes: ${error.message}` };
+      }
+    }
+
+    if (toolName === "search_web") {
+      const query = typeof args?.query === "string" ? args.query.trim() : "";
+      if (!query) {
+        return { error: "Missing query for search_web." };
+      }
+
+      try {
+        const results = await searchWeb(query);
+        if (results.length === 0) {
+          return {
+            query,
+            count: 0,
+            message: `No web results were available for "${query}".`,
+          };
+        }
+
+        return {
+          query,
+          count: results.length,
+          results,
+          // Kept for history sanitization and citation rendering.
+          citations: results.map(({ title, url }) => ({ title, url })),
+        };
+      } catch (error) {
+        return { error: `Web search failed: ${error.message}` };
+      }
+    }
+
+    if (toolName === "crawl_url") {
+      const url = typeof args?.url === "string" ? args.url.trim() : "";
+      if (!url) {
+        return { error: "Missing url for crawl_url." };
+      }
+
+      try {
+        return await fetchPage(url);
+      } catch (error) {
+        return { error: `Web fetch failed: ${error.message}` };
       }
     }
 

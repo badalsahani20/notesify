@@ -115,3 +115,67 @@ describe('IrisAgent save_memory', () => {
     );
   });
 });
+
+describe('IrisAgent web search fallback', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    chatWithAi.mockResolvedValue({ stream: {}, model: 'test-model' });
+  });
+
+  const runWithSearchResult = async (toolResult) => {
+    const executeServerTool = jest.fn().mockResolvedValue(toolResult);
+
+    const streamAiResponse = jest
+      .fn()
+      .mockResolvedValueOnce({
+        finalReply: '',
+        toolCalls: [],
+        serverToolCalls: [
+          { id: 'call_1', tool: 'search_web', args: { query: 'latest Node LTS' } },
+        ],
+        tokenUsage: usage,
+      })
+      .mockResolvedValueOnce({
+        finalReply: 'Here is what I found.',
+        toolCalls: [],
+        serverToolCalls: [],
+        tokenUsage: usage,
+      });
+
+    const agent = new IrisAgent({ maxToolRounds: 5 });
+
+    await agent.run({
+      message: 'what is the latest Node LTS?',
+      userId: 'user_1',
+      stream: true,
+      res: makeRes(),
+      streamAiResponse,
+      executeServerTool,
+    });
+  };
+
+  it('arms OpenRouter search for the next round when the adapter returns nothing', async () => {
+    await runWithSearchResult({
+      query: 'latest Node LTS',
+      count: 0,
+      message: 'No web results were available.',
+    });
+
+    expect(chatWithAi).toHaveBeenCalledTimes(2);
+    expect(chatWithAi.mock.calls[0][0].providerWebFallback).toBe(false);
+    expect(chatWithAi.mock.calls[1][0].providerWebFallback).toBe(true);
+  });
+
+  it('does not arm the fallback when the adapter returned results', async () => {
+    await runWithSearchResult({
+      query: 'latest Node LTS',
+      count: 1,
+      results: [
+        { title: 'Node.js', url: 'https://nodejs.org', snippet: 'LTS' },
+      ],
+    });
+
+    expect(chatWithAi).toHaveBeenCalledTimes(2);
+    expect(chatWithAi.mock.calls[1][0].providerWebFallback).toBe(false);
+  });
+});
