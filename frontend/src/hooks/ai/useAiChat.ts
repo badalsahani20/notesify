@@ -232,7 +232,7 @@ export const useAiChat = (noteId: string, noteContent: string, editor: Editor | 
 
       if (status === 429 || /quota|rate limit|too many requests/i.test(message)) {
         toast.error("AI Limit Reached", {
-          description: "Please upgrade to Premium to keep using AI features without limits.",
+          description: "Please upgrade to Premium to keep using AI features with higher limits.",
           duration: 5000,
         });
       }
