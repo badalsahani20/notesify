@@ -1,6 +1,24 @@
 import Notes from "../models/notes.model.js";
 import Folder from "../models/folder.model.js";
+import {
+    clearNoteTombstone,
+    recordNoteTombstones,
+} from "./tombstone.service.js";
+
 export const emptyTrash = async (userId) => {
+    const deletedNotes = await Notes.find({
+        user: userId,
+        isDeleted: true,
+        isArchived: { $in: [true, false, null] },
+    })
+        .select("_id")
+        .lean();
+
+    await recordNoteTombstones(
+        userId,
+        deletedNotes.map((note) => note._id)
+    );
+
     const [notesResult, foldersResult] = await Promise.all([
         Notes.deleteMany({ user: userId, isDeleted: true}),
         Folder.deleteMany({ user: userId, isDeleted: true})
@@ -13,17 +31,38 @@ export const emptyTrash = async (userId) => {
 }
 
 export const permanentlyDeleteFolderAndNotes = async (folderId, userId) => {
-    const folderResult = await Folder.findOneAndDelete({ _id: folderId, user: userId, isDeleted: true});
+    const folder = await Folder.findOne({
+        _id: folderId,
+        user: userId,
+        isDeleted: true,
+    });
 
-    if (folderResult) {
-        await Notes.deleteMany({ folder: folderId, user: userId});
+    if (!folder) {
+        return null;
     }
 
-    return folderResult;
+    const notes = await Notes.find({
+        folder: folderId,
+        user: userId,
+        isDeleted: { $in: [true, false, null] },
+        isArchived: { $in: [true, false, null] },
+    })
+        .select("_id")
+        .lean();
+
+    await recordNoteTombstones(
+        userId,
+        notes.map((note) => note._id)
+    );
+
+    await Folder.findOneAndDelete({ _id: folderId, user: userId, isDeleted: true });
+    await Notes.deleteMany({ folder: folderId, user: userId});
+
+    return folder;
 }
 export const getTrashItems = async (userId) => {
     const[notes, folders] = await Promise.all([
-        Notes.find({ user: userId, isDeleted: true, isArchived: { $in: [true, false] }}).sort({ updatedAt: -1 }),
+        Notes.find({ user: userId, isDeleted: true, isArchived: { $in: [true, false] }}).select("-embedding").sort({ updatedAt: -1 }),
         Folder.find({user: userId, isDeleted: true}).sort({ updatedAt: -1 })
     ])
 
@@ -31,11 +70,19 @@ export const getTrashItems = async (userId) => {
 }
 
 export const restoreNote = async (noteId, userId) => {
-    return await Notes.findOneAndUpdate(
+    const restoredNote = await Notes.findOneAndUpdate(
         { _id: noteId, user: userId, isDeleted: true, isArchived: { $in: [true, false] }},
         {isDeleted: false, $inc: { version: 1 }},
         { new: true }
     );
+
+    if (restoredNote) {
+        await clearNoteTombstone(userId, restoredNote._id).catch((err) => {
+            console.warn("[Trash] Failed to clear note tombstone:", err);
+        });
+    }
+
+    return restoredNote;
 };
 
 export const restoreFolderAndNotes = async (folderId, userId) => {

@@ -1,12 +1,11 @@
 import { useState, useEffect, lazy, Suspense } from "react";
-import { Expand, Loader2, ZoomIn, ZoomOut, RefreshCw } from "lucide-react";
+import { Loader2, ZoomIn, ZoomOut, RefreshCw } from "lucide-react";
 import { motion } from "framer-motion";
 import type { IrisSegment } from "@/store/useGlobalChatStore";
 
 const MermaidDiagram = lazy(() => import("./viz/MermaidDiagram"));
 const ChartBlock = lazy(() => import("./viz/ChartBlock"));
 const MathBlock = lazy(() => import("./viz/MathBlock"));
-const SvgPreviewCard = lazy(() => import("./viz/SvgPreviewCard"));
 
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
@@ -35,8 +34,6 @@ const IrisVisualBlock = ({ visualization: v }: IrisVisualBlockProps) => {
         return <ChartBlock data={v.data} expanded={expanded} />;
       case "math":
         return <MathBlock formula={v.data} />;
-      case "svg":
-        return <SvgPreviewCard svgCode={v.data} />;
       default:
         return (
           <div className="iris-viz-error">
@@ -55,48 +52,32 @@ const IrisVisualBlock = ({ visualization: v }: IrisVisualBlockProps) => {
       className={`iris-viz-block ${v.isStreaming ? "iris-viz-streaming" : ""}`}
     >
       {v.isStreaming ? (
-        <div className={isMath ? "py-2" : ""}>
-          {v.title && v.title !== "Visualization" && <p className="iris-viz-title">{v.title}</p>}
-          <div className={`flex items-center justify-center rounded-2xl border border-dashed border-white/10 bg-white/[0.02] p-6 text-center ${isMath ? "h-16" : "h-36 flex-col"}`}>
-            <Loader2 className={`animate-spin text-indigo-500 ${isMath ? "h-4 w-4 mr-2" : "h-6 w-6 mb-2"}`} />
+        <div className={isMath ? "py-1.5" : "py-2"}>
+          <div className={`flex items-center justify-center rounded-xl border border-dashed border-white/10 bg-white/[0.02] p-4 text-center ${isMath ? "h-14" : "h-24 flex-col"}`}>
+            <Loader2 className={`animate-spin text-indigo-400 ${isMath ? "h-4 w-4 mr-2" : "h-5 w-5 mb-1.5"}`} />
             <div>
-              <p className="text-sm font-semibold text-white">
+              <p className="text-xs font-medium text-stone-300">
                 {isMath ? "Formatting equation..." : `Generating ${v.type === "chart" ? "chart" : "diagram"}...`}
               </p>
-              {!isMath && <p className="text-xs text-stone-500 mt-1">Please wait while the visualization compiles.</p>}
+              {!isMath && <p className="text-[11px] text-stone-500 mt-0.5">Please wait while the visualization compiles.</p>}
             </div>
           </div>
         </div>
       ) : (
-        <>
-          {v.title && <p className="iris-viz-title">{v.title}</p>}
-          <button
-            type="button"
-            className="iris-viz-surface"
-            onClick={() => setIsExpanded(true)}
-            aria-label={v.title ? `Expand ${v.title}` : "Expand diagram"}
-          >
-            <span className="iris-viz-expand" aria-hidden="true">
-              <Expand size={16} />
-            </span>
-            <Suspense fallback={
-              <div className="flex h-36 items-center justify-center rounded-xl bg-white/[0.03] animate-pulse">
-                <Loader2 className="h-5 w-5 animate-spin text-indigo-500/50" />
-              </div>
-            }>
-              {renderViz(false)}
-            </Suspense>
-          </button>
-          <div className="iris-viz-footer">
-            <button 
-              className="iris-viz-btn"
-              onClick={() => setIsExpanded(true)}
-            >
-              <Expand size={12} />
-              <span>View Full Diagram</span>
-            </button>
-          </div>
-        </>
+        <button
+          type="button"
+          className="iris-viz-surface"
+          onClick={() => setIsExpanded(true)}
+          aria-label={v.title ? `Expand ${v.title}` : "Expand diagram"}
+        >
+          <Suspense fallback={
+            <div className="flex h-24 items-center justify-center rounded-xl bg-white/[0.02] animate-pulse">
+              <Loader2 className="h-5 w-5 animate-spin text-indigo-500/50" />
+            </div>
+          }>
+            {renderViz(false)}
+          </Suspense>
+        </button>
       )}
     </motion.div>
     <Dialog open={isExpanded} onOpenChange={setIsExpanded}>

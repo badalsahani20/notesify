@@ -91,6 +91,23 @@ export const updateFolderWithVersion = async (
   return { updatedFolder };
 };
 
+// Public share pages are cached per slug for up to an hour. Deleting a folder
+// soft-deletes its notes, so those cached pages must be cleared as well.
+export const findSharedNoteSlugsInFolder = async (folderId, userId) => {
+  const notes = await Notes.find({
+    folder: folderId,
+    user: userId,
+    isShared: true,
+    isDeleted: { $ne: true },
+    // The pre-find hook hides archived notes unless the field is explicit.
+    isArchived: { $in: [true, false, null] },
+  })
+    .select("shareSlug")
+    .lean();
+
+  return notes.map((note) => note.shareSlug).filter(Boolean);
+};
+
 export const removeFolderAndNotes = async (folderId, userId, clientVersion) => {
   // 1. Find the folder first to check the version
   const existingFolder = await Folder.findOne({ _id: folderId, user: userId });

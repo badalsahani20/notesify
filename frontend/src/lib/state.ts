@@ -20,6 +20,12 @@ export const clearAllLocalState = ({ clearLocalDatabase = true }: { clearLocalDa
   if (clearLocalDatabase) {
     db.notes.clear().catch(console.error);
     db.folders.clear().catch(console.error);
+    // The sync cursor is user-specific. Keeping it across logout would make
+    // the next user skip their initial full snapshot. Queued operations and
+    // conflicts are also user data and must not leak across accounts.
+    db.syncMeta.clear().catch(console.error);
+    db.syncQueue.clear().catch(console.error);
+    db.conflictLog.clear().catch(console.error);
   }
 
   // 2. Clear React Query cache

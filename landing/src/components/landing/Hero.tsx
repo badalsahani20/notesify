@@ -9,45 +9,37 @@ export const Hero = () => {
 
       <div className="relative z-20 flex flex-col items-center max-w-4xl px-6 text-center mt-10">
         <FadeIn delay={300}>
-          <div className="relative size-16 sm:size-20 mx-auto mb-10 group cursor-default">
-            {/* Architectural Specimen Badge */}
-            <div className="absolute inset-0 rounded-2xl bg-neutral-950/80 border border-white/10 group-hover:border-white/20 transition-all duration-500 shadow-xl shadow-black/80 flex items-center justify-center backdrop-blur-sm" />
+          <div className="relative w-20 h-20 sm:w-24 sm:h-24 mx-auto mb-6 group cursor-pointer transition-all duration-500 hover:scale-110">
+            {/* The Morphing Background */}
+            <div className="absolute inset-0 bg-gradient-to-br from-indigo-500 to-purple-600 iris-hero-blob shadow-[0_0_40px_rgba(99,102,241,0.5)] transition-all duration-700 group-hover:shadow-[0_0_60px_rgba(99,102,241,0.8)] group-hover:rotate-90" />
+            <div className="absolute inset-1 bg-[#050505] iris-hero-blob transition-all duration-700 group-hover:scale-90" />
             
-            <div className="relative z-10 flex flex-col items-center justify-center">
-              <img 
-                src="/favicon.png" 
-                alt="Notesify" 
-                className="size-8 sm:size-10 object-contain drop-shadow-md transition-transform duration-500 group-hover:scale-105" 
-              />
-            </div>
+            {/* The Inner Liquid */}
+            <div className="absolute inset-3 bg-gradient-to-br from-indigo-400 to-purple-500 iris-hero-blob opacity-40 animate-pulse" />
             
-            {/* Live Iris indicator pip */}
-            <div className="absolute -bottom-1 -right-1 z-20 flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-neutral-900 border border-white/10 text-[9px] font-mono text-emerald-400">
-              <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span>v1.3.4</span>
+            {/* The Core Nucleus */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="size-4 rounded-full bg-white shadow-[0_0_20px_rgba(255,255,255,1)] animate-pulse" />
             </div>
           </div>
         </FadeIn>
 
         <FadeIn delay={350}>
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-medium bg-white/[0.04] border border-white/10 text-stone-300 mb-6 backdrop-blur-md hover:border-indigo-500/40 transition-all">
-            <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>Offline-Ready Workspace</span>
-            <span className="text-stone-600">·</span>
-            <span className="text-indigo-300">Dual Sync Reconciler</span>
+          <div className="text-[11px] font-mono text-stone-500 tracking-wider mb-6">
+            v1.3.5
           </div>
         </FadeIn>
 
         <FadeIn delay={400}>
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight text-white leading-[1.15] mb-6">
-            A calm space for your <br className="hidden sm:block" />
-            notes, <span className="text-indigo-200 font-normal">quizzes, and flashcards.</span>
+            Your ideas deserve an <br className="hidden sm:block" />
+            <span className="text-indigo-200 font-normal">intelligent workspace.</span>
           </h1>
         </FadeIn>
 
         <FadeIn delay={500}>
           <p className="text-sm sm:text-[15px] md:text-base text-stone-400 max-w-[560px] mx-auto mb-10 leading-relaxed">
-            Capture notes, generate spaced-repetition flashcards instantly, and study smarter with AI.
+            Write, explore, learn, and organize your knowledge with Iris by your side.
           </p>
         </FadeIn>
 
@@ -71,17 +63,17 @@ export const Hero = () => {
             </a>
 
             <a 
-              href="/download/windows"
+              href="/download"
               className="group inline-flex items-center justify-center rounded-2xl px-8 py-4 text-base font-bold bg-white/5 hover:bg-white/10 transition-all duration-300 text-white border border-white/10 hover:border-white/20 w-full sm:w-auto"
             >
               <svg className="size-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
               </svg>
-              Download for Windows
+              Download for Windows & Android
             </a>
             
           </div>
-          <p className="mt-6 text-xs text-stone-300 font-medium">Free during public preview · No credit card · Early access</p>
+          <p className="mt-6 text-xs text-stone-400 font-medium">Available on Web, Windows & Android · Free during public preview</p>
         </FadeIn>
       </div>
 

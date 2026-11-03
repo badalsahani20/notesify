@@ -12,4 +12,9 @@ export const dbSchemaV2 = {
   conflictLog: "++id, entity, entityId, status, timestamp",
 };
 
-export const dbSchema = dbSchemaV2; 
+export const dbSchemaV3 = {
+  ...dbSchemaV2,
+  syncMeta: "key",
+};
+
+export const dbSchema = dbSchemaV3; 

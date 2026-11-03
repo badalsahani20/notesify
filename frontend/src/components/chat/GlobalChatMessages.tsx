@@ -27,7 +27,7 @@ interface ThinkingWidgetProps {
   thought?: string;
 }
 
-const ThinkingWidget = ({ isThinking, thinkingTime, thought }: ThinkingWidgetProps) => {
+const ThinkingWidget = memo(({ isThinking, thinkingTime, thought }: ThinkingWidgetProps) => {
   if (thought) {
     return (
       <Reasoning isStreaming={isThinking}>
@@ -64,7 +64,39 @@ const ThinkingWidget = ({ isThinking, thinkingTime, thought }: ThinkingWidgetPro
   }
 
   return null;
-};
+});
+ThinkingWidget.displayName = "ThinkingWidget";
+
+/**
+ * Reassurance for a request that is slower than normal. The timer only starts
+ * when the message is genuinely waiting for its first visible content, so a
+ * fast reply never flashes this. It disappears on the first answer token or
+ * reasoning chunk.
+ */
+const SLOW_RESPONSE_HINT_MS = 3000;
+
+const SlowResponseHint = memo(({ active }: { active: boolean }) => {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    if (!active) {
+      setVisible(false);
+      return;
+    }
+
+    const timer = window.setTimeout(() => setVisible(true), SLOW_RESPONSE_HINT_MS);
+    return () => window.clearTimeout(timer);
+  }, [active]);
+
+  if (!visible) return null;
+
+  return (
+    <div className="mt-0.5 text-[11.5px] font-normal text-white/45 select-none">
+      This is taking a little longer than usual — still working on it.
+    </div>
+  );
+});
+SlowResponseHint.displayName = "SlowResponseHint";
 
 interface AssistantMessageBodyProps {
   text: string;
@@ -75,12 +107,20 @@ interface AssistantMessageBodyProps {
 
 const EMPTY_CITATIONS: any[] = [];
 
+// Streaming text only needs to be split into segments when a visualization
+// directive is present. Skipping the parse for plain text avoids re-scanning
+// the whole growing response on every animation frame.
+const IRIS_VIZ_HINT = /\[IRIS_VIZ/i;
+
 // Keep old assistant messages out of the streaming render loop.
 const AssistantMessageBody = memo(({ text, isStreaming, savedSegments, citations }: AssistantMessageBodyProps) => {
-  const segments = useMemo(
-    () => savedSegments ?? parseIrisResponse(text),
-    [savedSegments, text],
-  );
+  const segments = useMemo(() => {
+    if (savedSegments) return savedSegments;
+    if (isStreaming && !IRIS_VIZ_HINT.test(text)) {
+      return [{ kind: "text" as const, content: text }];
+    }
+    return parseIrisResponse(text);
+  }, [savedSegments, text, isStreaming]);
 
   return (
     <IrisMessageBody
@@ -263,6 +303,7 @@ const ChatMessageRow = memo(({
     const toolCalls = (msg as any).toolCalls as Array<{
       id?: string;
       tool: string;
+      execution?: "local" | "server" | "client";
       query?: string;
       url?: string;
       citations?: any[];
@@ -276,6 +317,9 @@ const ChatMessageRow = memo(({
     }> | undefined;
 
     const isWorking = (isActiveStream && (isStreaming || isSending)) || effectiveIsThinking;
+    // Nothing visible has arrived yet: no answer text, no reasoning, no tool card.
+    const isWaitingForFirstContent =
+      isActiveStream && isSending && !effectiveDisplayText && !effectiveThought;
 
     // Identify active agentic tasks for streaming indicators
     const noteReadActivity = (toolCalls ?? []).find((tc) => tc.tool === "get_note_content");
@@ -348,6 +392,8 @@ const ChatMessageRow = memo(({
             />
           )}
 
+          <SlowResponseHint active={isWaitingForFirstContent} />
+
           {/* Message content with StreamingResponse */}
           {effectiveDisplayText ? (
             <div className="gc-markdown max-w-full select-text text-white" data-ms-editor="false" spellCheck={false} translate="no">
@@ -417,15 +463,17 @@ const ChatMessageRow = memo(({
               return null;
             }
             if (tc.tool === "create_note" || tc.tool === "delete_note") {
-              const noteId = tc.data?._id || tc.args?.noteId || tc.args?.id;
-              const title = tc.data?.title || tc.args?.title || "Untitled Note";
-              const content = tc.data?.content || tc.args?.content;
+              const noteId = tc.data?._id || tc.data?.noteId || tc.data?.note?._id || tc.args?.noteId || tc.args?.id;
+              const title = tc.data?.title || tc.data?.note?.title || tc.args?.title || "Untitled Note";
+              const content = tc.data?.content || tc.data?.note?.content || tc.args?.content;
 
+              // Server-side create_note auto-executes in the agent loop; only
+              // local executions (degraded fallback + deletes) stay approval-gated.
+              const isLocalExecution = tc.execution === "local";
               if (
-                tc.status === "approval-requested" ||
-                tc.status === "pending" ||
                 tc.status === "denied" ||
-                (!tc.data && tc.status !== "success")
+                tc.status === "approval-requested" ||
+                (isLocalExecution && !tc.data && tc.status !== "success")
               ) {
                 return (
                   <ToolApprovalCard
@@ -441,7 +489,11 @@ const ChatMessageRow = memo(({
                 );
               }
 
-              const toolState = tc.status === "error" ? "error" : "completed";
+              const toolState = tc.status === "error"
+                ? "error"
+                : tc.status === "pending" || tc.status === "executing"
+                  ? "running"
+                  : "completed";
               const variant = tc.tool === "delete_note" ? "deleted" : "created";
               return (
                 <IrisNoteCreatedCard

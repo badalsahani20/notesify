@@ -11,11 +11,16 @@ import type { useAiChat } from "@/hooks/ai/useAiChat";
 type Props = {
   aiChat: ReturnType<typeof useAiChat>;
   onOpenAiPanel: () => void;
+  /** True while the reader is scrolling; the stack gets out of the way. */
+  hidden?: boolean;
 };
 
-export const MobileAiActions = ({ aiChat, onOpenAiPanel }: Props) => {
+export const MobileAiActions = ({ aiChat, onOpenAiPanel, hidden = false }: Props) => {
   return (
-    <div className="mobile-ai-fab-stack">
+    <div
+      className={`mobile-ai-fab-stack${hidden ? " mobile-ai-fab-stack-hidden" : ""}`}
+      aria-hidden={hidden}
+    >
       {/* Actions dropdown — replaces single Summarize button */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>

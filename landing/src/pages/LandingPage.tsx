@@ -3,13 +3,13 @@ import { X } from 'lucide-react';
 import { Header } from '../components/landing/Header';
 import { Hero } from '../components/landing/Hero';
 import { SocialProof } from '../components/landing/SocialProof';
-import appScreenshot from '../assets/app-screenshot.png';
+import appScreenshot from '../assets/app-screenshot.jpg';
 import { Manifesto } from '../components/landing/Manifesto';
 import { Features } from '../components/landing/Features';
 import { AIExperience } from '../components/landing/AIExperience';
 import { StudyTools } from '../components/landing/StudyTools';
 import { EditorCapabilities } from '../components/landing/EditorCapabilities';
-import { IrisLiveDemo } from '../components/landing/IrisLiveDemo';
+// import { IrisLiveDemo } from '../components/landing/IrisLiveDemo';
 import { Roadmap } from '../components/landing/Roadmap';
 import { CTA } from '../components/landing/CTA';
 import { Feedback } from '../components/landing/Newsletter';
@@ -18,7 +18,7 @@ import { Footer } from '../components/landing/Footer';
 import { SEO } from '../components/landing/SEO';
 
 import { HeroScreenshot } from '../components/landing/HeroScreenshot';
-import { OfflineShowcase } from '../components/landing/OfflineShowcase';
+// import { OfflineShowcase } from '../components/landing/OfflineShowcase';
 
 export const LandingPage = () => {
   const [isScreenshotExpanded, setIsScreenshotExpanded] = useState(false);
@@ -42,11 +42,11 @@ export const LandingPage = () => {
         />
 
         {/* --- Offline-First Star Showcase --- */}
-        <OfflineShowcase />
+        {/* <OfflineShowcase /> */}
 
         {/* --- Iris Preview Section --- */}
 
-        <section className="relative py-24 bg-[#050505]/50 border-t border-white/5">
+        {/* <section className="relative py-24 bg-[#050505]/50 border-t border-white/5">
           <div className="container mx-auto px-6 max-w-4xl">
             <div className="text-center mb-12">
                <span className="inline-block text-xs font-medium tracking-widest text-indigo-500 uppercase mb-3">
@@ -59,7 +59,7 @@ export const LandingPage = () => {
             </div>
             <IrisLiveDemo />
           </div>
-        </section>
+        </section> */}
 
         <Manifesto />
         <Features />

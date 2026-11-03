@@ -7,7 +7,7 @@ const clearNoteCaches = async (userId) =>
   Promise.all([
     redis.del(`notes:${userId}`),
     redis.del(`notes:archive:${userId}`),
-  ]);
+  ]).catch((err) => console.warn("[Redis] clearNoteCaches failed:", err.message || err));
 export const getTrash = catchAsync(async (req, res, next) => {
     const trash = await TrashService.getTrashItems(req.user._id);
 
@@ -25,7 +25,7 @@ export const hardDeleteFolder = catchAsync(async (req, res, next) => {
     await Promise.all([
         clearNoteCaches(req.user._id),
         redis.del(`folders:${req.user._id}`),
-    ]);
+    ]).catch((err) => console.warn("[Redis] Cache invalidation failed:", err.message || err));
     res.status(200).json({ message: "Folder and its notes permanently deleted "});
 });
 
@@ -33,8 +33,9 @@ export const emptyTrash = catchAsync(async (req, res, next) => {
     const result = await TrashService.emptyTrash(req.user._id);
     await Promise.all([
         redis.del(`notes:${req.user._id}`),
+        redis.del(`notes:archive:${req.user._id}`),
         redis.del(`folders:${req.user._id}`),
-    ]);
+    ]).catch((err) => console.warn("[Redis] Cache invalidation failed:", err.message || err));
     res.status(200).json({
         success: true,
         message: "All Cleared!",
@@ -69,8 +70,9 @@ export const restoreFolder = catchAsync(async (req, res, next) => {
   const folder = await TrashService.restoreFolderAndNotes(id, req.user._id);
   await Promise.all([
     redis.del(`notes:${req.user._id}`),
+    redis.del(`notes:archive:${req.user._id}`),
     redis.del(`folders:${req.user._id}`),
-  ]);
+  ]).catch((err) => console.warn("[Redis] Cache invalidation failed:", err.message || err));
 
   res.status(200).json({
     success: true,

@@ -1,4 +1,4 @@
-export type OSKey = 'windows' | 'mac' | 'linux';
+export type OSKey = 'windows' | 'android' | 'mac' | 'linux';
 
 export interface PlatformConfig {
   name: string;

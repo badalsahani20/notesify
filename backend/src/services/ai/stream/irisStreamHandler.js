@@ -26,9 +26,7 @@ export class IrisStreamHandler {
   async handle({
     stream,
     res,
-    noteFetched,
-    userId,
-    fallbackNoteId,
+    noteFetched,yes
   }) {
     const decoder = new TextDecoder();
     let finalReply = "";
@@ -157,7 +155,7 @@ export class IrisStreamHandler {
                       id: state.id,
                       tool: "create_note",
                       args: parsed,
-                      execution: "local",
+                      status: "executing",
                     })}\n\n`,
                   )
                 } else if(normalizedTool === "delete_note" && !state.emitted) {
@@ -428,16 +426,19 @@ export class IrisStreamHandler {
         }
 
         if (parsedArgs) {
-          toolCalls.push({
+          // Server-executed: create_note now runs inside the agentic loop
+          // (toolExecutor) so the model can chain update_note calls in the
+          // same turn. No execution:"local" push here — the loop stores the
+          // definitive result with data once the create resolves.
+          serverToolCalls.push({
             id: state.id,
             tool: "create_note",
             args: parsedArgs,
-            execution: "local",
           });
 
           if (!finalReply.trim()) {
             const noteTitle = parsedArgs.title ? `**${parsedArgs.title}**` : "your note";
-            finalReply = `I've drafted ${noteTitle}. Would you like me to create this note?`;
+            finalReply = `I've created ${noteTitle}.`;
             res.write(
               `data: ${JSON.stringify({ choices: [{ delta: { content: finalReply } }] })}\n\n`,
             );

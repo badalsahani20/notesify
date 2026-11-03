@@ -132,6 +132,64 @@ export function normalizeGitHubRelease(raw: any): NormalizedRelease {
 // Built-in fallback snapshot if offline or GitHub API is unavailable
 export const FALLBACK_RELEASES: NormalizedRelease[] = [
   {
+    id: 393900000,
+    version: 'v1.3.5',
+    tagName: 'v1.3.5',
+    name: '🚀 Notesify v1.3.5 — One-Turn Note Authoring, Delta Sync Protocol, Redis Resilience & Official Android App',
+    publishedAt: '2026-11-03T00:00:00Z',
+    publishedDateFormatted: 'Nov 3, 2026',
+    htmlUrl: 'https://github.com/badalsahani20/notesify/releases/tag/v1.3.5',
+    body: `## 🚀 Notesify v1.3.5 — One-Turn Note Authoring, Delta Sync Protocol, Redis Resilience & Official Android App\n\nNotesify v1.3.5 brings one-turn server-side note creation and chained editing, an incremental delta synchronization protocol with tombstones, resilient Redis caching with automatic database fallbacks, rich comparison and spec-sheet visual blocks, and the official signed Android release.\n\n### ✨ What's New\n\n- **One-Turn Server-Side Note Creation** — Iris creates notes directly in the server workspace loop with immediate id feedback and zero temporary placeholders.\n- **Direct Note Edit Chaining** — Iris can chain create and update operations in a single conversational round for refined draft-to-polish workflows.\n- **Incremental Keyset Delta Sync** — Fast, cursor-based synchronization replaces full note re-downloads while accurately tracking hard-deleted tombstones.\n- **Redis Fault Resilience** — Graceful database fallbacks protect active note lists, archived notes, and folders against cache interruptions.\n- **Rich Iris Visual Blocks** — Seamless comparison cards and spec sheets rendered directly into conversation responses.\n- **Official Android Release** — Standalone signed Android app ready for direct installation on mobile devices.`,
+    highlights: [
+      {
+        title: 'One-Turn Note Authoring',
+        tag: 'Agentic AI',
+        description: 'Server-side note creation with instant ID return and zero draft round trips.',
+      },
+      {
+        title: 'Incremental Delta Sync',
+        tag: 'Local First',
+        description: 'Keyset-paginated sync protocol with tombstone tracking for instant offline reconciliation.',
+      },
+      {
+        title: 'Resilient Redis Fallbacks',
+        tag: 'Architecture',
+        description: 'Non-blocking cache reads and writes with automatic MongoDB fallbacks.',
+      },
+      {
+        title: 'Comparison & Spec Sheet Cards',
+        tag: 'Visualization',
+        description: 'Streamlined interactive visual elements for side-by-side analysis and structured specs.',
+      },
+      {
+        title: 'Official Android Release',
+        tag: 'Mobile App',
+        description: 'Production-signed APK available directly for installation without Play Store dependency.',
+      },
+    ],
+    technicalNotes: [
+      'Engineered server-side create_note execution with direct Dexie store adoption on client.',
+      'Constructed /api/notes/sync with (updatedAt, _id) cursor pagination and 80-day tombstone retention.',
+      'Added non-blocking try/catch resilience around Redis operations in notes and folder controllers.',
+      'Wired @assistant-ui comparison-card and spec-sheet visual blocks into chat markdown pipeline.',
+      'Configured production v2 release signing and generated Notesify-1.3.5.apk.',
+    ],
+    assets: [
+      {
+        name: 'Notesify.Setup.1.3.5.exe',
+        size: 104500000,
+        sizeFormatted: '99.6 MB',
+        downloadUrl: 'https://github.com/badalsahani20/notesify/releases/download/v1.3.5/Notesify.Setup.1.3.5.exe',
+      },
+      {
+        name: 'Notesify-1.3.5.apk',
+        size: 14816000,
+        sizeFormatted: '14.1 MB',
+        downloadUrl: 'https://github.com/badalsahani20/notesify/releases/download/v1.3.5/Notesify-1.3.5.apk',
+      },
+    ],
+  },
+  {
     id: 393800000,
     version: 'v1.3.4',
     tagName: 'v1.3.4',

@@ -61,17 +61,17 @@ export const classifyChatIntent = (
   //   return DEFAULT_CHAT_MODEL || PRIMARY_MODEL || COMPLEX_ANALYSIS_MODEL;
   // }
 
-  // 3. Current and research-heavy requests benefit from the primary model.
-  const isResearchRequest =
-    /\b(latest|today|current|recent|news|research|sources?|cite|citation|according to|compare)\b/i.test(
-      msg,
-    );
-  if (isResearchRequest) {
-    console.log(
-      `🔎 [Research/Web Request] Routing to primary model: ${PRIMARY_MODEL}`,
-    );
-    return PRIMARY_MODEL;
-  }
+  // // 3. Current and research-heavy requests benefit from the primary model.
+  // const isResearchRequest =
+  //   /\b(latest|today|current|recent|news|research|sources?|cite|citation|according to|compare)\b/i.test(
+  //     msg,
+  //   );
+  // if (isResearchRequest) {
+  //   console.log(
+  //     `🔎 [Research/Web Request] Routing to primary model: ${PRIMARY_MODEL}`,
+  //   );
+  //   return PRIMARY_MODEL;
+  // }
 
   // 7. Default chat model
   return DEFAULT_CHAT_MODEL || QUICK_MODEL;

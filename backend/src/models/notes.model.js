@@ -107,6 +107,9 @@ const notesSchema = new mongoose.Schema({
 
 notesSchema.index({ user: 1, pinned: -1, updatedAt: -1 });
 notesSchema.index({ user: 1, folder: 1, updatedAt: -1 });
+// Delta sync: keyset pagination ordered by (updatedAt, _id). Without this,
+// every sync scans the user's whole collection and sorts it in memory.
+notesSchema.index({ user: 1, updatedAt: 1, _id: 1 });
 notesSchema.index({ user: 1, isDeleted: 1, title: "text", content: "text"},
     {
         weights: {

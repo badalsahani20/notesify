@@ -11,7 +11,7 @@ export const Header = () => {
             <Link to="/" className="group flex items-center outline-none gap-3">
               <div className="relative size-8 sm:size-9 flex items-center justify-center">
                 <img 
-                  src="/favicon.png" 
+                  src="/notesify-favicon.svg" 
                   alt="Notesify" 
                   className="relative z-10 size-full object-contain transition-transform duration-300 group-hover:scale-105" 
                 />
@@ -21,13 +21,6 @@ export const Header = () => {
           </FadeIn>
           
           <FadeIn delay={200} className="flex items-center space-x-2 sm:space-x-5">
-            <a href="#offline" className="group hidden md:inline-flex items-center justify-center outline-none transition duration-300 px-3 py-2 text-sm font-bold text-stone-400 hover:text-white">
-              Offline Mode
-            </a>
-
-            <Link to="/download/windows" className="group hidden lg:inline-flex items-center justify-center outline-none transition duration-300 px-3 py-2 text-sm font-bold text-stone-400 hover:text-white">
-              Windows App
-            </Link>
 
             <Link to="/docs" className="group hidden sm:inline-flex items-center justify-center outline-none transition duration-300 px-4 py-2 text-sm font-bold text-stone-400 hover:text-white">
               <div className="relative size-5 mr-2">

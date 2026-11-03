@@ -12,6 +12,20 @@ export async function getArchivedNotes() {
     return api.get("/notes/archive");
 }
 
+export async function getNoteChanges(params: {
+    since?: string | null;
+    page?: string | null;
+    limit?: number;
+}) {
+    const query: Record<string, string | number> = {};
+
+    if (params.since) query.since = params.since;
+    if (params.page) query.page = params.page;
+    if (params.limit) query.limit = params.limit;
+
+    return api.get("/notes/sync", { params: query });
+}
+
 export async function createNote(data: {
     _id?: string;
     folderId?: string | null;

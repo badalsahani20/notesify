@@ -91,29 +91,21 @@ const CapabilityIcon = ({ title }: { title: string }) => {
 export const EditorCapabilities = () => {
   const capabilities = [
     {
+      title: "Auto-Generating Titles",
+      desc: "Iris reads your note and generates clear, meaningful titles automatically as you write.",
+    },
+    {
       title: "Real-Time Code Blocks",
       desc: "Automatic syntax highlighting for dozens of languages. Just type ``` and start coding.",
     },
     {
-      title: "Drag & Drop Images",
-      desc: "Drop images directly into your note. They are instantly uploaded and securely hosted.",
-    },
-    {
       title: "Structure-Preserving Tables",
-      desc: "Native markdown tables that actually work. Easy to resize, edit, and keep readable.",
+      desc: "Native markdown tables that actually work. Easy to resize, edit, and keep clean.",
     },
     {
       title: "Markdown-Style Speed",
-      desc: "Keep your hands on the keyboard. Use familiar markdown shortcuts for instant formatting.",
+      desc: "Keep your hands on the keyboard. Familiar shortcuts and slash commands for instant formatting.",
     },
-    {
-      title: "Color-Coded Highlights",
-      desc: "Mark what matters with visual priority highlights, keeping long documents easily scannable.",
-    },
-    {
-      title: "Auto-Generating Titles",
-      desc: "Iris reads your note and names it for you. Your library stays organized without the busywork.",
-    }
   ];
 
   return (

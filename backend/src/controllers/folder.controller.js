@@ -22,7 +22,7 @@ export const createFolder = catchAsync(async (req, res) => {
     await Promise.all([
       redis.del(`folders:${req.user._id}`),
       redis.del(`notes:${req.user._id}`),
-    ]);
+    ]).catch((err) => console.warn("[Redis] Cache invalidation failed:", err.message || err));
 
     res.status(201).json({
       success: true,
@@ -36,15 +36,24 @@ export const getAllFolders = catchAsync(async (req, res) => {
   const userId = req.user._id;
   const cacheKey = `folders:${userId}`;
 
-  const cachedFolders = await redis.get(cacheKey);
-  if(cachedFolders) {
-    return res.json(cachedFolders);
+  try {
+    const cachedFolders = await redis.get(cacheKey);
+    if (cachedFolders) {
+      return res.json(cachedFolders);
+    }
+  } catch (err) {
+    console.warn("[getAllFolders] Redis cache get failed, falling back to DB:", err.message || err);
   }
-  
-    const folders = await FolderService.getUserFolders(userId);
-    await redis.set(cacheKey, folders, { ex: 3600 });
 
-    res.json(folders);
+  const folders = await FolderService.getUserFolders(userId);
+
+  try {
+    await redis.set(cacheKey, folders, { ex: 3600 });
+  } catch (err) {
+    console.warn("[getAllFolders] Redis cache set failed:", err.message || err);
+  }
+
+  res.json(folders);
 });
 
 export const getFolderById = catchAsync(async (req, res) => {
@@ -97,7 +106,7 @@ export const updateFolder = catchAsync(async (req, res) => {
     await Promise.all([
       redis.del(`folders:${req.user._id}`),
       redis.del(`notes:${req.user._id}`),
-    ]);
+    ]).catch((err) => console.warn("[Redis] Cache invalidation failed:", err.message || err));
 
     //Successful update
     res.status(200).json({
@@ -109,6 +118,13 @@ export const updateFolder = catchAsync(async (req, res) => {
 export const deleteFolder = catchAsync(async (req, res) => {
     const { id } = req.params;
     const { version } = req.body;// Sent from frontend to prevent accidental deletes
+
+    // Collect share slugs before the cascade soft-delete, while the notes are
+    // still queryable.
+    const sharedSlugs = await FolderService.findSharedNoteSlugsInFolder(
+      id,
+      req.user._id
+    );
 
     const result = await FolderService.removeFolderAndNotes(id, req.user._id, version);
     if(!result) {
@@ -122,8 +138,16 @@ export const deleteFolder = catchAsync(async (req, res) => {
       })
     }
 
-    // Invalidate cache
-    await redis.del(`folders:${req.user._id}`);
+    // Invalidate cache. Deleting a folder soft-deletes its notes, so the
+    // active and archived note lists are stale too — not just the folder list.
+    // Public share pages are keyed by slug and are not derived from the list
+    // caches, so they need their own deletion.
+    await Promise.all([
+      redis.del(`folders:${req.user._id}`),
+      redis.del(`notes:${req.user._id}`),
+      redis.del(`notes:archive:${req.user._id}`),
+      ...sharedSlugs.map((slug) => redis.del(`shared_note:${slug}`)),
+    ]).catch((err) => console.warn("[Redis] Cache invalidation failed:", err.message || err));
 
     res.status(200).json({ message: "Folder and all associated notes deleted" });
 });

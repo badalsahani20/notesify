@@ -266,9 +266,9 @@ This pattern is called Optimistic Concurrency Control (OCC). It is the same appr
 
 ## Performance
 
-Notesify's backend serves note and folder requests through a self-healing Redis cache (Upstash). Most read requests return in under 10ms. Cache invalidation happens automatically on every write — you never see stale data.
+Notesify's backend caches note lists, folder lists, and public share pages in Upstash Redis with a one-hour TTL. A cached read avoids a MongoDB round trip. Every write goes to MongoDB first, then clears the affected cache entries.
 
-If a cache drift occurs (an expected key is missing), the system re-fetches from MongoDB and re-seeds the cache without any manual intervention.
+Caching covers the note list, the archive list, the folder list, and public share pages. Single-note reads and the trash listing are served directly from MongoDB. If a cached entry is missing, the backend re-fetches it from MongoDB and re-seeds the cache.
 
 ### Measured frontend performance
 

@@ -228,4 +228,23 @@ export class HybridNoteRepository implements INoteRepository {
             });
         });
     }
+
+    async applyRemoteNote(note: Note): Promise<void> {
+        // Server-authored write (e.g. an AI server tool created this note in
+        // MongoDB). Persist it locally WITHOUT touching the sync queue — the
+        // server write already happened, so queueing would create a duplicate
+        // push. A subsequent inbound delta sync put is idempotent (same _id).
+        const adopted: Note = {
+            ...note,
+            folder: note.folder ?? null,
+            color: note.color || "#ffffff",
+            pinned: Boolean(note.pinned),
+            isArchived: Boolean(note.isArchived),
+            isDeleted: false,
+            version: note.version || 1,
+            lastAccessedAt: note.lastAccessedAt ?? null,
+            updatedAt: note.updatedAt || new Date().toISOString(),
+        };
+        await this.localDB.save(adopted);
+    }
 }

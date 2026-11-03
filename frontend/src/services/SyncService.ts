@@ -1,7 +1,17 @@
 import { db, type SyncOperation } from "@/database/database";
+import {
+    clearNoteSyncCursor,
+    getNoteSyncCursor,
+    setNoteSyncCursor,
+} from "@/database/syncMeta";
+import type { NoteSyncPage } from "@/repositories/api/RemoteNoteDataSource";
 import { isOnline } from "@/lib/connectivity";
 import axios from "axios";
 
+type ProtectedIds = {
+    protectedNoteIds: Set<string>;
+    protectedFolderIds: Set<string>;
+};
 
 class SyncEngine {
     private isProcessing: boolean = false;
@@ -140,59 +150,227 @@ class SyncEngine {
         this.isPulling = true;
         let hasChanges = false;
         try {
-            const pendingOperations = await db.syncQueue.toArray();
-            const pendingNoteIds = new Set(
-                pendingOperations.filter(op => op.entity === "note").map(op => op.entityId),
-            );
-            const pendingFolderIds = new Set(
-                pendingOperations.filter(op => op.entity === "folder").map(op => op.entityId),
-            );
+            const protectedIds = await this.getProtectedIds();
+            const cursor = await getNoteSyncCursor();
 
-            // Also shield entities that have an active UNRESOLVED conflict from being overwritten
-            const unresolvedConflicts = await db.conflictLog.where("status").equals("UNRESOLVED").toArray();
-            const conflictedNoteIds = new Set(
-                unresolvedConflicts.filter(c => c.entity === "note").map(c => c.entityId),
-            );
-            const conflictedFolderIds = new Set(
-                unresolvedConflicts.filter(c => c.entity === "folder").map(c => c.entityId),
-            );
+            if (!cursor) {
+                // First run on this device, or the cursor was reset. The sync
+                // endpoint with no `since` returns everything, including
+                // tombstones, so one code path covers both bootstrap and
+                // recovery. The cursor comes from the server, never from the
+                // device clock, which may be wrong.
+                const snapshot = await this.pullSnapshot(protectedIds);
+                hasChanges = snapshot.hasChanges;
+                await setNoteSyncCursor(snapshot.highWaterMark);
+            } else {
+                try {
+                    const delta = await this.pullDelta(cursor, protectedIds);
+                    hasChanges = delta.hasChanges;
+                    await setNoteSyncCursor(delta.highWaterMark);
+                } catch (error) {
+                    const status = axios.isAxiosError(error) ? error.response?.status : undefined;
+                    // 410 = the cursor is older than tombstone retention.
+                    // 400 = the cursor cannot be parsed (format change, corrupt
+                    // storage). Both mean "this cursor is unusable", so a full
+                    // rebuild is the only way forward. Retrying would loop.
+                    if (status === 410 || status === 400) {
+                        await clearNoteSyncCursor();
+                        const snapshot = await this.pullSnapshot(protectedIds);
+                        hasChanges = snapshot.hasChanges;
+                        await setNoteSyncCursor(snapshot.highWaterMark);
+                    } else {
+                        throw error;
+                    }
+                }
+            }
 
-            const protectedNoteIds = new Set([...pendingNoteIds, ...conflictedNoteIds]);
-            const protectedFolderIds = new Set([...pendingFolderIds, ...conflictedFolderIds]);
+            // Folders are still a small full collection. Keep them on the
+            // existing path until they need their own delta protocol.
+            const folderChanged = await this.pullFolders(protectedIds);
 
-            const remoteNotesApi = await this.getRemoteNotes();
-            const remoteNotes = await remoteNotesApi.getNotes();
-            const archivedNotes = await remoteNotesApi.getArchivedNotes();
-            const trashedNotes = await remoteNotesApi.getTrashedNotes();
-            if(Array.isArray(remoteNotes)) {
-                const allRemoteNotes = [
-                    ...remoteNotes,
-                    ...(Array.isArray(archivedNotes) ? archivedNotes : []),
-                    ...(Array.isArray(trashedNotes) ? trashedNotes : []),
-                ];
-                const remoteNoteIds = new Set(allRemoteNotes.map(note => note._id));
+            return hasChanges || folderChanged;
+        } catch (error) {
+            console.warn("[SyncEngine] pullServerChanges warning:", error);
+            // If a delta page was applied before the failure, tell the caller
+            // so the UI refreshes. The cursor was not advanced, so the next
+            // sync safely re-fetches the same range.
+            return hasChanges;
+        } finally {
+            this.isPulling = false;
+        }
+    }
 
-                for(const remoteNote of allRemoteNotes) {
-                    if(!remoteNote?._id || protectedNoteIds.has(remoteNote._id)) continue;
+    private async getProtectedIds(): Promise<ProtectedIds> {
+        const pendingOperations = await db.syncQueue.toArray();
+        const pendingNoteIds = new Set(
+            pendingOperations.filter(op => op.entity === "note").map(op => op.entityId),
+        );
+        const pendingFolderIds = new Set(
+            pendingOperations.filter(op => op.entity === "folder").map(op => op.entityId),
+        );
+
+        // Also shield entities that have an active UNRESOLVED conflict from being overwritten
+        const unresolvedConflicts = await db.conflictLog.where("status").equals("UNRESOLVED").toArray();
+        const conflictedNoteIds = new Set(
+            unresolvedConflicts.filter(c => c.entity === "note").map(c => c.entityId),
+        );
+        const conflictedFolderIds = new Set(
+            unresolvedConflicts.filter(c => c.entity === "folder").map(c => c.entityId),
+        );
+
+        return {
+            protectedNoteIds: new Set<string>([...pendingNoteIds, ...conflictedNoteIds]),
+            protectedFolderIds: new Set<string>([...pendingFolderIds, ...conflictedFolderIds]),
+        };
+    }
+
+    private async pullSnapshot({ protectedNoteIds }: ProtectedIds): Promise<{ hasChanges: boolean; highWaterMark: string }> {
+        let hasChanges = false;
+        let page: string | null = null;
+        let pageCount = 0;
+        let highWaterMark = "";
+        const remoteNoteIds = new Set<string>();
+        const remoteNotesApi = await this.getRemoteNotes();
+
+        do {
+            const result: NoteSyncPage = await remoteNotesApi.getNoteChanges(null, page);
+
+            if (!result || typeof result !== "object") {
+                throw new Error("Invalid sync response");
+            }
+
+            if (!result.highWaterMark) {
+                throw new Error("Sync response missing highWaterMark");
+            }
+
+            // Every page from one pagination session reports the same
+            // server-side mark, so keeping the first is enough.
+            highWaterMark = result.highWaterMark;
+
+            const notes = Array.isArray(result.notes) ? result.notes : [];
+            const deletedIds = Array.isArray(result.deletedIds) ? result.deletedIds : [];
+
+            await db.transaction("rw", [db.notes], async () => {
+                for (const remoteNote of notes) {
+                    if (!remoteNote?._id) continue;
+
+                    remoteNoteIds.add(remoteNote._id);
+                    if (protectedNoteIds.has(remoteNote._id)) continue;
 
                     const localNote = await db.notes.get(remoteNote._id);
-                    if(!localNote || (remoteNote.version && remoteNote.version > (localNote.version || 0))) {
+                    if (!localNote || (remoteNote.version && remoteNote.version > (localNote.version || 0))) {
                         await db.notes.put(remoteNote);
                         hasChanges = true;
                     }
                 }
 
+                for (const noteId of deletedIds) {
+                    if (protectedNoteIds.has(noteId)) continue;
+
+                    const localNote = await db.notes.get(noteId);
+                    if (localNote) {
+                        await db.notes.delete(noteId);
+                        hasChanges = true;
+                    }
+                }
+            });
+
+            page = result.nextPage ?? null;
+
+            if (!result.hasMore) {
+                // Absence-based deletion is only safe after every page has
+                // been read; doing it per page would delete notes that live on
+                // a page we have not fetched yet.
                 const allLocalNotes = await db.notes.toArray();
-                for(const localNote of allLocalNotes) {
+                for (const localNote of allLocalNotes) {
                     if (!remoteNoteIds.has(localNote._id) && !protectedNoteIds.has(localNote._id)) {
                         await db.notes.delete(localNote._id);
                         hasChanges = true;
                     }
                 }
+
+                return { hasChanges, highWaterMark };
             }
 
+            if (!page) {
+                throw new Error("Invalid sync page: hasMore without nextPage");
+            }
+
+            pageCount += 1;
+            if (pageCount > 1000) {
+                throw new Error("Too many sync pages");
+            }
+        } while (page);
+
+        throw new Error("Sync pagination ended without a high-water mark");
+    }
+
+    private async pullDelta(since: string, { protectedNoteIds }: ProtectedIds): Promise<{ hasChanges: boolean; highWaterMark: string }> {
+        let hasChanges = false;
+        let page: string | null = null;
+        let pageCount = 0;
+        const remoteNotesApi = await this.getRemoteNotes();
+
+        do {
+            const result: NoteSyncPage = await remoteNotesApi.getNoteChanges(since, page);
+
+            if (!result || typeof result !== "object") {
+                throw new Error("Invalid sync response");
+            }
+
+            const notes = Array.isArray(result.notes) ? result.notes : [];
+            const deletedIds = Array.isArray(result.deletedIds) ? result.deletedIds : [];
+
+            await db.transaction("rw", [db.notes], async () => {
+                for (const remoteNote of notes) {
+                    if (!remoteNote?._id || protectedNoteIds.has(remoteNote._id)) continue;
+
+                    const localNote = await db.notes.get(remoteNote._id);
+                    if (!localNote || (remoteNote.version && remoteNote.version > (localNote.version || 0))) {
+                        await db.notes.put(remoteNote);
+                        hasChanges = true;
+                    }
+                }
+
+                for (const noteId of deletedIds) {
+                    if (protectedNoteIds.has(noteId)) continue;
+
+                    const localNote = await db.notes.get(noteId);
+                    if (localNote) {
+                        await db.notes.delete(noteId);
+                        hasChanges = true;
+                    }
+                }
+            });
+
+            page = result.nextPage ?? null;
+
+            if (!result.hasMore) {
+                if (!result.highWaterMark) {
+                    throw new Error("Sync response missing highWaterMark");
+                }
+                return { hasChanges, highWaterMark: result.highWaterMark };
+            }
+
+            if (!page) {
+                throw new Error("Invalid sync page: hasMore without nextPage");
+            }
+
+            pageCount += 1;
+            if (pageCount > 1000) {
+                throw new Error("Too many sync pages");
+            }
+        } while (page);
+
+        throw new Error("Sync pagination ended without a high-water mark");
+    }
+
+    private async pullFolders({ protectedFolderIds }: ProtectedIds): Promise<boolean> {
+        try {
+            let hasChanges = false;
             const remoteFoldersApi = await this.getRemoteFolders();
             const remoteFolders = await remoteFoldersApi.getFolders();
+
             if(Array.isArray(remoteFolders)) {
                 const remoteFolderIds = new Set(remoteFolders.map(folder => folder._id));
 
@@ -217,10 +395,8 @@ class SyncEngine {
 
             return hasChanges;
         } catch (error) {
-            console.warn("[SyncEngine] pullServerChanges warning:", error);
+            console.warn("[SyncEngine] pullFolders warning:", error);
             return false;
-        } finally {
-            this.isPulling = false;
         }
     }
 

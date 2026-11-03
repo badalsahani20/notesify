@@ -1,10 +1,10 @@
 import { memo, useMemo, useState, lazy, Suspense } from "react";
 import { CheckCheck, Copy, Code2, Loader2 } from "lucide-react";
 import IrisVisualBlock from "./IrisVisualBlock";
-import { StreamingSvgPlaceholder } from "@/components/chat/viz/StreamingSvgPlaceholder";
-import { SvgPreviewCard } from "@/components/chat/viz/SvgPreviewCard";
 
 const ComparisonBlock = lazy(() => import("@/components/chat/viz/ComparisonBlock"));
+const ComparisonCardBlock = lazy(() => import("@/components/chat/viz/ComparisonCardBlock"));
+const SpecSheetBlock = lazy(() => import("@/components/chat/viz/SpecSheetBlock"));
 
 type MarkdownCodeBlockProps = {
   code: string;
@@ -19,6 +19,7 @@ const escapeHtml = (value: string) =>
     .replace(/>/g, "&gt;");
 
 const normalizeLanguage = (language = "") => language.toLowerCase().trim();
+
 
 const MAX_HIGHLIGHT_CHARS = 12_000;
 const highlightCache = new Map<string, string>();
@@ -140,15 +141,16 @@ const getLanguageLabel = (language?: string) => {
   return normalized.toUpperCase();
 };
 
-const MarkdownCodeBlock = ({ code, language, isStreaming: _isStreaming }: MarkdownCodeBlockProps) => {
+const MarkdownCodeBlock = ({ code, language, isStreaming = false }: MarkdownCodeBlockProps) => {
   const normalizedLanguage = normalizeLanguage(language);
   const [copied, setCopied] = useState(false);
 
   const highlighted = useMemo(() => highlightCode(code, language), [code, language]);
   const renderedCode = highlighted || escapeHtml(code);
 
+  
   if (normalizedLanguage === "mermaid") {
-    const isDiagramStreaming = code.includes("%%iris-streaming-diagram");
+    const isDiagramStreaming = isStreaming && code.includes("%%iris-streaming-diagram");
     return (
       <IrisVisualBlock
         visualization={{
@@ -175,18 +177,39 @@ const MarkdownCodeBlock = ({ code, language, isStreaming: _isStreaming }: Markdo
   }
 
   if (
-    normalizedLanguage === "svg" ||
-    ((normalizedLanguage === "xml" || normalizedLanguage === "html") && code.includes("<svg"))
+    normalizedLanguage === "comparison-card" ||
+    normalizedLanguage === "comparison_card" ||
+    normalizedLanguage === "compare-card"
   ) {
-    const isSvgStreaming = code.includes("%%iris-streaming-svg");
-    if (isSvgStreaming) {
-      const ratioMatch = code.match(/aspectRatio=([0-9.]+)/);
-      const aspectRatio = ratioMatch ? parseFloat(ratioMatch[1]) : 16 / 9;
-      return <StreamingSvgPlaceholder aspectRatio={aspectRatio} />;
-    }
-    return <SvgPreviewCard svgCode={code} />;
+    return (
+      <Suspense fallback={
+        <div className="flex h-36 items-center justify-center rounded-xl bg-white/5 animate-pulse">
+          <Loader2 className="h-6 w-6 animate-spin text-indigo-500" />
+        </div>
+      }>
+        <ComparisonCardBlock data={code} isStreaming={isStreaming} />
+      </Suspense>
+    );
   }
 
+  if (
+    normalizedLanguage === "spec-sheet" ||
+    normalizedLanguage === "spec_sheet" ||
+    normalizedLanguage === "specs" ||
+    normalizedLanguage === "spec"
+  ) {
+    return (
+      <Suspense fallback={
+        <div className="flex h-32 items-center justify-center rounded-xl bg-white/5 animate-pulse">
+          <Loader2 className="h-6 w-6 animate-spin text-indigo-500" />
+        </div>
+      }>
+        <SpecSheetBlock data={code} isStreaming={isStreaming} />
+      </Suspense>
+    );
+  }
+
+  
 
 
   const handleCopy = async () => {

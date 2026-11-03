@@ -2,11 +2,12 @@ import { cn } from "@/lib/utils"
 import { ChevronDown } from "lucide-react"
 import React, {
   createContext,
+  memo,
   useContext,
   useEffect,
   useState,
 } from "react"
-import ReactMarkdown from "react-markdown"
+import ReactMarkdown, { type Components } from "react-markdown"
 import remarkGfm from "remark-gfm"
 
 type ReasoningContextType = {
@@ -115,6 +116,62 @@ function ReasoningTrigger({
   )
 }
 
+type MdastNode = {
+  type: string
+  value?: string
+  children?: MdastNode[]
+}
+
+/**
+ * Reasoning is written as plain lines, not paragraphs. CommonMark collapses a
+ * single newline into a space, so without this the model's line structure is
+ * lost. Turning soft breaks into explicit `break` nodes lets us render the
+ * text as normal markdown instead of re-enabling `white-space: pre-wrap` on a
+ * block container, which used to render the renderer's own inter-<p>
+ * whitespace as extra blank lines.
+ */
+const remarkSoftBreaks = () => (tree: MdastNode) => {
+  const convert = (node: MdastNode) => {
+    if (!node.children) return
+
+    const next: MdastNode[] = []
+    for (const child of node.children) {
+      if (child.type === "text" && child.value?.includes("\n")) {
+        child.value.split("\n").forEach((line, index) => {
+          if (index > 0) next.push({ type: "break" })
+          if (line) next.push({ type: "text", value: line })
+        })
+        continue
+      }
+
+      convert(child)
+      next.push(child)
+    }
+    node.children = next
+  }
+
+  convert(tree)
+}
+
+const reasoningRemarkPlugins = [remarkGfm, remarkSoftBreaks]
+const reasoningComponents: Components = {
+  blockquote: ({ children }) => <div className="my-1">{children}</div>,
+}
+
+/**
+ * Memoized so answer-text frames (which re-render the message ~60x/s) do not
+ * re-parse an unchanged reasoning buffer.
+ */
+const ReasoningMarkdown = memo(({ text }: { text: string }) => (
+  <ReactMarkdown
+    remarkPlugins={reasoningRemarkPlugins}
+    components={reasoningComponents}
+  >
+    {text}
+  </ReactMarkdown>
+))
+ReasoningMarkdown.displayName = "ReasoningMarkdown"
+
 export type ReasoningContentProps = {
   children: React.ReactNode
   className?: string
@@ -131,18 +188,12 @@ function ReasoningContent({
 }: ReasoningContentProps) {
   const { isOpen } = useReasoningContext()
 
-  const content = markdown && typeof children === "string" ? (
-    <ReactMarkdown
-      remarkPlugins={[remarkGfm]}
-      components={{
-        blockquote: ({ children }) => <div className="my-1">{children}</div>,
-      }}
-    >
-      {children}
-    </ReactMarkdown>
-  ) : (
-    children
-  )
+  const content =
+    markdown && typeof children === "string" ? (
+      <ReasoningMarkdown text={children} />
+    ) : (
+      children
+    )
 
   return (
     <div
@@ -156,7 +207,7 @@ function ReasoningContent({
       <div className="overflow-hidden">
         <div
           className={cn(
-            "text-white/90 text-[13.5px] leading-[1.65] py-1.5 whitespace-pre-wrap font-sans [&>p]:my-1.5 [&>p:first-child]:mt-0 [&>p:last-child]:mb-0",
+            "text-white/90 text-[13.5px] leading-[1.65] py-1.5 font-sans [&>p]:my-1.5 [&>p:first-child]:mt-0 [&>p:last-child]:mb-0",
             contentClassName
           )}
         >

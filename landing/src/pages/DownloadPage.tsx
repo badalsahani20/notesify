@@ -57,8 +57,12 @@ export const DownloadPage = () => {
   // Determine initial OS from URL param
   const initialOS: OSKey = useMemo(() => {
     const lower = os?.toLowerCase();
+    if (lower === 'android' || lower === 'apk') return 'android';
     if (lower === 'mac') return 'mac';
     if (lower === 'linux') return 'linux';
+    if (typeof navigator !== 'undefined' && /android/i.test(navigator.userAgent)) {
+      return 'android';
+    }
     return 'windows';
   }, [os]);
 
@@ -206,10 +210,6 @@ export const DownloadPage = () => {
           </FadeIn>
 
           <FadeIn delay={200}>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-white/10 bg-white/[0.03] text-stone-300 font-mono text-[11px] font-semibold tracking-wider mb-4">
-              <span className="size-1.5 rounded-full bg-emerald-400" />
-              <span>Release {latestRelease.version} • Verified</span>
-            </div>
             <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white mb-4">
               {downloadStarted ? 'Thanks for downloading!' : `Download Notesify for ${platform.name}`}
             </h1>
@@ -229,9 +229,9 @@ export const DownloadPage = () => {
           {/* OS Switcher Pills */}
           <FadeIn delay={250}>
             <div className="inline-flex items-center p-1.5 rounded-xl bg-neutral-900/90 border border-white/10 mb-8 backdrop-blur-xl shadow-lg relative">
-              {(['windows', 'mac', 'linux'] as OSKey[]).map((osKey) => {
+              {(['windows', 'android', 'mac', 'linux'] as OSKey[]).map((osKey) => {
                 const isCurrent = selectedOS === osKey;
-                const osLabel = osKey === 'windows' ? 'Windows' : osKey === 'mac' ? 'macOS' : 'Linux';
+                const osLabel = osKey === 'windows' ? 'Windows' : osKey === 'android' ? 'Android' : osKey === 'mac' ? 'macOS' : 'Linux';
                 return (
                   <button
                     key={osKey}
@@ -263,6 +263,13 @@ export const DownloadPage = () => {
                           isCurrent ? 'bg-neutral-200 text-neutral-900' : 'bg-white/5 text-stone-400'
                         }`}>
                           Exe
+                        </span>
+                      )}
+                      {osKey === 'android' && (
+                        <span className={`ml-1.5 text-[10px] px-1.5 py-0.5 rounded font-mono font-bold transition-colors ${
+                          isCurrent ? 'bg-neutral-200 text-neutral-900' : 'bg-emerald-500/20 text-emerald-400'
+                        }`}>
+                          APK
                         </span>
                       )}
                     </span>

@@ -12,4 +12,11 @@ export interface INoteRepository {
     permanentlyDeleteNote(id: string): Promise<void>;
     restoreNote(id: string): Promise<Note>;
     toggleArchive(id: string, version: number): Promise<Note>;
+    /**
+     * Persist a note that was already created/updated server-side (e.g. by an
+     * AI server tool) into the local Dexie store without enqueueing a sync
+     * operation — the server write already happened. Optional: only the
+     * hybrid repository implements adoption.
+     */
+    applyRemoteNote?(note: Note): Promise<void>;
 }

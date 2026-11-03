@@ -30,7 +30,7 @@ The goal is to make capturing, exploring, and reviewing knowledge feel like one 
 | Area | Status |
 |---|---|
 | Rich-text editor (TipTap/ProseMirror) | Live |
-| Notes, nested notebooks, tags, search, trash | Live |
+| Notes, notebooks, search, trash | Live |
 | Iris chat + inline AI actions | Live |
 | Quiz and flashcard generation from notes | Live |
 | Offline-first desktop (Electron) | Live, Windows |
@@ -82,8 +82,9 @@ Relevant code: `frontend/src/hooks/ai/`, `frontend/src/utils/consumeAiChatStream
 Iris uses native tool calling inside a bounded execution loop, allowing it to interact with the user's workspace rather than merely suggesting actions.
 
 - **Note retrieval** — `search_notes` and `get_note_content` retrieve notes for contextual answers, scoped to the requesting user.
-- **Note authoring** — `create_note` and `update_note` let Iris create and modify notes through chat.
-- **User-confirmed actions** — Creating and deleting notes requires explicit user confirmation through a request modal before the action proceeds.
+- **Note authoring** — `create_note` executes server-side inside the agent loop against the workspace database and hands back the real note id, so Iris can chain `update_note` in the same turn to polish the fresh note. `update_note` itself runs client-side against the local-first store.
+- **Instant local visibility** — server-created notes are adopted into the client's Dexie store as soon as the tool result streams in, without enqueueing a duplicate sync operation.
+- **Degrading mutations** — if the server-side create fails, the call falls back to client execution: an approval card, then a local write plus the offline sync queue.
 - **Interactive learning** — `ask_question` presents questions through an interactive dialog for clarification and self-quizzing.
 - **Persistent preferences** — `save_memory` stores supported preferences beyond the current session.
 - **Web research** — `search_web` retrieves live web results when a search provider is configured, while `crawl_url` fetches the contents of a public webpage.
@@ -100,6 +101,18 @@ The system prompt and tool list are cached: the constitution carries a block-lev
 
 Long chats don't get truncated by turn count. The resolver walks history backwards to fit a dynamic token budget (18k high watermark, 10k low watermark by default), then summarizes older messages into a running technical summary that preserves decisions and identifiers. See `backend/src/services/ai/chatContextResolver.js`.
 
+### 5. Incremental sync
+
+Notes are stored in Dexie and synced with a cursor, not by re-downloading the collection.
+
+- `GET /api/notes/sync` returns notes changed since the last successful sync, including archived and trashed ones, plus tombstones for notes that were hard-deleted.
+- Pagination is keyset-based on `(updatedAt, _id)`, so a bulk edit that stamps many notes with the same millisecond cannot skip or duplicate rows.
+- One server high-water mark is carried through the page cursor, so a note written during pagination cannot fall behind the final cursor.
+- A full snapshot runs only on first sync or when the server rejects the cursor (`400`/`410`). Cursors older than 80 days force a rebuild, leaving a 10-day margin before the 90-day tombstone TTL expires.
+- Folders still use a full pull. They are small and few; a delta protocol for them would add code without a measurable benefit.
+
+The design, the rejected alternatives, and the remaining limits are documented in [docs/redis-caching-and-delta-sync.md](docs/redis-caching-and-delta-sync.md).
+
 ---
 
 ## Technology stack
@@ -111,7 +124,7 @@ Long chats don't get truncated by turn count. The resolver walks history backwar
 | Styling | Tailwind CSS 4, shadcn/ui, Framer Motion |
 | Backend | Node.js, Express 5 |
 | Database | MongoDB + Mongoose 8 |
-| Cache | Upstash Redis |
+| Cache | Upstash Redis (note/folder lists, share pages, OAuth state) |
 | Auth | Passport, JWT, refresh rotation, PKCE for desktop OAuth |
 | AI | OpenRouter, Google Gemini, Groq |
 | Desktop | Electron 33 + electron-builder (NSIS) |
@@ -126,7 +139,7 @@ fullstack-notes/
 │   └── src/
 │       ├── controllers/       # HTTP handlers
 │       ├── middleware/        # Auth, verification, AI rate limits
-│       ├── models/            # Mongoose schemas (users, notes, sessions)
+│       ├── models/            # Mongoose schemas (users, notes, folders, quizzes, flashcards)
 │       ├── routes/            # Express routers
 │       ├── services/          # Notes, study, memory, title generation
 │       │   └── ai/            # Router, transports, agent loop, streaming
@@ -236,7 +249,7 @@ npm run build:desktop      # Windows installer in dist-desktop-build/
 
 ### Tests and checks
 ```bash
-cd backend && npm test     # 172 tests, 16 suites
+cd backend && npm test     # 236 tests, 20 suites
 cd frontend && npx tsc -b  # type check
 cd frontend && npm run lint
 ```
@@ -249,6 +262,8 @@ cd frontend && npm run lint
 - No real-time collaborative editing or comments. Both are on the roadmap.
 - Android is built and tested locally but not released.
 - No payment or subscription flow. The `plan.tier` field exists, but there is no checkout.
+- Folder sync is still a full collection pull; only notes use the incremental protocol.
+- Redis list caches have no failure fallback: an Upstash outage turns a cache miss into a 500 rather than a slower database read.
 - Windows is the only packaged desktop target.
 - The AI features depend on third-party keys; a fresh clone needs all of them to exercise the full loop.
 

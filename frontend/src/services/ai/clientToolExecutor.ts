@@ -249,9 +249,55 @@ export function combineNoteContent(
   return `${existingBlockHtml}\n${replacementHtml}`;
 }
 
+/**
+ * Adopts a note that was created server-side by an AI tool (e.g. create_note
+ * as a server tool): persists it into local Dexie without enqueueing a sync
+ * operation and updates the React Query caches so lists and the artifact
+ * panel show it immediately.
+ */
+export async function adoptServerCreatedNote(serverNote: {
+  _id: string;
+  title?: string;
+  content?: string;
+  folder?: string | null;
+  color?: string;
+  version?: number;
+  pinned?: boolean;
+  isArchived?: boolean;
+  isDeleted?: boolean;
+  updatedAt?: string;
+  lastAccessedAt?: string | null;
+}): Promise<Note> {
+  const note: Note = {
+    _id: serverNote._id,
+    title: serverNote.title || "Untitled Note",
+    content: serverNote.content || "",
+    folder: serverNote.folder ?? null,
+    color: serverNote.color || "#ffffff",
+    pinned: Boolean(serverNote.pinned),
+    isArchived: Boolean(serverNote.isArchived),
+    isDeleted: false,
+    version: serverNote.version ?? 1,
+    updatedAt: serverNote.updatedAt || new Date().toISOString(),
+    lastAccessedAt: serverNote.lastAccessedAt ?? null,
+  };
+
+  try {
+    await noteRepository.applyRemoteNote?.(note);
+  } catch (err) {
+    console.warn("[ADOPT SERVER NOTE] Local persistence failed:", err);
+  }
+
+  queryClient.setQueryData<Note[]>(["notes"], (old = []) =>
+    addNoteToList(old, note)
+  );
+  queryClient.setQueryData(["note", note._id], note);
+
+  return note;
+}
+
 // Executes a tool locally in the browser/desktop workspace 
-export async function executeClientTool(tool: string, args: Record<string, any> = {}): Promise<ToolExecutionResult> {
-  switch (tool) {
+export async function executeClientTool(tool: string, args: Record<string, any> = {}): Promise<ToolExecutionResult> {  switch (tool) {
     case "create_note": 
       return await executeCreateNote(args);
     case "update_note":

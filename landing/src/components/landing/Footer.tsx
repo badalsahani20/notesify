@@ -8,7 +8,7 @@ export const Footer = () => {
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-10">
           <div className="lg:col-span-2">
             <a href="#" className="flex items-center gap-2 group">
-              <img src="/favicon.png" alt="Notesify" width={32} height={32} className="group-hover:scale-110 transition-transform duration-300" />
+              <img src="/notesify-favicon.svg" alt="Notesify" width={32} height={32} className="group-hover:scale-110 transition-transform duration-300" />
               <span className="font-semibold tracking-tight text-lg text-white">Notesify</span>
             </a>
             <p className="mt-4 text-sm text-stone-400 max-w-sm">

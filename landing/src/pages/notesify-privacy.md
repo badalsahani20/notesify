@@ -72,7 +72,7 @@ User data is securely stored using MongoDB Atlas cloud infrastructure with acces
 
 ### Session and Cache Management
 
-Authentication sessions, temporary verification data, and synchronization states are managed through Upstash Redis.
+Authentication state is stored in MongoDB: refresh tokens, email verification tokens and one-time codes, and password-reset tokens are kept on the user record. Upstash Redis holds short-lived Google OAuth state and authorization codes during sign-in, along with short-lived caches for note lists, folder lists, and public share pages. Offline synchronization state is stored locally on your device.
 
 ### File and Image Storage
 
@@ -107,7 +107,7 @@ To provide and operate Notesify, certain information may be processed by trusted
 
 * Google (Authentication and Gemini AI services)
 * MongoDB Atlas (Database hosting)
-* Upstash Redis (Caching and session management)
+* Upstash Redis (Short-lived OAuth state and caching)
 * Cloudinary (Image storage and delivery)
 
 These providers receive only the information necessary to perform their services and are not authorized to use your information for unrelated purposes.

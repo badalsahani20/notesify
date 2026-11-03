@@ -23,23 +23,23 @@ interface WhatsNewModalProps {
 const HIGHLIGHTS = [
   {
     icon: Sparkles,
-    title: "Inline Slash AI (/)",
-    desc: "Generate, outline, and summarize directly at cursor without leaving your keyboard.",
+    title: "One-Turn Note Authoring",
+    desc: "Iris creates and edits notes directly in the server workspace loop with immediate feedback.",
   },
   {
     icon: Zap,
-    title: "60 FPS Streaming Engine",
-    desc: "Velocity-timed reveal buffer completely eliminates token stutter and dropped frames.",
+    title: "Incremental Delta Sync",
+    desc: "Keyset-paginated sync protocol with tombstone tracking for instant offline reconciliation.",
   },
   {
     icon: Network,
-    title: "Live Mermaid Diagrams",
-    desc: "Safe mid-stream interception with auto-repairing syntax sanitizer.",
+    title: "Rich Visual Blocks",
+    desc: "Interactive comparison cards and spec sheets rendered directly in conversation streams.",
   },
   {
     icon: Cpu,
-    title: "Fast KV Prompt Caching",
-    desc: "Ephemeral system prompt caching cuts latency on repeated actions.",
+    title: "Resilient Redis Caching",
+    desc: "Automatic database fallbacks ensure uninterrupted performance across note lists.",
   },
 ];
 

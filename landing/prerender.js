@@ -28,7 +28,10 @@ async function prerender() {
     { path: '/terms', file: 'terms.html' },
     { path: '/privacy', file: 'privacy.html' },
     { path: '/download', file: 'download.html' },
-    { path: '/download/windows', file: 'download/windows.html' }
+    { path: '/download/windows', file: 'download/windows.html' },
+    { path: '/download/android', file: 'download/android.html' },
+    { path: '/download/mac', file: 'download/mac.html' },
+    { path: '/download/linux', file: 'download/linux.html' }
   ];
 
   for (const { path: routePath, file } of routesToPrerender) {

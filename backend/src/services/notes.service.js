@@ -3,28 +3,40 @@ import Notes from "../models/notes.model.js";
 import { getWelcomeNote } from "../utils/welcomeNote.js";
 import { nanoid } from "nanoid";
 import { stripHtml } from "../utils/stripHtml.js";
+import {
+    clearNoteTombstone,
+    recordNoteTombstones,
+} from "./tombstone.service.js";
 // Bypasses the Mongoose pre('find') hook while matching missing fields on old docs
 const ANY_ARCHIVE_STATE = { $in: [true, false, null] };
 
 export const findUserNotes = async (userId) => {
-    return await Notes.find({ user: userId, isDeleted: { $ne: true }, isArchived: { $ne: true }}).sort({
+    return await Notes.find({ user: userId, isDeleted: { $ne: true }, isArchived: { $ne: true }}).select("-embedding").sort({
         pinned: -1,
         updatedAt: -1,
     });
 }
 
 export const findArchivedNotes = async (userId) => {
-    return await Notes.find({ user: userId, isDeleted: false, isArchived: true }).sort({
+    return await Notes.find({ user: userId, isDeleted: false, isArchived: true }).select("-embedding").sort({
         pinned: -1,
         updatedAt: -1,
     });
 }
 
 export const createNewNote = async (userId, noteData) => {
-    return await Notes.create({
+    const note = await Notes.create({
         user: userId,
         ...noteData
     });
+
+    // A client may reuse an _id that was previously hard-deleted. Clearing the
+    // tombstone is best-effort: failing it must not fail the note creation.
+    await clearNoteTombstone(userId, note._id).catch((err) => {
+        console.warn("[Notes] Failed to clear note tombstone:", err);
+    });
+
+    return note;
 };
 
 export const createWelcomeNote = async (userId) => {
@@ -212,7 +224,28 @@ export const searchNote = async (userId, query, folderId = null) => {
 };
 
 export const permanentlyRemoveNote = async (noteId, userId) => {
-    return await Notes.findOneAndDelete({ _id: noteId, user: userId, isDeleted: true });
+    const existingNote = await Notes.findOne({
+        _id: noteId,
+        user: userId,
+        isDeleted: true,
+        isArchived: { $in: [true, false, null] },
+    });
+
+    if (!existingNote) {
+        return null;
+    }
+
+    // Write the tombstone first. If the process dies between these operations,
+    // clients may briefly remove a note that still exists; the next full
+    // resync restores it. The reverse order would permanently lose the delete.
+    await recordNoteTombstones(userId, [existingNote._id]);
+
+    return await Notes.findOneAndDelete({
+        _id: noteId,
+        user: userId,
+        isDeleted: true,
+        isArchived: { $in: [true, false, null] },
+    });
 };
 
 
@@ -260,8 +293,11 @@ export const findByShareSlug = async (slug) => {
         return {expired: true};
     }
 
-    //Increment views in the background
-    Notes.updateOne({ _id: note._id }, { $inc: {shareViews: 1}}).catch(err => {
+    //Increment views in the background. View counts are not content changes,
+    //so they must not bump updatedAt and create delta-sync noise.
+    Notes.updateOne({ _id: note._id }, { $inc: {shareViews: 1}})
+        .setOptions({ timestamps: false })
+        .catch(err => {
         console.error("Failed to increment share views:", err);
     });
 

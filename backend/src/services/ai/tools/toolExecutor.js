@@ -1,6 +1,9 @@
-import { getNoteContentForUser, searchNote, findNotesById, removeNote } from "../../notes.service.js";
+import { getNoteContentForUser, searchNote, findNotesById, removeNote, createNewNote } from "../../notes.service.js";
 import { saveMemoryWithStatus, searchMemories } from "../../memoryService.js";
 import { stripHtml } from "../../../utils/stripHtml.js";
+import { sanitizeNoteHtml } from "../../../utils/sanitizeNoteHtml.js";
+import { ensureBlockHtml } from "../../../utils/noteContentHtml.js";
+import { redis } from "../../../../config/redis.js";
 import { searchWeb } from "../search/searchAdapter.js";
 import { fetchPage } from "../search/webFetch.js";
 
@@ -26,6 +29,58 @@ export class ToolExecutor {
         return { error: `Failed to fetch note: ${err.message}` };
       }
     }
+    if (toolName === "create_note") {
+      const title = typeof args?.title === "string" ? args.title.trim() : "";
+      const rawContent = typeof args?.content === "string" ? args.content : "";
+      if (!rawContent.trim()) {
+        return { error: "Missing content for create_note." };
+      }
+
+      try {
+        // Same content pipeline as the HTTP create route: markdown in from the
+        // model, TipTap-compatible sanitized HTML in the database.
+        const content = sanitizeNoteHtml(ensureBlockHtml(rawContent));
+        const note = await createNewNote(userId, {
+          title: title || "Untitled Note",
+          content,
+          version: 1,
+        });
+
+        // Invalidate list caches so the next pull returns the new note.
+        await Promise.all([
+          redis.del(`notes:${userId}`),
+          redis.del(`notes:archive:${userId}`),
+        ]).catch(() => {});
+
+        // `note` carries the full document for the client to reconcile into its
+        // local Dexie store; the model-visible tool response is slimmed to the
+        // id/title (irisAgent strips `note`) so the conversation doesn't pay
+        // tokens for content the model itself just generated.
+        return {
+          created: true,
+          noteId: String(note._id),
+          title: note.title || "Untitled Note",
+          version: note.version,
+          updatedAt: note.updatedAt,
+          note: {
+            _id: String(note._id),
+            title: note.title || "Untitled Note",
+            content: note.content || "",
+            folder: note.folder ? String(note.folder) : null,
+            color: note.color || "#ffffff",
+            pinned: Boolean(note.pinned),
+            isArchived: Boolean(note.isArchived),
+            isDeleted: false,
+            version: note.version,
+            updatedAt: note.updatedAt,
+            lastAccessedAt: note.lastAccessedAt || null,
+          },
+        };
+      } catch (err) {
+        return { error: `Failed to create note: ${err.message}` };
+      }
+    }
+
     if (toolName === "delete_note") {
       const noteId = args?.noteId || fallbackNoteId;
       if (!noteId) {
@@ -40,6 +95,13 @@ export class ToolExecutor {
         if (!result || result.conflict) {
           return { error: "Failed to delete note due to version conflict or deletion failure." };
         }
+
+        // Invalidate list caches so notes lists refresh properly
+        await Promise.all([
+          redis.del(`notes:${userId}`),
+          redis.del(`notes:archive:${userId}`),
+        ]).catch(() => {});
+
         return {
           deleted: true,
           noteId,

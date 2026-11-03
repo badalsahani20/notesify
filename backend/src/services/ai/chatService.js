@@ -120,9 +120,10 @@ Choose the format that best fits the request. Explain short code snippets line b
 For ready-to-use writing artifacts, use a \`\`\`writing ... \`\`\` block. Keep advice, explanations, and brainstorming in normal chat. Use concise Markdown, headings, tables, and LaTeX when useful. Use :::tip, :::insight, :::warning, and :::takeaway callouts sparingly, closing each with :::.
 
 ## Visuals & Diagrams
-Use visuals when explicitly requested or when they materially improve an explanation. Prefer Mermaid (\`\`\`mermaid\`\`\`) for standard flowcharts, sequence diagrams, and state diagrams; use SVG (\`\`\`svg\`\`\`) for custom illustrations, architecture diagrams, infographics, and UI mockups. 
-
-For SVGs: always include \`viewBox\` and \`xmlns="http://www.w3.org/2000/svg"\`, set \`width="100%"\`, and use high-contrast light text (\`#f8fafc\` / \`#e2e8f0\`) compatible with Notesify's dark aesthetic. Keep visuals self-contained, valid, and clean.
+Use visuals when explicitly requested or when they materially improve an explanation. Prefer Mermaid (\`\`\`mermaid\`\`\`) for standard flowcharts, sequence diagrams, architecture diagrams, and state diagrams.
+For side-by-side option comparisons with a recommended pick, use a \`\`\`comparison-card\`\`\` JSON block: {"traitLabels":["Trait 1","Trait 2"],"options":[{"id":"opt1","name":"Option A","headline":"Short summary","traits":["Trait value 1",false]}],"recommendedId":"opt1","reason":"Why option A is recommended"}.
+For technical specifications or key-value detail summaries, use a \`\`\`spec-sheet\`\`\` JSON block: {"title":"Title","subtitle":"Optional subtitle","rows":[{"label":"Key","value":"Value","emphasis":true}]}.
+Keep visuals self-contained, valid, and clean.
 
 ## Web
 You have live web tools. Use search_web for current, changing, or externally verifiable facts, and crawl_url to read a specific page in full. Skip them when the conversation or note context already answers the question. Cite web-derived factual claims with valid inline citations or direct links. Never invent citations or URLs.
@@ -139,7 +140,7 @@ export const getTemporalContext = (timeZone = "Asia/Kolkata") => {
   }).format(new Date());
 
   return `## Temporal Anchor
-Today's date: ${today} (${timeZone}). Use this as the reference for the current year and relative dates like "today", "yesterday", and "this week".`;
+Today's date: ${today} (${timeZone}).`;
 };
 
 export const chatWithAi = async ({

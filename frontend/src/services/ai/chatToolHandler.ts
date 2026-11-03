@@ -1,7 +1,7 @@
 import type { ChatArtifact, ChatMessage, PendingInteraction } from "@/store/useGlobalChatStore";
 import type { InteractiveQuestion, ToolCallRecord } from "@/components/ai/types";
 import type { ToolCallEvent } from "@/utils/consumeAiChatStream";
-import { executeClientTool } from "./clientToolExecutor";
+import { executeClientTool, adoptServerCreatedNote } from "./clientToolExecutor";
 
 type UpdateAssistantMessage = (updater: (message: ChatMessage) => ChatMessage) => void;
 
@@ -171,6 +171,35 @@ export const createChatToolHandler = ({
       });
     });
     }
+  }
+
+  // Server-executed create_note: the note was created in MongoDB by the
+  // agentic loop. Adopt it into the local Dexie store + React Query caches and
+  // open it in the artifact panel. The degraded execution:"local" fallback
+  // above still handles the local path separately.
+  if (tool === "create_note" && execution !== "local" && event.status === "success" && event.data?.note?._id) {
+    void adoptServerCreatedNote(event.data.note).then((note) => {
+      setActiveArtifact({
+        type: "note",
+        id: note._id,
+        title: note.title,
+        content: note.content,
+      });
+    });
+
+    updateAssistantMessage((message) => {
+      const existing = message.toolCalls ?? [];
+      const index = existing.findIndex((toolCall) => (id ? toolCall.id === id : toolCall.tool === tool));
+      if (index === -1) return message;
+
+      const updated = [...existing];
+      updated[index] = {
+        ...updated[index],
+        data: event.data.note,
+        status: "success",
+      };
+      return { ...message, toolCalls: updated };
+    });
   }
 
   updateAssistantMessage((message) => {

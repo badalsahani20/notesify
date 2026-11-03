@@ -3,6 +3,14 @@ import type { Note } from "@/store/useNoteStore";
 import * as notesApi from "@/api/notes";
 import api from "@/lib/api";
 
+export interface NoteSyncPage {
+    notes: Note[];
+    deletedIds: string[];
+    nextPage: string | null;
+    highWaterMark: string;
+    hasMore: boolean;
+}
+
 export class RemoteNoteDataSource implements INoteRepository {
     async getNotes(): Promise<Note[]> {
         const res = await notesApi.getNotes();
@@ -30,6 +38,19 @@ export class RemoteNoteDataSource implements INoteRepository {
         const res = await notesApi.getArchivedNotes();
         const data = res.data.notes || res.data;
     return Array.isArray(data) ? data : [];
+  }
+
+  async getNoteChanges(since: string | null, page: string | null): Promise<NoteSyncPage> {
+    const res = await notesApi.getNoteChanges({ since, page });
+    const data = res.data ?? {};
+
+    return {
+      notes: Array.isArray(data.notes) ? data.notes : [],
+      deletedIds: Array.isArray(data.deletedIds) ? data.deletedIds : [],
+      nextPage: data.nextPage ?? null,
+      highWaterMark: String(data.highWaterMark ?? ""),
+      hasMore: Boolean(data.hasMore),
+    };
   }
 
   async getTrashedNotes(): Promise<Note[]> {

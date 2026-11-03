@@ -1,4 +1,5 @@
 import * as NoteService from "../services/notes.service.js";
+import * as DeltaSyncService from "../services/deltaSync.service.js";
 import catchAsync from "../utils/catchAsync.js";
 import mongoose from "mongoose";
 import { redis } from "../../config/redis.js";
@@ -12,10 +13,16 @@ const clearNoteCaches = async (userId) =>
   Promise.all([
     redis.del(`notes:${userId}`),
     redis.del(`notes:archive:${userId}`),
-  ]);
+  ]).catch((err) => console.warn("[Redis] clearNoteCaches failed:", err?.message || err));
 
 const clearSharedNoteCache = async (slug) => {
-  if (slug) await redis.del(`shared_note:${slug}`);
+  if (slug) {
+    try {
+      await redis.del(`shared_note:${slug}`);
+    } catch (err) {
+      console.warn("[Redis] clearSharedNoteCache failed:", err?.message || err);
+    }
+  }
 };
 
 const queueNoteEmbedding = (note, userId) => {
@@ -94,40 +101,46 @@ export const getAllNotes = catchAsync(async (req, res) => {
     const cacheKey = `notes:${userId}`;
     const lockKey = `lock:notes:${userId}`;
 
-    //Check cache
-    const cachedNotes = await redis.get(cacheKey);
+    try {
+      // Check cache
+      const cachedNotes = await redis.get(cacheKey);
 
-    if (cachedNotes) {
+      if (cachedNotes) {
         // Upstash automatically parses objects
         return res.status(200).json(cachedNotes);
-    }
-
-    const lock = await redis.set(lockKey, "1", { nx: true, ex: 5});
-
-    if(lock) {
-      // 2. If not in cache, fetch from database
-      const notes = await NoteService.findUserNotes(userId);
-      if (!notes || notes.length === 0) {
-        await redis.del(lockKey);
-        return res.status(200).json([]);
       }
-      
-      await redis.set(cacheKey, notes, { ex: 3600 });
-      await redis.del(lockKey); 
-      
-      res.status(200).json(notes);
-    }else{
-       // Another request is fetching DB
-       await new Promise((resolve) => setTimeout(resolve, 100));
-       const retryCache = await redis.get(cacheKey);
 
-       if(retryCache) {
-        return res.status(200).json(retryCache);
-       }
+      const lock = await redis.set(lockKey, "1", { nx: true, ex: 5 });
 
-       //Fallback if cache still empty
-       const notes = await NoteService.findUserNotes(userId);
-       return res.status(200).json(notes);
+      if (lock) {
+        // 2. If not in cache, fetch from database
+        const notes = await NoteService.findUserNotes(userId);
+        if (!notes || notes.length === 0) {
+          await redis.del(lockKey).catch(() => {});
+          return res.status(200).json([]);
+        }
+
+        await redis.set(cacheKey, notes, { ex: 3600 }).catch(() => {});
+        await redis.del(lockKey).catch(() => {});
+
+        return res.status(200).json(notes);
+      } else {
+        // Another request is fetching DB
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        const retryCache = await redis.get(cacheKey);
+
+        if (retryCache) {
+          return res.status(200).json(retryCache);
+        }
+
+        // Fallback if cache still empty
+        const notes = await NoteService.findUserNotes(userId);
+        return res.status(200).json(notes);
+      }
+    } catch (err) {
+      console.warn("[getAllNotes] Redis cache error, falling back to DB:", err.message || err);
+      const notes = await NoteService.findUserNotes(userId);
+      return res.status(200).json(notes || []);
     }
 });
 
@@ -136,29 +149,51 @@ export const getArchivedNotes = catchAsync(async (req, res) => {
     const cacheKey = `notes:archive:${userId}`;
     const lockKey = `lock:notes:archive:${userId}`;
 
-    const cachedNotes = await redis.get(cacheKey);
-    if (cachedNotes) {
-      return res.status(200).json(cachedNotes);
-    }
+    try {
+      const cachedNotes = await redis.get(cacheKey);
+      if (cachedNotes) {
+        return res.status(200).json(cachedNotes);
+      }
 
-    const lock = await redis.set(lockKey, "1", { nx: true, ex: 5 });
+      const lock = await redis.set(lockKey, "1", { nx: true, ex: 5 });
 
-    if (lock) {
+      if (lock) {
+        const notes = await NoteService.findArchivedNotes(userId);
+        await redis.set(cacheKey, notes || [], { ex: 3600 }).catch(() => {});
+        await redis.del(lockKey).catch(() => {});
+        return res.status(200).json(notes || []);
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      const retryCache = await redis.get(cacheKey);
+
+      if (retryCache) {
+        return res.status(200).json(retryCache);
+      }
+
       const notes = await NoteService.findArchivedNotes(userId);
-      await redis.set(cacheKey, notes || [], { ex: 3600 });
-      await redis.del(lockKey);
+      return res.status(200).json(notes);
+    } catch (err) {
+      console.warn("[getArchivedNotes] Redis cache error, falling back to DB:", err.message || err);
+      const notes = await NoteService.findArchivedNotes(userId);
       return res.status(200).json(notes || []);
     }
+});
 
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    const retryCache = await redis.get(cacheKey);
+export const syncNotes = catchAsync(async (req, res) => {
+    const { since, page, limit } = req.query;
 
-    if (retryCache) {
-      return res.status(200).json(retryCache);
-    }
+    const changes = await DeltaSyncService.getNoteChanges({
+      userId: req.user._id,
+      since: since ? String(since) : null,
+      page: page ? String(page) : null,
+      limit,
+    });
 
-    const notes = await NoteService.findArchivedNotes(userId);
-    return res.status(200).json(notes);
+    res.status(200).json({
+      success: true,
+      ...changes,
+    });
 });
 
 export const createNote = catchAsync(async (req, res) => {
@@ -386,9 +421,12 @@ export const getSharedNote = catchAsync(async (req, res) => {
     if (cachedData) {
       const parsedCache = typeof cachedData === "string" ? JSON.parse(cachedData) : cachedData;
       
-      // Background view increment
+      // Background view increment. This is not a content change, so it must
+      // not bump updatedAt or delta sync would re-download unchanged notes.
       if (parsedCache.noteId) {
-        Notes.updateOne({ _id: parsedCache.noteId }, { $inc: { shareViews: 1 } }).catch(console.error);
+        Notes.updateOne({ _id: parsedCache.noteId }, { $inc: { shareViews: 1 } })
+          .setOptions({ timestamps: false })
+          .catch(console.error);
       }
 
       return res.status(200).json({

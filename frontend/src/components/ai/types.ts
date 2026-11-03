@@ -26,7 +26,7 @@ export type SelectionRange = { from: number; to: number } | null;
 export interface VizSegment {
   id?: string;
   kind: "viz";
-  type: "mermaid" | "chart" | "math" | "svg";
+  type: "mermaid" | "chart" | "math";
   title: string;
   data: string;
   isStreaming?: boolean;

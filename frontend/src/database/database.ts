@@ -1,5 +1,5 @@
 import Dexie from "dexie";
-import { dbSchemaV1, dbSchemaV2 } from "./tables";
+import { dbSchemaV1, dbSchemaV2, dbSchemaV3 } from "./tables";
 import type { Note } from "@/store/useNoteStore";
 import type { Folder } from "@/store/useFolderStore";
 
@@ -27,16 +27,23 @@ export interface ConflictRecord {
     timestamp: number;
 }
 
+export interface SyncMetaRecord {
+    key: string;
+    value: string;
+}
+
 export class NotesDatabase extends Dexie {
     notes!: Dexie.Table<Note, string>;
     folders!: Dexie.Table<Folder, string>;
     syncQueue!: Dexie.Table<SyncOperation, number>;
     conflictLog!: Dexie.Table<ConflictRecord, number>;
+    syncMeta!: Dexie.Table<SyncMetaRecord, string>;
 
     constructor() {
         super("NotesifyDB");
         this.version(1).stores(dbSchemaV1);
         this.version(2).stores(dbSchemaV2);
+        this.version(3).stores(dbSchemaV3);
     }
 }
 

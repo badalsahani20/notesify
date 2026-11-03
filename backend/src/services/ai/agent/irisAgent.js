@@ -173,7 +173,8 @@ export class IrisAgent {
               localSearchFailed = true;
             }
 
-            // Keep the existing SSE payload exactly as-is.
+            // Keep the existing SSE payload exactly as-is (full data reaches
+            // the client card).
             res.write(
               `data: ${JSON.stringify({
                 type: "tool_call",
@@ -183,6 +184,21 @@ export class IrisAgent {
                 data: toolExecResult,
               })}\n\n`,
             );
+
+            // Degraded fallback: if the server store failed the create, emit
+            // the call back with execution:"local" so the client runs it
+            // against its local Dexie store + sync queue instead.
+            if (st.tool === "create_note" && toolExecResult?.error) {
+              res.write(
+                `data: ${JSON.stringify({
+                  type: "tool_call",
+                  id: st.id,
+                  tool: "create_note",
+                  args: st.args,
+                  execution: "local",
+                })}\n\n`,
+              );
+            }
 
             toolCalls.push({
               id: st.id,
@@ -201,11 +217,25 @@ export class IrisAgent {
               },
             });
 
+            // The model already generated create_note's content, so echoing
+            // the full document back into the conversation only burns tokens.
+            // It only needs the real noteId to chain update_note next round.
+            const modelToolResult =
+              st.tool === "create_note" && toolExecResult?.created
+                ? {
+                    created: true,
+                    noteId: toolExecResult.noteId,
+                    title: toolExecResult.title,
+                    version: toolExecResult.version,
+                    ...(toolExecResult.error ? { error: toolExecResult.error } : {}),
+                  }
+                : toolExecResult;
+
             roundToolResponses.push({
               role: "tool",
               tool_call_id: st.id,
               name: st.tool,
-              content: typeof toolExecResult === "string" ? toolExecResult : JSON.stringify(toolExecResult),
+              content: typeof modelToolResult === "string" ? modelToolResult : JSON.stringify(modelToolResult),
             });
           }
 

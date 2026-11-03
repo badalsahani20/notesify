@@ -14,8 +14,6 @@ export const executeOpenRouter = async (
 
   if (!apiKey) throw new Error("No OpenRouter API Key found");
 
-  const isMandatoryReasoningModel =
-    modelId.toLowerCase().includes("glm");
 
   const isGlm = modelId.toLowerCase().includes("glm");
   const isDeepseek = modelId.toLowerCase().includes("deepseek");
@@ -33,12 +31,15 @@ export const executeOpenRouter = async (
   }
 
   if (isGlm) {
+    // Cheap-first GLM endpoints. These can take several seconds to first token,
+    // so the chat UI shows a delayed "taking longer than usual" hint instead of
+    // silently waiting.
     bodyPayload.provider = {
       order: [
-        "open-inference/fp4",
         "relace",
         "wafer/us",
         "wafer/nvfp4",
+        "open-inference/fp4",
         "gmicloud/fp8",
       ],
       allow_fallbacks: true,
@@ -116,6 +117,7 @@ export const executeOpenRouter = async (
     return response.body;
   }
 
+  // background tasks (generating a title, summarizing past history, generating tags).
   const data = await response.json();
   const choice = data.choices?.[0];
   const content = choice?.message?.content;

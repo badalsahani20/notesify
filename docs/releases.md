@@ -4,7 +4,39 @@ Detailed release history for Notesify. For the product overview, see the [README
 
 ---
 
-## 🚀 What's New in v1.3.4
+## 🚀 What's New in v1.3.5
+
+### 🧠 One-Turn Note Creation & Editing (Server-Side `create_note`)
+- **Server-Executed Note Creation:** `create_note` now runs inside the agentic loop against the workspace database instead of being shipped to the client. The tool result returns the real note id, so the note that appears is exactly what Iris wrote — no temp-id placeholders, no "approve a draft" round trip.
+- **Create → Edit in One Turn:** With the real id in hand, Iris chains `update_note` immediately to refine the fresh note in the same reply — draft, then polish block by block, in a single conversational round.
+- **Instant Local Adoption:** The created note lands in the client's local Dexie store and lists the moment the server confirms, without enqueueing a duplicate sync operation; the next delta-sync pull reconciles by the same shared id.
+- **Format Parity:** Server-side notes run the same markdown → TipTap-HTML pipeline as client edits (shared `noteContentHtml` converter), so server-created and locally-edited content stays consistent.
+- **Mongo Fallback:** If the server-side create fails, the call silently degrades to the previous client path — an approval card, then local Dexie write + offline sync queue.
+
+### 🔁 `update_note` Re-Enabled
+- The `update_note` tool is offered again (it executes client-side against the local-first store). AI edits racing user typing surface as version conflicts handled by the existing conflict-resolution UI.
+
+### ⚡ Keyset Delta Sync Protocol & Tombstones (`GET /api/notes/sync`)
+- **Incremental Keyset Synchronization:** Replaced heavy full-workspace downloads with an opaque `(updatedAt, _id)` cursor protocol. Clients only download notes updated since their high-water mark with a 10-second overlap window.
+- **Hard-Delete Tombstone Tracking:** Hard deletes record durable tombstones in MongoDB with an 80-day retention window, allowing offline devices to discover and cleanly delete purged notes upon reconnecting.
+- **Memory & Bandwidth Optimization:** High-dimensional note embeddings are excluded from sync payloads, and response sizes scale strictly with recent edits rather than total notebook size.
+
+### 🛡️ Resilient Redis Caching & Fault Tolerance
+- **Non-Blocking Read Fallbacks:** Wrapped Redis cache lookups and distributed mutex locks in `getAllNotes`, `getArchivedNotes`, and `getAllFolders` with automatic MongoDB fallback. Network timeouts or cache disconnects gracefully return database records with `200 OK` rather than failing with unhandled 500 errors.
+- **Comprehensive Cache Invalidation:** Plugged cache invalidation gaps in AI `delete_note` tooling and `emptyTrash`, ensuring active, archived, and folder list caches stay coherent across user mutations.
+
+### 📊 Rich Iris Visual Elements (@assistant-ui Elements)
+- **Comparison Cards & Spec Sheets:** Wired `@assistant-ui/elements-comparison-card` and `@assistant-ui/elements-spec-sheet` directly into the chat markdown stream for side-by-side analysis, technical spec breakdowns, and product matrices.
+
+### 📱 Official Android Release APK (`Notesify-1.3.5.apk`)
+- **Standalone Mobile Installation:** Built and signed production Android release APK (`v2` signature scheme, adaptive density, 14.1 MB) available directly for sideloading from the landing page with zero Play Store lock-in.
+
+---
+
+<details>
+<summary><b>v1.3.4 Release Notes</b></summary>
+
+### 🚀 What's New in v1.3.4
 
 ### 🌐 Always-On Autonomous Web Search (No Manual Toggle)
 - **Zero-Friction Web Retrieval:** Removed the manual web search toggle button from the chat composers. Web search (`search_web`) and page crawler (`crawl_url`) tools are now continuously available by default.
@@ -35,6 +67,7 @@ Detailed release history for Notesify. For the product overview, see the [README
 - **Settings Visuals:** Upgraded active selection chips in Settings $\to$ Editor to high-contrast solid white (`bg-white text-zinc-950`).
 - **Capacitor Alignment:** Synchronized devDependencies `@capacitor/android` and `@capacitor/cli` to `^8.6.0` to match `@capacitor/core@8.6.0`.
 
+</details>
 
 ---
 

@@ -24,6 +24,29 @@ export const PLATFORM_CONFIGS: Record<OSKey, PlatformConfig> = {
       },
     ],
   },
+  android: {
+    name: 'Android',
+    osKey: 'android',
+    architecture: 'Universal APK (ARM64 & x86_64)',
+    packageType: 'Android Package (.apk)',
+    dpiAware: 'Adaptive Density (hdpi to xxxhdpi)',
+    assetPattern: /\.apk$/i,
+    fallbackDownloadUrl: 'https://github.com/badalsahani20/notesify/releases',
+    steps: [
+      {
+        title: 'Download the APK',
+        desc: 'Tap Download to save Notesify-1.3.5.apk directly to your device.',
+      },
+      {
+        title: 'Allow Installation',
+        desc: 'If prompted by Android, permit "Install unknown apps" for your browser or file manager.',
+      },
+      {
+        title: 'Install & Launch',
+        desc: 'Tap Install, open Notesify, and log in to sync your notes and chat with Iris.',
+      },
+    ],
+  },
   mac: {
     name: 'macOS',
     osKey: 'mac',
@@ -103,7 +126,9 @@ export function resolvePlatformState(
   // Preview or unreleased platform state
   const cleanVersion = release?.version.replace(/^v/, '') || '1.2.0';
   const fallbackBinary =
-    osKey === 'mac'
+    osKey === 'android'
+      ? `Notesify-${cleanVersion}.apk`
+      : osKey === 'mac'
       ? `Notesify-${cleanVersion}-universal.dmg`
       : osKey === 'linux'
       ? `Notesify-${cleanVersion}.AppImage`

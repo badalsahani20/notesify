@@ -94,7 +94,7 @@ export const createNoteTool = {
   function: {
     name: "create_note",
     description:
-      "Create a new Markdown note only when explicitly requested.",
+      "Create a new note in the user's workspace. Runs server-side: the note is persisted immediately and the result returns the real noteId, which you can then pass to update_note in the same turn to revise content (e.g. create a draft note, then fix or extend specific blocks). Only create when explicitly requested.",
     parameters: {
       type: "object",
       properties: {
@@ -152,13 +152,12 @@ export const getNoteContentTool = {
   },
 };
 
-/*
 export const updateNoteTool = {
   type: "function",
   function: {
     name: "update_note",
     description:
-      "Edit an existing note. Supply 'blockId' (e.g. 'b_xxx') to surgically replace a specific block from editor context with 100% precision, or use 'targetContent' as fallback. Use mode: 'append' to add to the bottom, or 'full_replace' only with explicit authorization.",
+      "Edit an existing note. Supply 'blockId' (e.g. 'b_xxx') to surgically replace a specific block from editor context with 100% precision, or use 'targetContent' as fallback. Use mode: 'append' to add to the bottom, or 'full_replace' only with explicit authorization. After create_note, call this with the returned real noteId to refine the fresh note in the same turn.",
     parameters: {
       type: "object",
       properties: {
@@ -194,7 +193,6 @@ export const updateNoteTool = {
     },
   },
 };
-*/
 
 export const searchNotesTool = {
   type: "function",
@@ -262,7 +260,11 @@ export const CHAT_TOOLS = [
   getNoteContentTool,
   createNoteTool,
   deleteNoteTool,
-  // updateNoteTool, // Temporarily commented out to avoid simultaneous edit conflict issues
+  // update_note executes client-side (execution:"local") against the user's
+  // local-first store; re-enabled so the model can chain create_note ->
+  // update_note in one turn. Caveat: user-typed edits racing the AI update
+  // surface as version conflicts (ConflictResolutionService handles them).
+  updateNoteTool,
   askQuestionTool,
 ];
 

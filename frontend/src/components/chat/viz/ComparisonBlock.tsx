@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { Check, X, Info, Loader2 } from "lucide-react";
+import ComparisonCardBlock from "./ComparisonCardBlock";
 
 interface ComparisonData {
   title?: string;
@@ -118,6 +119,11 @@ const renderCellContent = (content: string) => {
 };
 
 const ComparisonBlock = ({ data }: ComparisonBlockProps) => {
+  // If the comparison payload has options (assistant-ui comparison card schema), render ComparisonCardBlock
+  if (/"options"\s*:/i.test(data)) {
+    return <ComparisonCardBlock data={data} />;
+  }
+
   const parsed = useMemo(() => safeParse(data), [data]);
 
   // If no data or fields parsed yet, display a premium skeleton loader instead of an error

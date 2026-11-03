@@ -28,6 +28,12 @@ import { MobileAiActions } from "@/components/editor/MobileAiActions";
 import { NoteConflictBanner } from "@/components/notes/NoteConflictBanner";
 
 
+// Reveal only after the scroll settles, so a flick never flashes a control
+// under the finger. Then auto-hide once the reader stops interacting.
+const SCROLL_SETTLE_MS = 220;
+const SCROLL_REVEAL_MS = 220;
+const SCROLL_HIDE_MS = 1500;
+
 const NoteEditor = () => {
   const { noteId, folderId } = useParams();
   const isNew = noteId === "new";
@@ -79,49 +85,99 @@ const NoteEditor = () => {
 
   const editorScrollRef = useRef<HTMLDivElement>(null);
   const scrollRafRef = useRef<number | null>(null);
-  const [showScrollTop, setShowScrollTop] = useState(false);
-  const [showScrollBottom, setShowScrollBottom] = useState(false);
+  const scrollRevealRef = useRef<number | null>(null);
+  const scrollHideRef = useRef<number | null>(null);
+  const scrollActiveRef = useRef<number | null>(null);
+  const [isAtTop, setIsAtTop] = useState(true);
+  const [isAtBottom, setIsAtBottom] = useState(true);
+  const [scrollUiVisible, setScrollUiVisible] = useState(false);
+  // True only while the finger/momentum is still moving the document.
+  const [isScrollActive, setIsScrollActive] = useState(false);
 
-  const updateScrollButtons = useCallback(() => {
+  const clearScrollTimers = useCallback(() => {
+    if (scrollRevealRef.current !== null) {
+      window.clearTimeout(scrollRevealRef.current);
+      scrollRevealRef.current = null;
+    }
+    if (scrollHideRef.current !== null) {
+      window.clearTimeout(scrollHideRef.current);
+      scrollHideRef.current = null;
+    }
+    if (scrollActiveRef.current !== null) {
+      window.clearTimeout(scrollActiveRef.current);
+      scrollActiveRef.current = null;
+    }
+  }, []);
+
+  const updateScrollPosition = useCallback(() => {
     const el = editorScrollRef.current;
     if (!el) return;
     const { scrollTop, scrollHeight, clientHeight } = el;
-    const nextTop = scrollTop > 300;
-    const nextBottom =
-      scrollHeight > clientHeight && scrollHeight - scrollTop - clientHeight > 300;
+    const scrollable = scrollHeight - clientHeight > 8;
+    const nextAtTop = scrollTop <= 8;
+    // A non-scrollable document counts as "at the bottom" so neither button
+    // offers a jump that goes nowhere.
+    const nextAtBottom = !scrollable || scrollHeight - scrollTop - clientHeight <= 8;
 
-    // Only schedule a render when the visibility actually flips. Setting the
-    // same boolean on every scroll event still pushes work through React on
-    // every frame, which shows up as scroll lag on Android WebView.
-    setShowScrollTop((prev) => (prev === nextTop ? prev : nextTop));
-    setShowScrollBottom((prev) => (prev === nextBottom ? prev : nextBottom));
+    // Only schedule a render when a boolean actually flips. Setting the same
+    // value on every scroll event still pushes work through React each frame,
+    // which shows up as scroll lag on Android WebView.
+    setIsAtTop((prev) => (prev === nextAtTop ? prev : nextAtTop));
+    setIsAtBottom((prev) => (prev === nextAtBottom ? prev : nextAtBottom));
   }, []);
 
-  // Coalesce scroll events to one update per animation frame.
+  // Coalesce scroll events to one position update per animation frame.
   const handleEditorScroll = useCallback(() => {
+    // Hide immediately: the controls must never sit under a moving finger.
+    setScrollUiVisible(false);
+    setIsScrollActive(true);
+    clearScrollTimers();
+
+    scrollActiveRef.current = window.setTimeout(() => {
+      scrollActiveRef.current = null;
+      setIsScrollActive(false);
+    }, SCROLL_SETTLE_MS);
+
+    scrollRevealRef.current = window.setTimeout(() => {
+      scrollRevealRef.current = null;
+      setScrollUiVisible(true);
+
+      scrollHideRef.current = window.setTimeout(() => {
+        scrollHideRef.current = null;
+        setScrollUiVisible(false);
+      }, SCROLL_HIDE_MS);
+    }, SCROLL_REVEAL_MS);
+
     if (scrollRafRef.current !== null) return;
     scrollRafRef.current = window.requestAnimationFrame(() => {
       scrollRafRef.current = null;
-      updateScrollButtons();
+      updateScrollPosition();
     });
-  }, [updateScrollButtons]);
+  }, [clearScrollTimers, updateScrollPosition]);
 
   useEffect(() => () => {
     if (scrollRafRef.current !== null) {
       window.cancelAnimationFrame(scrollRafRef.current);
       scrollRafRef.current = null;
     }
-  }, []);
+    clearScrollTimers();
+  }, [clearScrollTimers]);
 
+  // Recompute availability after content changes, but do not reveal the
+  // controls: opening a note is not scrolling.
   useEffect(() => {
-    updateScrollButtons();
-  }, [note?.content, updateScrollButtons]);
+    updateScrollPosition();
+  }, [note?.content, updateScrollPosition]);
 
   // Reset scroll to top when switching between notes
   useEffect(() => {
     if (!noteId) return;
     editorScrollRef.current?.scrollTo({ top: 0 });
-  }, [noteId]);
+    clearScrollTimers();
+    setScrollUiVisible(false);
+    setIsScrollActive(false);
+    setIsAtTop(true);
+  }, [noteId, clearScrollTimers]);
 
   useEffect(() => {
     // Panel preload removed
@@ -341,8 +397,9 @@ const NoteEditor = () => {
         </div>
 
         <FloatingScrollButtons
-          showScrollTop={showScrollTop}
-          showScrollBottom={showScrollBottom}
+          visible={scrollUiVisible && !(isAtTop && isAtBottom)}
+          atTop={isAtTop}
+          atBottom={isAtBottom}
           onScrollTop={() => editorScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" })}
           onScrollBottom={() => editorScrollRef.current?.scrollTo({ top: editorScrollRef.current.scrollHeight, behavior: "smooth" })}
           yOffset={isMobile ? keyboardOffset : 0}
@@ -425,7 +482,11 @@ const NoteEditor = () => {
       )}
 
       {isMobile && !isAiPanelOpen ? (
-        <MobileAiActions aiChat={aiChat} onOpenAiPanel={() => setAiPanelOpen(true)} />
+        <MobileAiActions
+          aiChat={aiChat}
+          onOpenAiPanel={() => setAiPanelOpen(true)}
+          hidden={isScrollActive}
+        />
       ) : null}
 
       <AiResultDialog

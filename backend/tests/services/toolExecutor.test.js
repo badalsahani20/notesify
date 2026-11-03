@@ -7,6 +7,7 @@ jest.unstable_mockModule('../../src/services/notes.service.js', () => ({
   searchNote: jest.fn(),
   findNotesById: jest.fn(),
   removeNote: jest.fn(),
+  createNewNote: jest.fn(),
 }));
 
 jest.unstable_mockModule('../../src/services/memoryService.js', () => ({
@@ -15,7 +16,7 @@ jest.unstable_mockModule('../../src/services/memoryService.js', () => ({
 }));
 
 // Dynamic imports
-const { getNoteContentForUser, searchNote, findNotesById, removeNote } = await import('../../src/services/notes.service.js');
+const { getNoteContentForUser, searchNote, findNotesById, removeNote, createNewNote } = await import('../../src/services/notes.service.js');
 const { searchMemories, saveMemoryWithStatus } = await import('../../src/services/memoryService.js');
 const { toolExecutor } = await import('../../src/services/ai/tools/toolExecutor.js');
 const { CHAT_TOOLS, searchNotesTool } = await import('../../src/services/ai/tools/chatTools.js');
@@ -280,6 +281,108 @@ describe('ToolExecutor - search_notes & chat tools', () => {
       });
 
       expect(result.error).toMatch(/failed to save memory/i);
+    });
+  });
+
+  describe('create_note execution (server tool)', () => {
+    it('rejects missing content without calling createNewNote', async () => {
+      const emptyArgs = await toolExecutor.execute({
+        toolName: 'create_note',
+        args: { title: 'Draft', content: '   ' },
+        userId,
+      });
+      expect(emptyArgs.error).toMatch(/missing content/i);
+      expect(createNewNote).not.toHaveBeenCalled();
+    });
+
+    it('creates the note, converts markdown to block HTML, and returns the real noteId', async () => {
+      createNewNote.mockResolvedValue({
+        _id: new mongoose.Types.ObjectId('66a1234567890123456789cd'),
+        title: 'Meeting Notes',
+        content: '<h1>Meeting Notes</h1><p>Agenda first item</p>',
+        folder: null,
+        color: '#f5f5f5',
+        pinned: false,
+        isArchived: false,
+        version: 1,
+        updatedAt: new Date('2026-11-03'),
+        lastAccessedAt: null,
+      });
+
+      const result = await toolExecutor.execute({
+        toolName: 'create_note',
+        args: { title: 'Meeting Notes', content: '# Meeting Notes\n\nAgenda first item' },
+        userId,
+      });
+
+      expect(createNewNote).toHaveBeenCalledWith(userId, {
+        title: 'Meeting Notes',
+        content: '<h1>Meeting Notes</h1><p>Agenda first item</p>',
+        version: 1,
+      });
+      expect(result.created).toBe(true);
+      expect(result.noteId).toBe('66a1234567890123456789cd');
+      expect(result.title).toBe('Meeting Notes');
+      // Full document is present for the client to adopt; the model echo is
+      // slimmed separately (irisAgent strips `note`).
+      expect(result.note._id).toBe('66a1234567890123456789cd');
+      expect(result.note.content).toContain('<h1>');
+    });
+
+    it('wraps plain text in a block element so TipTap parses it as a discrete block', async () => {
+      createNewNote.mockResolvedValue({
+        _id: new mongoose.Types.ObjectId(),
+        title: 'Quick note',
+        content: '<p>just some text</p>',
+        version: 1,
+        updatedAt: new Date(),
+      });
+
+      await toolExecutor.execute({
+        toolName: 'create_note',
+        args: { title: 'Quick note', content: 'just some text' },
+        userId,
+      });
+
+      expect(createNewNote).toHaveBeenCalledWith(
+        userId,
+        expect.objectContaining({
+          content: '<p>just some text</p>',
+        }),
+      );
+    });
+
+    it('falls back to Untitled Note when the title is missing', async () => {
+      createNewNote.mockResolvedValue({
+        _id: new mongoose.Types.ObjectId(),
+        title: 'Untitled Note',
+        content: '<p>x</p>',
+        version: 1,
+        updatedAt: new Date(),
+      });
+
+      await toolExecutor.execute({
+        toolName: 'create_note',
+        args: { title: '  ', content: 'x' },
+        userId,
+      });
+
+      expect(createNewNote).toHaveBeenCalledWith(
+        userId,
+        expect.objectContaining({ title: 'Untitled Note' }),
+      );
+    });
+
+    it('surfaces a failed insert as an error so the client can fall back to local execution', async () => {
+      createNewNote.mockRejectedValue(new Error('mongo down'));
+
+      const result = await toolExecutor.execute({
+        toolName: 'create_note',
+        args: { title: 'Draft', content: 'hi' },
+        userId,
+      });
+
+      expect(result.error).toBe('Failed to create note: mongo down');
     });
   });
 });

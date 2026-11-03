@@ -89,7 +89,7 @@ export const useAiChatStreaming = ({
                     id: id ?? updated[correlatedIdx].id,
                     query: query ?? updated[correlatedIdx].query,
                     url: url ?? updated[correlatedIdx].url,
-                    args: args ?? updated[existingIdx].args,
+                    args: args ?? updated[correlatedIdx].args,
                     execution: execution ?? updated[correlatedIdx].execution,
                     purpose: purpose ?? updated[correlatedIdx].purpose,
                     status: status ?? updated[correlatedIdx].status,
