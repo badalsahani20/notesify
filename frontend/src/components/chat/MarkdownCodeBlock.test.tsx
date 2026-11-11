@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
+import { act } from "react";
+import { createRoot } from "react-dom/client";
 
 vi.mock("./IrisVisualBlock", () => ({
   default: ({ visualization }: { visualization: Record<string, unknown> }) => (
@@ -70,5 +72,42 @@ describe("MarkdownCodeBlock routing", () => {
 
     expect(html).toContain("Device Specs");
     expect(html).toContain("16 GB");
+  });
+
+  it("falls back to execCommand and shows Copied when the Clipboard API is blocked", async () => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+    const writeText = vi.fn().mockRejectedValue(new Error("NotAllowedError"));
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+    });
+    const execCommand = vi.fn().mockReturnValue(true);
+    Object.defineProperty(document, "execCommand", {
+      value: execCommand,
+      configurable: true,
+    });
+
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(<MarkdownCodeBlock code="const x = 1;" language="typescript" />);
+    });
+
+    const button = container.querySelector("button.gc-code-copy") as HTMLButtonElement;
+    expect(button).toBeTruthy();
+
+    await act(async () => {
+      button.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    expect(writeText).toHaveBeenCalledWith("const x = 1;");
+    expect(execCommand).toHaveBeenCalledWith("copy");
+    expect(button.getAttribute("aria-label")).toBe("Copied");
+
+    await act(async () => root.unmount());
+    container.remove();
   });
 });

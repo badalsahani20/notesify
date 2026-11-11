@@ -51,7 +51,7 @@ export const MarkdownLink = ({ href, children, ...props }: any) => {
 
 export const sharedMarkdownComponents = (isStreaming = false) => ({
   code({ className, children, ...props }: any) {
-    const rawCode = String(children ?? "").replace(/\n$/, "");
+    const rawCode = String(children ?? "").replace(/^[\r\n]+/, "").replace(/[\r\n]+$/, "");
     const language = className?.replace("language-", "") || "";
     const isBlock = Boolean(language) || rawCode.includes("\n");
 

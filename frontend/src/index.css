@@ -4100,7 +4100,7 @@ span[data-ai-ghost] {
 /* ── ChatGPT-style Code Block ── */
 .gc-code-block {
   overflow: hidden;
-  border-radius: 0.85rem;
+  border-radius: 0.75rem;
   background: #282828;
   margin: 0.5rem 0;
   font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
@@ -4111,7 +4111,7 @@ span[data-ai-ghost] {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.6rem 0.9rem;
+  padding: 0.35rem 0.85rem 0.15rem;
   background: #282828;
   color: #9a9a9a;
 }
@@ -4143,8 +4143,8 @@ span[data-ai-ghost] {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.8rem;
-  height: 1.8rem;
+  width: 1.5rem;
+  height: 1.5rem;
   border-radius: 0.35rem;
   color: #9a9a9a;
   background: transparent;
@@ -4171,7 +4171,7 @@ span[data-ai-ghost] {
 .gc-code-pre {
   margin: 0;
   overflow-x: auto;
-  padding: 0rem 1.1rem 1rem;
+  padding: 0.25rem 0.85rem 0.55rem;
   background: transparent;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
@@ -4201,7 +4201,7 @@ span[data-ai-ghost] {
   min-width: max-content;
   color: #d4d4d4;
   font-size: 0.83rem;
-  line-height: 1.75;
+  line-height: 1.5;
   white-space: pre;
   font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
 }
@@ -7139,8 +7139,8 @@ html:not(.dark) .dock-btn-active {
 
 .gc-code-block {
   position: relative;
-  margin: 1rem 0;
-  border-radius: 0.85rem;
+  margin: 0.5rem 0;
+  border-radius: 0.75rem;
   background: var(--panel-bg, #171717);
   overflow: hidden;
   box-shadow: none;
@@ -7151,7 +7151,7 @@ html:not(.dark) .dock-btn-active {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.5rem 0.85rem 0.25rem; /* Tighter vertical spacing */
+  padding: 0.35rem 0.85rem 0.15rem; /* Tighter vertical spacing */
   background: transparent;
   border: none; /* Removed header border/divider */
   user-select: none;
@@ -7160,7 +7160,7 @@ html:not(.dark) .dock-btn-active {
 .gc-code-header-left {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.45rem;
   opacity: 0.8; /* Subtle header to keep focus on code */
 }
 
@@ -7180,17 +7180,17 @@ html:not(.dark) .dock-btn-active {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 0.5rem;
-  color: rgba(255, 255, 255, 0.3);
+  width: 24px;
+  height: 24px;
+  border-radius: 0.375rem;
+  color: rgba(255, 255, 255, 0.35);
   transition: all 0.2s ease;
   background: transparent;
   border: none;
 }
 
 .gc-code-copy:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.08);
   color: #ffffff;
 }
 
@@ -7204,7 +7204,7 @@ html:not(.dark) .dock-btn-active {
 
 .gc-code-pre {
   margin: 0;
-  padding: 0.75rem 1.25rem 1.25rem;
+  padding: 0.25rem 0.85rem 0.55rem;
   overflow-x: auto;
   background: var(--panel-bg, #171717) !important;
   border: none !important;
@@ -7214,8 +7214,8 @@ html:not(.dark) .dock-btn-active {
 
 .gc-code-content {
   font-family: 'JetBrains Mono', 'Fira Code', 'Menlo', 'Consolas', monospace;
-  font-size: 0.875rem;
-  line-height: 1.65;
+  font-size: 0.84rem;
+  line-height: 1.5;
   font-weight: 400;
   color: rgba(255, 255, 255, 0.88);
   background: transparent !important;

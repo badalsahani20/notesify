@@ -5,6 +5,7 @@ import rehypeRaw from "rehype-raw";
 import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 import { irisSanitizeSchema } from "@/utils/markdownSanitizeSchema";
+import { copyToClipboard } from "@/utils/clipboard";
 
 type MarkdownWritingBlockProps = {
   content: string;
@@ -33,7 +34,11 @@ const MarkdownWritingBlock = ({ content }: MarkdownWritingBlockProps) => {
   }, [isEditing, localContent]);
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(localContent);
+    const copied = await copyToClipboard(localContent);
+    if (!copied) {
+      console.error("Failed to copy writing block");
+      return;
+    }
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1400);
   };
@@ -74,8 +79,9 @@ const MarkdownWritingBlock = ({ content }: MarkdownWritingBlockProps) => {
           <button
             type="button"
             className="gc-writing-action-btn"
-            onClick={handleCopy}
+            onClick={() => void handleCopy()}
             title={copied ? "Copied!" : "Copy text"}
+            aria-label={copied ? "Copied" : "Copy text"}
           >
             {copied ? (
               <CheckCheck size={16} className="text-emerald-500" />

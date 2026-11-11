@@ -3,6 +3,7 @@ import {
   DEFAULT_CHAT_MODEL,
   COMPLEX_ANALYSIS_MODEL,
   QUICK_MODEL,
+  DEFAULT_CHAT_MODEL_II,
 } from "../config/aiModels.js";
 
 export const classifyChatIntent = (
@@ -18,7 +19,7 @@ export const classifyChatIntent = (
     console.log(
       `⚡ [ModelRouter] Fast mode active: Routing to ${DEFAULT_CHAT_MODEL} (GLM - minimal effort)`,
     );
-    return DEFAULT_CHAT_MODEL;
+    return DEFAULT_CHAT_MODEL_II || DEFAULT_CHAT_MODEL;
   }
 
   if (modelTier === "thinking") {
@@ -39,7 +40,7 @@ export const classifyChatIntent = (
 
   // 1. VISUAL CONVO
   const hasAttachedImage = !!imageBase64;
-  if (hasAttachedImage) return DEFAULT_CHAT_MODEL || COMPLEX_ANALYSIS_MODEL;
+  if (hasAttachedImage) return DEFAULT_CHAT_MODEL || QUICK_MODEL;
 
   // // Calculate total context size
   // const historyText = history

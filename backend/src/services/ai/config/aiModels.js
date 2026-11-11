@@ -6,12 +6,13 @@ export const TEACHING_MODELS = [
   "deepseek/deepseek-v4-flash-0731",
 ];
 export const DEFAULT_CHAT_MODEL = "z-ai/glm-5.3-flash";
+export const DEFAULT_CHAT_MODEL_II = "inclusionai/ling-3.0-flash";
 export const QUICK_MODEL = "qwen/qwen3.7-flash";
 export const QWEN_MODEL = "qwen/qwen3.7-flash";
 export const TITLE_GENERATION_MODEL = "meta-llama/llama-3.1-8b-instruct";
 export const COMPLEX_ANALYSIS_MODEL = "z-ai/glm-5.3-flash";
 export const NOTES_GENERATION_MODEL = "qwen/qwen3.7-flash";
-export const GRAMMAR_MODEL = "inclusionai/ling-3.0-flash"
+export const GRAMMAR_MODEL = "inclusionai/ling-3.0-flash";
 export const FALLBACK_MODEL = "qwen/qwen3.7-flash";
 export const FALLBACK_MODELS = [
   "qwen/qwen3.7-flash",

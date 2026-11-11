@@ -1,6 +1,7 @@
 import { memo, useMemo, useState, lazy, Suspense } from "react";
 import { CheckCheck, Copy, Code2, Loader2 } from "lucide-react";
 import IrisVisualBlock from "./IrisVisualBlock";
+import { copyToClipboard } from "@/utils/clipboard";
 
 const ComparisonBlock = lazy(() => import("@/components/chat/viz/ComparisonBlock"));
 const ComparisonCardBlock = lazy(() => import("@/components/chat/viz/ComparisonCardBlock"));
@@ -213,7 +214,11 @@ const MarkdownCodeBlock = ({ code, language, isStreaming = false }: MarkdownCode
 
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(code);
+    const copied = await copyToClipboard(code);
+    if (!copied) {
+      console.error("Failed to copy code block");
+      return;
+    }
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1400);
   };
@@ -222,7 +227,7 @@ const MarkdownCodeBlock = ({ code, language, isStreaming = false }: MarkdownCode
     <div className="gc-code-block">
       <div className="gc-code-header">
         <div className="gc-code-header-left">
-          <Code2 size={14} className="gc-code-lang-icon" />
+          <Code2 size={13} className="gc-code-lang-icon" />
           <span className="gc-code-language">{getLanguageLabel(language)}</span>
         </div>
         <button
@@ -230,8 +235,9 @@ const MarkdownCodeBlock = ({ code, language, isStreaming = false }: MarkdownCode
           className="gc-code-copy"
           onClick={() => void handleCopy()}
           title={copied ? "Copied!" : "Copy code"}
+          aria-label={copied ? "Copied" : "Copy code"}
         >
-          {copied ? <CheckCheck size={15} className="gc-code-copy-icon-ok" /> : <Copy size={15} />}
+          {copied ? <CheckCheck size={14} className="gc-code-copy-icon-ok" /> : <Copy size={14} />}
         </button>
       </div>
       <pre className="gc-code-pre">
