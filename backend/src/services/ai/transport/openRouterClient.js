@@ -96,8 +96,8 @@ export const executeOpenRouter = async (
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
-        "HTTP-Referer": process.env.BACKEND_URL || "http://localhost:5500",
-        "X-Title": "Notesify AI Assistant",
+        "HTTP-Referer": process.env.SITE_URL || process.env.BACKEND_URL || "https://notesify.in",
+        "X-Title": process.env.SITE_NAME || "Notesify AI Assistant",
         "Content-Type": "application/json",
       },
       body: JSON.stringify(bodyPayload),

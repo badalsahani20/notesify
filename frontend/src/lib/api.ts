@@ -15,10 +15,10 @@ const getApiBaseUrl = () => {
   const isFileProtocol = typeof window !== "undefined" && window.location?.protocol === "file:";
   if (import.meta.env.PROD || isFileProtocol) {
     if (!envUrl || envUrl.includes("localhost")) {
-      return "https://fullstack-notes-app-xluo.onrender.com/api";
+      return "https://api.notesify.in/api";
     }
   }
-  return envUrl || "https://fullstack-notes-app-xluo.onrender.com/api";
+  return envUrl || "https://api.notesify.in/api";
 };
 
 export const API_BASE_URL = getApiBaseUrl();

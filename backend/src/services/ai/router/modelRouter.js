@@ -14,10 +14,18 @@ export const classifyChatIntent = (
   pdfContext = "",
   modelTier = null,
 ) => {
+  const hasAttachedImage = !!imageBase64;
+
   // Explicit Model Tier Overrides
   if (modelTier === "fast") {
+    if (hasAttachedImage) {
+      console.log(
+        `⚡ [ModelRouter] Fast mode with image: Routing to ${DEFAULT_CHAT_MODEL} (GLM vision)`,
+      );
+      return DEFAULT_CHAT_MODEL || QUICK_MODEL;
+    }
     console.log(
-      `⚡ [ModelRouter] Fast mode active: Routing to ${DEFAULT_CHAT_MODEL} (GLM - minimal effort)`,
+      `⚡ [ModelRouter] Fast mode active: Routing to ${DEFAULT_CHAT_MODEL_II || DEFAULT_CHAT_MODEL} (Ling - minimal effort)`,
     );
     return DEFAULT_CHAT_MODEL_II || DEFAULT_CHAT_MODEL;
   }
@@ -39,7 +47,6 @@ export const classifyChatIntent = (
   const msg = message.toLowerCase();
 
   // 1. VISUAL CONVO
-  const hasAttachedImage = !!imageBase64;
   if (hasAttachedImage) return DEFAULT_CHAT_MODEL || QUICK_MODEL;
 
   // // Calculate total context size

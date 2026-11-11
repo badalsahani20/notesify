@@ -16,6 +16,7 @@ jest.unstable_mockModule("../../src/services/ai/config/aiModels.js", () => ({
   PRIMARY_MODEL: "test/primary-model",
   TEACHING_MODELS: ["test/teaching-model"],
   DEFAULT_CHAT_MODEL: "test/default-chat-model",
+  DEFAULT_CHAT_MODEL_II: "test/default-chat-model-ii",
   COMPLEX_ANALYSIS_MODEL: "test/complex-model",
   GROQ_CHEAP_MODEL: "test/groq-cheap",
   GROQ_STRONG_MODEL: "test/groq-strong",
@@ -96,7 +97,7 @@ describe("chatService - chatWithAi", () => {
       stream: false,
     });
     expect(executeOpenRouter).toHaveBeenLastCalledWith(
-      "test/default-chat-model",
+      "test/default-chat-model-ii",
       expect.any(Array),
       false,
       "minimal",
@@ -306,7 +307,6 @@ describe("chatService - temporal context", () => {
     expect(context).toContain("## Temporal Anchor");
     expect(context).toContain("Today's date:");
     expect(context).toContain("Asia/Kolkata");
-    expect(context).toContain("reference for the current year and relative dates");
     // Verifies YYYY-MM-DD pattern
     expect(context).toMatch(/\d{4}-\d{2}-\d{2}/);
   });

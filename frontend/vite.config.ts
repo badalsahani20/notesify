@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'path'
 
-const FALLBACK_API_ORIGIN = 'https://fullstack-notes-app-xluo.onrender.com'
+const FALLBACK_API_ORIGIN = 'https://api.notesify.in'
 
 /**
  * Injects a production Content-Security-Policy meta tag.
