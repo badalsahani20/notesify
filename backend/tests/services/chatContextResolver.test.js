@@ -50,10 +50,40 @@ describe("ChatContextResolver & Watermark Compaction Engine", () => {
       expect(lowWatermark).toBe(7000);
     });
 
-    it("clamps watermarks against safe model context budget", () => {
-      process.env.CHAT_HISTORY_HIGH_WATERMARK = "70000"; // Exceeds 64k safe model context limit
-      const { highWatermark } = getWatermarkThresholds();
-      expect(highWatermark).toBeLessThanOrEqual(56500); // 64000 - 2500 - 5000
+    it("scales defaults with the plan tier", () => {
+      const free = getWatermarkThresholds({ planTier: "free" });
+      expect(free.highWatermark).toBe(18000);
+      expect(free.lowWatermark).toBe(10000);
+
+      const pro = getWatermarkThresholds({ planTier: "pro" });
+      expect(pro.highWatermark).toBe(100000);
+      expect(pro.lowWatermark).toBe(64000);
+
+      const enterprise = getWatermarkThresholds({
+        modelId: "inclusionai/ling-3.0-flash", // 260k window
+        planTier: "enterprise",
+      });
+      expect(enterprise.highWatermark).toBe(200000);
+      expect(enterprise.lowWatermark).toBe(130000);
+    });
+
+    it("clamps watermarks to the routed model's real context window", () => {
+      process.env.CHAT_HISTORY_HIGH_WATERMARK = "500000";
+      const { highWatermark, modelContextWindow } = getWatermarkThresholds({
+        modelId: "inclusionai/ling-3.0-flash", // 260k fast route
+        planTier: "enterprise",
+      });
+      expect(modelContextWindow).toBe(260000);
+      expect(highWatermark).toBeLessThanOrEqual(260000 - 4000 - 8000);
+    });
+
+    it("uses the 1M window for the GLM thinking/pro route", () => {
+      const { modelContextWindow, highWatermark } = getWatermarkThresholds({
+        modelId: "z-ai/glm-5.3-flash",
+        planTier: "enterprise",
+      });
+      expect(modelContextWindow).toBe(1000000);
+      expect(highWatermark).toBe(200000);
     });
   });
 
@@ -227,6 +257,73 @@ describe("ChatContextResolver & Watermark Compaction Engine", () => {
       expect(updatedSession.summary).toContain("Current Goal: Implementing Iris compaction.");
       expect(updatedSession.lastSummarizedSeq).toBeGreaterThan(0);
       expect(updatedSession.lastSummarizedMessageId).toBeTruthy();
+    });
+
+    it("does not re-summarize already-covered history on the next turn", async () => {
+      process.env.CHAT_HISTORY_HIGH_WATERMARK = "2000";
+      process.env.CHAT_HISTORY_LOW_WATERMARK = "500";
+
+      const messages = Array.from({ length: 20 }, (_, i) => ({
+        id: `m-${i + 1}`,
+        seq: i + 1,
+        role: i % 2 === 0 ? "user" : "assistant",
+        content: `Turn ${i + 1}: ${"technical context ".repeat(60)}`,
+      }));
+
+      const session = await GlobalChatSession.create({
+        user: userId,
+        summary: "",
+        lastSummarizedSeq: 0,
+        messages,
+      });
+
+      summarizeHistory.mockResolvedValue("Compacted summary");
+
+      await resolver.resolve({
+        user: { _id: userId, plan: { tier: "free" } },
+        body: { message: "First turn over threshold" },
+        sessionData: {
+          history: messages,
+          summary: "",
+          activeSession: session,
+          isGlobalChat: true,
+        },
+      });
+      expect(summarizeHistory).toHaveBeenCalledTimes(1);
+
+      // Simulate the next persisted turn: append + save (this also applies the
+      // message cap), then resolve again.
+      const reloaded = await GlobalChatSession.findById(session._id);
+      const lastSeq = reloaded.messages[reloaded.messages.length - 1].seq;
+      reloaded.messages.push(
+        { id: "new-1", seq: lastSeq + 1, role: "user", content: "short question" },
+        { id: "new-2", seq: lastSeq + 2, role: "assistant", content: "short answer" },
+      );
+      await reloaded.save();
+
+      const history2 = reloaded.messages.map((m) => ({
+        id: m.id,
+        seq: m.seq,
+        role: m.role,
+        content: m.content,
+      }));
+
+      summarizeHistory.mockClear();
+      const result = await resolver.resolve({
+        user: { _id: userId, plan: { tier: "free" } },
+        body: { message: "next turn" },
+        sessionData: {
+          history: history2,
+          summary: reloaded.summary,
+          activeSession: reloaded,
+          isGlobalChat: true,
+        },
+      });
+
+      // The summarized prefix is excluded from the watermark, so the small new
+      // tail must not trigger another summarizer call.
+      expect(summarizeHistory).not.toHaveBeenCalled();
+      expect(result.effectiveHistory.length).toBeGreaterThan(0);
     });
 
     it("performs delta-only compaction on subsequent rounds", async () => {

@@ -1,7 +1,10 @@
 import crypto from "crypto";
 import mongoose from "mongoose";
 
-const MESSAGE_CAP = 100;
+// Raised for the 260k/1M model windows. The resolver only sends messages after
+// the summary checkpoint, so older turns remain available to the UI without
+// being replayed to the model. Kept well below the 16MB document limit.
+const MESSAGE_CAP = 300;
 
 // Typed subdocument — each message has a strict shape with stable id and monotonic sequence
 const chatMessageSchema = new mongoose.Schema(

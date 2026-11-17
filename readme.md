@@ -99,7 +99,7 @@ The system prompt and tool list are cached: the constitution carries a block-lev
 
 ### Context budgeting
 
-Long chats don't get truncated by turn count. The resolver walks history backwards to fit a dynamic token budget (18k high watermark, 10k low watermark by default), then summarizes older messages into a running technical summary that preserves decisions and identifiers. See `backend/src/services/ai/chatContextResolver.js`.
+Long chats don't get truncated by turn count. The resolver walks history backwards to fit a dynamic token budget, then summarizes older messages into a running technical summary that preserves decisions and identifiers. Budgets are derived from the routed model's real window (260k for the fast route, 1M for GLM) and the user's plan: free 18k/10k, pro 100k/64k, enterprise 200k/130k (high/low watermarks). Messages already covered by the summary checkpoint are not replayed to the model or counted toward the watermark, so compaction runs in large chunks with hysteresis instead of firing on every turn. See `backend/src/services/ai/chatContextResolver.js`.
 
 ### 5. Incremental sync
 

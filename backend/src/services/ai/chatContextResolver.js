@@ -4,40 +4,91 @@ import { stripHtml } from "../../utils/stripHtml.js";
 import { summarizeHistory } from "../../utils/summarizeHistory.js";
 import { formatStructuredNoteContext } from "./chatService.js";
 import { getChatTools } from "./tools/chatTools.js";
+import { DEFAULT_CHAT_MODEL, DEFAULT_CHAT_MODEL_II } from "./config/aiModels.js";
 
-const DEFAULT_HIGH_WATERMARK_TOKENS = 18000;
-const DEFAULT_LOW_WATERMARK_TOKENS = 10000;
-const SYSTEM_AND_TOOL_OVERHEAD_TOKENS = 2500;
-const RESERVED_OUTPUT_TOKENS = 5000;
-const SAFE_MODEL_CONTEXT_LIMIT = 64000;
+// Every routed model exposes at least a 200k window; keep 200k as the safe
+// fallback for any model that is not in the registry yet.
+const DEFAULT_MODEL_CONTEXT_WINDOW = 200000;
+
+const MODEL_CONTEXT_WINDOWS = {
+  [DEFAULT_CHAT_MODEL_II]: 260000, // inclusionai/ling-3.0-flash (fast route)
+  "inclusionai/ling-3.0-flash": 260000,
+  [DEFAULT_CHAT_MODEL]: 1000000, // z-ai/glm-5.3-flash (thinking/pro)
+  "z-ai/glm-5.3-flash": 1000000,
+  "deepseek/deepseek-v4-flash-0731": 260000,
+  "deepseek/deepseek-v4.1-flash": 260000,
+};
+
+// Reserve room for the static system prompt, tool schemas, the summary, note
+// and PDF context, and the model's own output. These are bounded separately,
+// so a flat reservation is enough here.
+const SYSTEM_AND_TOOL_OVERHEAD_TOKENS = 4000;
+const RESERVED_OUTPUT_TOKENS = 8000;
+
+// Below this delta a summarizer round-trip costs more than the context it
+// saves. The hysteresis band (high - low) normally exceeds this by a wide
+// margin, so compaction runs in meaningful chunks instead of every turn.
+const MIN_COMPACTION_DELTA_TOKENS = 2000;
+
+// Operational budgets per plan. The physical window is much larger (260k/1M),
+// but sending it every turn would be slow and would exhaust the daily quota in
+// a single message. These are the per-request ceilings; env vars can override.
+const TIER_BUDGETS = {
+  free: { high: 18000, low: 10000 },
+  pro: { high: 100000, low: 64000 },
+  enterprise: { high: 200000, low: 130000 },
+};
+
+export const getModelContextWindow = (modelId) => {
+  if (!modelId) return DEFAULT_MODEL_CONTEXT_WINDOW;
+  return MODEL_CONTEXT_WINDOWS[modelId] || DEFAULT_MODEL_CONTEXT_WINDOW;
+};
 
 /**
- * Derives dynamic watermarks accounting for system instructions, tool schemas,
- * and reserved output token budget.
+ * Derives dynamic watermarks from the routed model's real context window and
+ * the user's plan. Clamps explicit env overrides to the model's safe budget.
  */
-export const getWatermarkThresholds = () => {
+export const getWatermarkThresholds = ({ modelId, planTier } = {}) => {
+  const modelContextWindow = getModelContextWindow(modelId);
+  const maxSafeHistoryBudget = Math.max(
+    4000,
+    modelContextWindow - SYSTEM_AND_TOOL_OVERHEAD_TOKENS - RESERVED_OUTPUT_TOKENS,
+  );
+
+  const tierBudget = TIER_BUDGETS[planTier] || TIER_BUDGETS.free;
   const configuredHigh = Number.parseInt(process.env.CHAT_HISTORY_HIGH_WATERMARK, 10);
   const configuredLow = Number.parseInt(process.env.CHAT_HISTORY_LOW_WATERMARK, 10);
 
-  const maxSafeHistoryBudget = Math.max(
-    4000,
-    SAFE_MODEL_CONTEXT_LIMIT - SYSTEM_AND_TOOL_OVERHEAD_TOKENS - RESERVED_OUTPUT_TOKENS,
+  const requestedHigh =
+    Number.isFinite(configuredHigh) && configuredHigh > 0
+      ? configuredHigh
+      : tierBudget.high;
+  const highWatermark = Math.max(
+    1000,
+    Math.min(requestedHigh, maxSafeHistoryBudget),
   );
 
-  const highWatermark = Number.isFinite(configuredHigh) && configuredHigh > 0
-    ? Math.min(configuredHigh, maxSafeHistoryBudget)
-    : Math.min(DEFAULT_HIGH_WATERMARK_TOKENS, maxSafeHistoryBudget);
-
-  const targetLow = Number.isFinite(configuredLow) && configuredLow > 0
-    ? Math.min(configuredLow, highWatermark - 100)
-    : Math.min(DEFAULT_LOW_WATERMARK_TOKENS, highWatermark - 2000);
-
-  const lowWatermark = Math.max(100, Math.min(targetLow, highWatermark - 100));
+  const requestedLow =
+    Number.isFinite(configuredLow) && configuredLow > 0
+      ? configuredLow
+      : tierBudget.low;
+  const lowWatermark = Math.max(
+    100,
+    Math.min(requestedLow, highWatermark - 100),
+  );
 
   return {
     highWatermark,
     lowWatermark,
-    fallbackMaxTokens: Math.max(highWatermark + 3000, 12000),
+    modelContextWindow,
+    fallbackMaxTokens: Math.min(
+      maxSafeHistoryBudget,
+      Math.max(highWatermark + 3000, 12000),
+    ),
+    minCompactionDeltaTokens: Math.min(
+      MIN_COMPACTION_DELTA_TOKENS,
+      Math.max(100, highWatermark - lowWatermark),
+    ),
   };
 };
 
@@ -256,16 +307,24 @@ export class ChatContextResolver {
       contextChanged = false,
       chatMode,
       clientToolResults,
+      modelTier,
+      imageBase64,
     } = body || {};
 
     let effectiveHistory = history;
     let sessionSummary = activeSession?.summary || summary || "";
 
-    const { highWatermark, lowWatermark, fallbackMaxTokens } = getWatermarkThresholds();
-    const historyTokenCount = history.reduce(
-      (total, item) => total + estimateMessageTokens(item),
-      0,
-    );
+    // The routed model fixes the physical window; the plan fixes the
+    // per-request budget so one message cannot eat a user's whole daily quota.
+    const routedModelId =
+      modelTier === "fast" && !imageBase64 ? DEFAULT_CHAT_MODEL_II : DEFAULT_CHAT_MODEL;
+    const planTier = user?.plan?.tier || "free";
+    const {
+      highWatermark,
+      lowWatermark,
+      fallbackMaxTokens,
+      minCompactionDeltaTokens,
+    } = getWatermarkThresholds({ modelId: routedModelId, planTier });
 
     const sessionId = activeSession?._id ? String(activeSession._id) : null;
 
@@ -273,139 +332,163 @@ export class ChatContextResolver {
     if (sessionId && activeCompactionLocks.has(sessionId)) {
       try {
         await activeCompactionLocks.get(sessionId);
-        // Refresh session summary & checkpoint after concurrent compaction completes
-        if (activeSession) {
-          sessionSummary = activeSession.summary || sessionSummary;
+        // Re-read the committed summary and checkpoint. Otherwise a concurrent
+        // request would recompute the same delta and summarize it again.
+        if (activeSession?._id) {
+          const latest = await GlobalChatSession.findById(activeSession._id).lean();
+          if (latest) {
+            activeSession.summary = latest.summary;
+            activeSession.lastSummarizedMessageId = latest.lastSummarizedMessageId;
+            activeSession.lastSummarizedSeq = latest.lastSummarizedSeq;
+            sessionSummary = latest.summary || sessionSummary;
+          }
         }
       } catch (_) {
         // Proceed safely with current state if concurrent compaction failed
       }
     }
 
-    // Only compact when history exceeds the high watermark; otherwise reuse existing extracted context
+    // Everything up to the checkpoint is already represented in the running
+    // summary. Keep those messages in storage for the UI, but never replay them
+    // to the model and never count them toward the watermark. Counting the full
+    // stored history is what made compaction fire again on every single turn.
+    const lastSummarizedSeq = activeSession?.lastSummarizedSeq || 0;
+    const lastSummarizedMessageId = activeSession?.lastSummarizedMessageId || null;
+
+    let unsummarizedStartIndex = 0;
+    if (lastSummarizedSeq > 0) {
+      const firstUnsummarized = history.findIndex(
+        (m) => typeof m.seq !== "number" || m.seq > lastSummarizedSeq,
+      );
+      unsummarizedStartIndex =
+        firstUnsummarized === -1 ? history.length : firstUnsummarized;
+    } else if (lastSummarizedMessageId) {
+      const checkpointIndex = history.findIndex((m) => m.id === lastSummarizedMessageId);
+      unsummarizedStartIndex = checkpointIndex >= 0 ? checkpointIndex + 1 : 0;
+    }
+
+    const unsummarizedHistory = history.slice(unsummarizedStartIndex);
+    const historyTokenCount = unsummarizedHistory.reduce(
+      (total, item) => total + estimateMessageTokens(item),
+      0,
+    );
+
+    effectiveHistory = unsummarizedHistory;
+
+    // Compact only when the unsummarized tail crosses the high watermark. The
+    // [low, high] band is the hysteresis: after a compaction the prompt starts
+    // near low and grows until it crosses high again, so the summarizer runs on
+    // a large chunk (high - low) instead of on every turn.
     if (historyTokenCount > highWatermark) {
-      const { recentHistory } = getRecentHistoryWithinTokenBudget(history, lowWatermark);
-      const cutoffIndex = history.length - recentHistory.length;
+      const { recentHistory, olderMessages } = getRecentHistoryWithinTokenBudget(
+        unsummarizedHistory,
+        lowWatermark,
+      );
 
-      if (cutoffIndex > 0) {
-        const olderSlice = history.slice(0, cutoffIndex);
+      const deltaTokenCount = olderMessages.reduce(
+        (total, item) => total + estimateMessageTokens(item),
+        0,
+      );
 
-        // Sequence / Checkpoint resolution:
-        // Use monotonic sequence cursor (survives MESSAGE_CAP trimming) with ID fallback
-        const lastSummarizedSeq = activeSession?.lastSummarizedSeq || 0;
-        const lastSummarizedMessageId = activeSession?.lastSummarizedMessageId || null;
+      if (olderMessages.length > 0 && deltaTokenCount >= minCompactionDeltaTokens) {
+        const candidateCheckpointMsg = olderMessages[olderMessages.length - 1];
+        const candidateCheckpointId = candidateCheckpointMsg?.id || null;
+        const candidateCheckpointSeq =
+          typeof candidateCheckpointMsg?.seq === "number"
+            ? candidateCheckpointMsg.seq
+            : lastSummarizedSeq + olderMessages.length;
 
-        let deltaMessages = [];
-        if (lastSummarizedSeq > 0) {
-          deltaMessages = olderSlice.filter((m) => (typeof m.seq === "number" ? m.seq > lastSummarizedSeq : true));
-        } else if (lastSummarizedMessageId) {
-          const checkpointIdx = olderSlice.findIndex((m) => m.id === lastSummarizedMessageId);
-          if (checkpointIdx >= 0) {
-            deltaMessages = olderSlice.slice(checkpointIdx + 1);
-          } else {
-            console.warn(
-              `⚠️ [ChatContextResolver] Checkpoint message "${lastSummarizedMessageId}" not found in older slice. Using full older slice.`,
-            );
-            deltaMessages = olderSlice;
-          }
-        } else {
-          // First compaction for this session
-          deltaMessages = olderSlice;
-        }
+        const sanitizedDelta = olderMessages.map(sanitizeMessageForSummary);
 
-        if (deltaMessages.length > 0) {
-          const candidateCheckpointMsg = deltaMessages[deltaMessages.length - 1];
-          const candidateCheckpointId = candidateCheckpointMsg?.id || null;
-          const candidateCheckpointSeq =
-            typeof candidateCheckpointMsg?.seq === "number"
-              ? candidateCheckpointMsg.seq
-              : lastSummarizedSeq + deltaMessages.length;
+        const runCompaction = async () => {
+          const consolidatedSummary = await summarizeHistory(sanitizedDelta, sessionSummary);
+          if (consolidatedSummary && typeof consolidatedSummary === "string" && consolidatedSummary.trim()) {
+            const trimmed = consolidatedSummary.trim();
+            sessionSummary = trimmed;
 
-          const sanitizedDelta = deltaMessages.map(sanitizeMessageForSummary);
-
-          const runCompaction = async () => {
-            const consolidatedSummary = await summarizeHistory(sanitizedDelta, sessionSummary);
-            if (consolidatedSummary && typeof consolidatedSummary === "string" && consolidatedSummary.trim()) {
-              const trimmed = consolidatedSummary.trim();
-              sessionSummary = trimmed;
-
-              // Optimistic concurrency update: only advance if checkpoint sequence matches precondition
-              if (activeSession?._id) {
-                try {
-                  const previousSeq = lastSummarizedSeq;
-                  const updated = await GlobalChatSession.findOneAndUpdate(
-                    {
-                      _id: activeSession._id,
-                      $or: [
-                        { lastSummarizedSeq: previousSeq },
-                        { lastSummarizedSeq: { $exists: false } },
-                        { lastSummarizedSeq: 0 },
-                      ],
+            // Optimistic concurrency update: only advance if checkpoint sequence matches precondition
+            if (activeSession?._id) {
+              try {
+                const previousSeq = lastSummarizedSeq;
+                const updated = await GlobalChatSession.findOneAndUpdate(
+                  {
+                    _id: activeSession._id,
+                    $or: [
+                      { lastSummarizedSeq: previousSeq },
+                      { lastSummarizedSeq: { $exists: false } },
+                      { lastSummarizedSeq: 0 },
+                    ],
+                  },
+                  {
+                    $set: {
+                      summary: trimmed,
+                      lastSummarizedMessageId: candidateCheckpointId,
+                      lastSummarizedSeq: candidateCheckpointSeq,
                     },
-                    {
-                      $set: {
-                        summary: trimmed,
-                        lastSummarizedMessageId: candidateCheckpointId,
-                        lastSummarizedSeq: candidateCheckpointSeq,
-                      },
-                    },
-                    { new: true },
-                  );
+                  },
+                  { new: true },
+                );
 
-                  if (updated) {
-                    activeSession.summary = updated.summary;
-                    activeSession.lastSummarizedMessageId = updated.lastSummarizedMessageId;
-                    activeSession.lastSummarizedSeq = updated.lastSummarizedSeq;
-                  } else {
-                    // Concurrent write conflict: reload committed summary and checkpoint rather than overwriting
-                    const latest = await GlobalChatSession.findById(activeSession._id).lean();
-                    if (latest) {
-                      activeSession.summary = latest.summary;
-                      activeSession.lastSummarizedMessageId = latest.lastSummarizedMessageId;
-                      activeSession.lastSummarizedSeq = latest.lastSummarizedSeq;
-                      sessionSummary = latest.summary || trimmed;
-                    }
+                if (updated) {
+                  activeSession.summary = updated.summary;
+                  activeSession.lastSummarizedMessageId = updated.lastSummarizedMessageId;
+                  activeSession.lastSummarizedSeq = updated.lastSummarizedSeq;
+                } else {
+                  // Concurrent write conflict: reload committed summary and checkpoint rather than overwriting
+                  const latest = await GlobalChatSession.findById(activeSession._id).lean();
+                  if (latest) {
+                    activeSession.summary = latest.summary;
+                    activeSession.lastSummarizedMessageId = latest.lastSummarizedMessageId;
+                    activeSession.lastSummarizedSeq = latest.lastSummarizedSeq;
+                    sessionSummary = latest.summary || trimmed;
                   }
-                } catch (dbErr) {
-                  console.warn("⚠️ [ChatContextResolver] Failed to persist compaction checkpoint:", dbErr.message);
                 }
+              } catch (dbErr) {
+                console.warn("⚠️ [ChatContextResolver] Failed to persist compaction checkpoint:", dbErr.message);
               }
-              return { success: true, summary: trimmed };
             }
-            return { success: false, summary: sessionSummary };
-          };
-
-          let compactionPromise;
-          if (sessionId) {
-            compactionPromise = runCompaction();
-            activeCompactionLocks.set(sessionId, compactionPromise);
-          } else {
-            compactionPromise = runCompaction();
+            return { success: true, summary: trimmed };
           }
+          return { success: false, summary: sessionSummary };
+        };
 
-          let compactionResult = { success: false, summary: sessionSummary };
-          try {
-            compactionResult = await compactionPromise;
-          } catch (sumErr) {
-            console.warn("⚠️ [ChatContextResolver] Conversation extraction failed:", sumErr.message);
-          } finally {
-            if (sessionId) {
-              activeCompactionLocks.delete(sessionId);
-            }
-          }
-
-          if (compactionResult.success) {
-            effectiveHistory = recentHistory;
-          } else {
-            // Failure-safe fallback: retain previous valid summary, do not advance checkpoint,
-            // and retain as much history as safely fits within the fallback context limit to prevent context loss
-            console.warn("⚠️ [ChatContextResolver] Extraction uncommitted; retaining previous summary and safe fallback history.");
-            effectiveHistory = getRecentHistoryWithinTokenBudget(history, fallbackMaxTokens).recentHistory;
-          }
+        let compactionPromise;
+        if (sessionId) {
+          compactionPromise = runCompaction();
+          activeCompactionLocks.set(sessionId, compactionPromise);
         } else {
-          // All messages before cutoff were already extracted into summary
-          effectiveHistory = recentHistory;
+          compactionPromise = runCompaction();
         }
+
+        let compactionResult = { success: false, summary: sessionSummary };
+        try {
+          compactionResult = await compactionPromise;
+        } catch (sumErr) {
+          console.warn("⚠️ [ChatContextResolver] Conversation extraction failed:", sumErr.message);
+        } finally {
+          if (sessionId) {
+            activeCompactionLocks.delete(sessionId);
+          }
+        }
+
+        if (compactionResult.success) {
+          effectiveHistory = recentHistory;
+        } else {
+          // Failure-safe fallback: retain previous valid summary, do not advance checkpoint,
+          // and retain as much history as safely fits within the fallback context limit to prevent context loss
+          console.warn("⚠️ [ChatContextResolver] Extraction uncommitted; retaining previous summary and safe fallback history.");
+          effectiveHistory = getRecentHistoryWithinTokenBudget(
+            unsummarizedHistory,
+            fallbackMaxTokens,
+          ).recentHistory;
+        }
+      } else {
+        // Not enough new material to justify a summarizer round-trip. Keep the
+        // extra history; both the model window and the plan budget leave room.
+        console.log(
+          `📊 [ChatContextResolver] Compaction deferred: ${deltaTokenCount} new tokens < ${minCompactionDeltaTokens}`,
+        );
+        effectiveHistory = unsummarizedHistory;
       }
     }
 
