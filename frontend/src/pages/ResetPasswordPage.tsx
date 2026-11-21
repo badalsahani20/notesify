@@ -1,8 +1,3 @@
-/* Hallmark · component: reset-password · genre: modern-minimal · theme: vercel-obsidian
- * states: default · hover · focus-visible · active · disabled · loading · error · success
- * contrast: pass (WCAG AAA on black canvas)
- */
-
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Eye, EyeOff, Loader2 } from "lucide-react";

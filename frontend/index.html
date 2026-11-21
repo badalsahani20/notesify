@@ -3,6 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-visual" />
+    <!--
+      Android WebView builds swap `resizes-visual` for `overlays-content` at
+      build time (see the notesify-android-viewport plugin in vite.config.ts).
+      Do not do it with an inline script here: production CSP forbids inline
+      scripts. Browsers keep `resizes-visual` because they derive the keyboard
+      offset from visualViewport.
+    -->
     <title>Notesify – AI Notes, Quizzes & Flashcards for Students</title>
 
     <!-- Essential Meta Tags for Social Previews (First 1024 bytes) -->

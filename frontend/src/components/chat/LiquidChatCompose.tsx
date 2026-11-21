@@ -426,8 +426,16 @@ export const LiquidChatCompose = forwardRef<LiquidChatComposeHandle, LiquidChatC
 
   return (
     <div
-      className="absolute bottom-0 left-0 w-full z-20 bg-gradient-to-t from-background via-background/95 to-transparent pt-6 pb-[max(0.65rem,env(safe-area-inset-bottom,0px))] px-2 sm:px-4 flex flex-col justify-end pointer-events-none transition-transform duration-100 ease-out will-change-transform"
-      style={{ transform: "translate3d(0, calc(0px - var(--keyboard-offset, 0px)), 0)" }}
+      className="absolute left-0 w-full z-20 bg-gradient-to-t from-background via-background/95 to-transparent pt-6 pb-[max(0.65rem,env(safe-area-inset-bottom,0px))] px-2 sm:px-4 flex flex-col justify-end pointer-events-none"
+      style={{
+        // Reserve the keyboard space in layout, not paint. A focused input moved
+        // only with `transform` keeps its layout box under the IME, so Android's
+        // WebView pans the visual viewport to reveal it on top of our lift.
+        //
+        // No transition on purpose: `bottom` is a layout property, so animating
+        // it re-lays-out the composer every frame. That is the lag.
+        bottom: "var(--keyboard-offset, 0px)",
+      }}
     >
       <div className="pointer-events-auto flex flex-col w-full max-w-3xl mx-auto">
         {topSlot}

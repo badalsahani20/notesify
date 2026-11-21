@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
 import { App as CapApp } from "@capacitor/app";
@@ -12,15 +12,83 @@ import { useAuthStore } from "@/store/useAuthStore";
 import { toast } from "sonner";
 import { triggerSelectionHaptic } from "@/utils/haptics";
 
+const KEYBOARD_OFFSET_EVENT = "notesify:keyboard-offset";
+const KEYBOARD_ANIMATION_MS = 280;
+
 export function useCapacitorApp() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Hardware back needs the current route, but re-registering the native
+  // listener on every navigation also tore down the keyboard listeners.
+  const pathnameRef = useRef(location.pathname);
   useEffect(() => {
-    // Only run on native mobile platforms (Android/iOS) — safely no-ops on Web & Electron
+    pathnameRef.current = location.pathname;
+  }, [location.pathname]);
+
+  // 1. Keyboard inset — one app-level writer for every platform.
+  //
+  // Native reports the IME height through the Keyboard plugin; browsers only
+  // resize the visual viewport. Everything else reads --keyboard-offset (or the
+  // custom event) instead of measuring again, so there is a single source of
+  // truth and one animation timing. Mounted once: a route change while the IME
+  // is open must never clear the offset.
+  useEffect(() => {
+    const root = document.documentElement;
+    let transitionTimer: number | undefined;
+    let removeListeners: (() => void) | undefined;
+
+    const applyOffset = (height: number) => {
+      const offset = Math.max(0, Math.round(height));
+      root.style.setProperty("--keyboard-offset", `${offset}px`);
+      root.classList.toggle("keyboard-open", offset > 0);
+      root.classList.add("keyboard-transitioning");
+      if (transitionTimer !== undefined) window.clearTimeout(transitionTimer);
+      transitionTimer = window.setTimeout(() => {
+        root.classList.remove("keyboard-transitioning");
+      }, KEYBOARD_ANIMATION_MS);
+      window.dispatchEvent(new CustomEvent<number>(KEYBOARD_OFFSET_EVENT, { detail: offset }));
+    };
+
+    if (Capacitor.isNativePlatform()) {
+      const showListener = Keyboard.addListener("keyboardWillShow", ({ keyboardHeight }) =>
+        applyOffset(keyboardHeight)
+      );
+      const hideListener = Keyboard.addListener("keyboardWillHide", () => {
+        applyOffset(0);
+      });
+      removeListeners = () => {
+        void showListener.then((handle) => handle.remove());
+        void hideListener.then((handle) => handle.remove());
+      };
+    } else if (window.visualViewport) {
+      const viewport = window.visualViewport;
+      const sync = () => {
+        // Pinch-zoom also shrinks the visual viewport; only the IME counts here.
+        if (viewport.scale !== 1) return;
+        applyOffset(window.innerHeight - viewport.height - viewport.offsetTop);
+      };
+      sync();
+      viewport.addEventListener("resize", sync);
+      viewport.addEventListener("scroll", sync);
+      removeListeners = () => {
+        viewport.removeEventListener("resize", sync);
+        viewport.removeEventListener("scroll", sync);
+      };
+    }
+
+    return () => {
+      removeListeners?.();
+      if (transitionTimer !== undefined) window.clearTimeout(transitionTimer);
+      root.style.removeProperty("--keyboard-offset");
+      root.classList.remove("keyboard-open", "keyboard-transitioning");
+    };
+  }, []);
+
+  // 2. Native shell setup: root class, long-press haptic, status-bar theme.
+  useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
 
-    // 1. Tag document root for any mobile native CSS rules (e.g. safe-area tweaks)
     document.documentElement.classList.add("is-capacitor");
 
     // Android dispatches this after a true long press has opened its context menu.
@@ -28,7 +96,6 @@ export function useCapacitorApp() {
     const handleContextMenu = () => triggerSelectionHaptic();
     document.addEventListener("contextmenu", handleContextMenu);
 
-    // 2. Synchronize Status Bar styling with current theme (Light font on dark, Dark font on light)
     const syncStatusBarWithTheme = () => {
       const isDark = document.documentElement.classList.contains("dark");
       if (isDark) {
@@ -58,28 +125,16 @@ export function useCapacitorApp() {
       })
       .catch(() => {});
 
-    // The Android keyboard overlays the WebView, so bottom-pinned controls
-    // need the native keyboard height to move above it.
-    let keyboardAnimationTimer: number | undefined;
-    const setKeyboardOffset = (height: number) => {
-      const offset = Math.max(0, height);
-      document.documentElement.style.setProperty("--keyboard-offset", `${offset}px`);
-      document.documentElement.classList.toggle("keyboard-open", offset > 0);
-      document.documentElement.classList.add("keyboard-transitioning");
-      if (keyboardAnimationTimer !== undefined) window.clearTimeout(keyboardAnimationTimer);
-      keyboardAnimationTimer = window.setTimeout(() => {
-        document.documentElement.classList.remove("keyboard-transitioning");
-      }, 280);
-      window.dispatchEvent(new CustomEvent<number>("notesify:keyboard-offset", { detail: offset }));
+    return () => {
+      themeObserver.disconnect();
+      document.removeEventListener("contextmenu", handleContextMenu);
     };
-    const keyboardShowListener = Keyboard.addListener("keyboardWillShow", ({ keyboardHeight }) => {
-      setKeyboardOffset(keyboardHeight);
-    });
-    const keyboardHideListener = Keyboard.addListener("keyboardWillHide", () => {
-      setKeyboardOffset(0);
-    });
+  }, []);
 
-    // 3. Deep link listener (handles notesify://, notesify://callback, and https://notesify.in)
+  // 3. Native navigation: deep links and the hardware back button.
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+
     const urlListenerPromise = CapApp.addListener("appUrlOpen", async (event) => {
       try {
         const rawUrl = event.url;
@@ -148,7 +203,8 @@ export function useCapacitorApp() {
 
     // 4. Android Hardware Back Button listener
     const backListenerPromise = CapApp.addListener("backButton", ({ canGoBack }) => {
-      const isRoot = location.pathname === "/" || location.pathname === "/login";
+      const pathname = pathnameRef.current;
+      const isRoot = pathname === "/" || pathname === "/login";
       if (!isRoot && canGoBack) {
         navigate(-1);
       } else {
@@ -157,15 +213,8 @@ export function useCapacitorApp() {
     });
 
     return () => {
-      themeObserver.disconnect();
       void urlListenerPromise.then((handle) => handle.remove());
       void backListenerPromise.then((handle) => handle.remove());
-      void keyboardShowListener.then((handle) => handle.remove());
-      void keyboardHideListener.then((handle) => handle.remove());
-      document.documentElement.style.removeProperty("--keyboard-offset");
-      document.documentElement.classList.remove("keyboard-open", "keyboard-transitioning");
-      if (keyboardAnimationTimer !== undefined) window.clearTimeout(keyboardAnimationTimer);
-      document.removeEventListener("contextmenu", handleContextMenu);
     };
-  }, [navigate, location.pathname]);
+  }, [navigate]);
 }

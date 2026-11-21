@@ -45,6 +45,33 @@ const cspPlugin = (env: Record<string, string>): Plugin => ({
   },
 })
 
+/**
+ * Android WebView builds get a different `interactive-widget` value.
+ *
+ * With `resizes-visual` (the browser default) Chrome shrinks the visual
+ * viewport and scrolls the page itself when an input is focused. That page
+ * scroll stacks with the manual --keyboard-offset lift in useCapacitorApp(),
+ * shifting everything up by a full keyboard height.
+ *
+ * `overlays-content` tells the WebView to leave the viewport alone, so the
+ * manual offset is the only thing that moves. Browsers keep `resizes-visual`
+ * because they derive the offset from visualViewport.
+ *
+ * Build-time (not an inline script) because production CSP forbids inline
+ * scripts.
+ */
+const androidViewportPlugin = (mode: string): Plugin => ({
+  name: 'notesify-android-viewport',
+  apply: 'build',
+  transformIndexHtml(html) {
+    if (mode !== 'android') return html
+    return html.replace(
+      'interactive-widget=resizes-visual',
+      'interactive-widget=overlays-content',
+    )
+  },
+})
+
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
@@ -52,7 +79,7 @@ export default defineConfig(({ mode }) => {
   return {
     // Use relative path ONLY for desktop builds; use '/' for web to ensure nested routes (/shared/:slug) resolve assets correctly
     base: process.env.VITE_APP_TARGET === 'desktop' ? './' : '/',
-    plugins: [react(), tailwindcss(), cspPlugin(env)],
+    plugins: [react(), tailwindcss(), cspPlugin(env), androidViewportPlugin(mode)],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, './src'),
@@ -61,12 +88,45 @@ export default defineConfig(({ mode }) => {
     build: {
       rollupOptions: {
         output: {
-          manualChunks: {
-            'vendor': ['react', 'react-dom', 'react-router-dom', 'framer-motion', 'lucide-react', 'sonner'],
-          }
-        }
+          manualChunks(id) {
+            if (id.includes('node_modules')) {
+              if (id.includes('mermaid') || id.includes('cytoscape') || id.includes('d3') || id.includes('dagre')) {
+                return 'vendor-diagrams';
+              }
+              if (id.includes('@tiptap') || id.includes('prosemirror')) {
+                return 'vendor-tiptap';
+              }
+              if (id.includes('katex')) {
+                return 'vendor-katex';
+              }
+              if (id.includes('chart.js') || id.includes('react-chartjs-2')) {
+                return 'vendor-charts';
+              }
+              if (id.includes('html2canvas') || id.includes('jspdf')) {
+                return 'vendor-export';
+              }
+              if (id.includes('dexie')) {
+                return 'vendor-db';
+              }
+              if (id.includes('lucide-react') || id.includes('@tabler')) {
+                return 'vendor-icons';
+              }
+              if (
+                id.includes('react') ||
+                id.includes('react-dom') ||
+                id.includes('react-router-dom') ||
+                id.includes('zustand') ||
+                id.includes('@tanstack') ||
+                id.includes('framer-motion') ||
+                id.includes('motion')
+              ) {
+                return 'vendor-framework';
+              }
+            }
+          },
+        },
       },
-      chunkSizeWarningLimit: 800, // Slightly higher limit after chunking
+      chunkSizeWarningLimit: 900,
     },
   }
 })

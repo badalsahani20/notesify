@@ -17,7 +17,7 @@ export const FALLBACK_MODEL = "qwen/qwen3.7-flash";
 export const FALLBACK_MODELS = [
   "qwen/qwen3.7-flash",
   "openai/gpt-oss-120b",
-  "z-ai/glm-5.3-flash",
+  "deepseek/deepseek-v4.1-flash",
 ];
 export const GROQ_CHEAP_MODEL = "openai/gpt-oss-20b";
 export const GROQ_STRONG_MODEL = "openai/gpt-oss-120b";

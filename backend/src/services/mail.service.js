@@ -1,23 +1,62 @@
 import nodeMailer from "nodemailer";
 
-const getMailUser = () => (process.env.MAIL_USER || process.env.EMAIL_USER || "").trim();
-const getMailPass = () => (process.env.MAIL_PASS || process.env.EMAIL_PASS || "").replace(/\s+/g, "").trim();
+const cleanEnv = (val) => (val ? String(val).replace(/^["']|["']$/g, "").trim() : "");
 
-const transporter = nodeMailer.createTransport({
-    host: process.env.MAIL_HOST || "smtp.gmail.com",
-    port: Number(process.env.MAIL_PORT) || 465,
-    secure: (Number(process.env.MAIL_PORT) || 465) === 465,
-    auth: {
-        get user() { return getMailUser(); },
-        get pass() { return getMailPass(); },
+const getMailUser = () => cleanEnv(process.env.MAIL_USER || process.env.EMAIL_USER);
+const getMailPass = () => cleanEnv(process.env.MAIL_PASS || process.env.EMAIL_PASS).replace(/\s+/g, "");
+const getMailHost = () => cleanEnv(process.env.MAIL_HOST) || "smtp.gmail.com";
+const getMailPort = () => {
+    const raw = cleanEnv(process.env.MAIL_PORT);
+    const parsed = Number(raw);
+    return !isNaN(parsed) && parsed > 0 ? parsed : 465;
+};
+const getMailFrom = () => {
+    const customFrom = cleanEnv(process.env.MAIL_FROM || process.env.EMAIL_FROM);
+    if (customFrom) {
+        return customFrom.includes("<") ? customFrom : `"Notesify" <${customFrom}>`;
     }
-});
+    return `"Notesify" <${getMailUser()}>`;
+};
+
+let cachedTransporter = null;
+let cachedConfigKey = "";
+
+export const getTransporter = () => {
+    const user = getMailUser();
+    const pass = getMailPass();
+    const host = getMailHost();
+    const port = getMailPort();
+    const configKey = `${host}:${port}:${user}:${pass}`;
+
+    if (!cachedTransporter || cachedConfigKey !== configKey) {
+        cachedTransporter = nodeMailer.createTransport({
+            host,
+            port,
+            secure: port === 465,
+            auth: {
+                user,
+                pass,
+            },
+        });
+        cachedConfigKey = configKey;
+    }
+    return cachedTransporter;
+};
+
+export const transporter = {
+    sendMail: (options, callback) => getTransporter().sendMail(options, callback),
+    verify: (callback) => getTransporter().verify(callback),
+};
+
+export const verifyMailConnection = async () => {
+    return getTransporter().verify();
+};
 
 export const sendResetPasswordEmail = async (email, resetUrl) => {
     const year = new Date().getFullYear();
 
     const mailOptions = {
-        from: `"Notesify" <${getMailUser()}>`,
+        from: getMailFrom(),
         to: email,
         subject: "Reset Your Notesify Password 🔑",
         html: `
@@ -129,112 +168,88 @@ export const sendResetPasswordEmail = async (email, resetUrl) => {
 
 export const sendWelcomeEmail = async (email, name) => {
     const year = new Date().getFullYear();
-    const dashboardUrl = process.env.FRONTEND_URL;
+    const dashboardUrl = process.env.FRONTEND_URL || "https://notesify.in";
     const firstName = name ? name.split(" ")[0] : "there";
 
     const mailOptions = {
-        from: `"Notesify" <${getMailUser()}>`,
+        from: getMailFrom(),
         to: email,
-        subject: `Welcome to Notesify, ${firstName}! 🎉`,
+        subject: `Welcome to Notesify, ${firstName}!`,
         html: `
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Welcome to Notesify</title>
 </head>
-<body style="margin: 0; padding: 0; background-color: #f4f4f5; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f4f5; padding: 40px 20px;">
+<body style="margin: 0; padding: 0; background-color: #0c0c0e; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #e4e4e7; -webkit-font-smoothing: antialiased;">
+  <!-- Hallmark · component: welcome-email · genre: modern-minimal · theme: obsidian · contrast: AAA -->
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #0c0c0e; padding: 48px 16px;">
     <tr>
       <td align="center">
-        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.06);">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width: 560px; background-color: #141417; border: 1px solid #232328; border-radius: 12px; overflow: hidden; text-align: left;">
 
-          <!-- Header -->
+          <!-- Top Brand Bar -->
           <tr>
-            <td style="background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%); padding: 48px 40px; text-align: center;">
-              <h1 style="margin: 0 0 8px 0; font-size: 28px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px;">Notesify</h1>
-              <p style="margin: 0; font-size: 14px; color: rgba(255,255,255,0.6); letter-spacing: 2px; text-transform: uppercase;">Your Intelligent Workspace</p>
+            <td style="padding: 32px 36px 24px 36px; border-bottom: 1px solid #232328;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td>
+                    <span style="font-size: 18px; font-weight: 700; color: #ffffff; letter-spacing: -0.4px;">Notesify</span>
+                  </td>
+                  <td align="right">
+                    <span style="font-size: 11px; font-weight: 600; color: #71717a; text-transform: uppercase; letter-spacing: 1px;">Getting Started</span>
+                  </td>
+                </tr>
+              </table>
             </td>
           </tr>
 
-          <!-- Welcome Message -->
+          <!-- Editorial Lead -->
           <tr>
-            <td style="padding: 40px 40px 24px 40px;">
-              <h2 style="margin: 0 0 16px 0; font-size: 24px; font-weight: 700; color: #0a0a0a;">Welcome aboard, ${firstName}! 👋</h2>
-              <p style="margin: 0 0 8px 0; font-size: 16px; line-height: 1.7; color: #4a4a4a;">
-                We're thrilled to have you on Notesify — the smarter way to capture, organize, and supercharge your notes with AI.
+            <td style="padding: 36px 36px 20px 36px;">
+              <h1 style="margin: 0 0 16px 0; font-size: 24px; font-weight: 700; line-height: 1.3; color: #ffffff; letter-spacing: -0.5px;">
+                Notes you will actually remember.
+              </h1>
+              <p style="margin: 0 0 16px 0; font-size: 15px; line-height: 1.6; color: #a1a1aa;">
+                Welcome aboard, ${firstName}!
               </p>
-              <p style="margin: 0; font-size: 16px; line-height: 1.7; color: #4a4a4a;">
-                Your account is all set up and ready to go. Here's what you can do right away:
+              <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #a1a1aa;">
+                Most notes end up as a graveyard of forgotten text. Notesify gives your writing a second life: whenever you finish capturing an idea, you can test yourself on it immediately.
               </p>
             </td>
           </tr>
 
-          <!-- Feature Cards -->
+          <!-- Asymmetric Flow (Anti-slop: No card-in-card, clean typographic pacing) -->
           <tr>
-            <td style="padding: 0 40px;">
+            <td style="padding: 12px 36px 28px 36px;">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
 
-                <!-- Feature 1 -->
+                <!-- Step 01 -->
                 <tr>
-                  <td style="padding: 12px 0;">
-                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f8f9fa; border-radius: 12px; border-left: 4px solid #0a0a0a;">
-                      <tr>
-                        <td style="padding: 20px 24px;">
-                          <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                            <tr>
-                              <td width="40" valign="top" style="font-size: 24px;">🤖</td>
-                              <td style="padding-left: 12px;">
-                                <p style="margin: 0 0 4px 0; font-size: 15px; font-weight: 700; color: #0a0a0a;">AI-Powered Assistant</p>
-                                <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #6b7280;">Ask questions, summarize notes, brainstorm ideas — your personal AI assistant is built right in.</p>
-                              </td>
-                            </tr>
-                          </table>
-                        </td>
-                      </tr>
-                    </table>
+                  <td width="36" valign="top" style="padding: 12px 0 16px 0; font-size: 12px; font-weight: 700; color: #52525b; font-family: monospace;">01</td>
+                  <td style="padding: 12px 0 16px 12px; border-bottom: 1px solid #1f1f24;">
+                    <p style="margin: 0 0 4px 0; font-size: 14px; font-weight: 600; color: #ffffff;">Turn any note into a quiz</p>
+                    <p style="margin: 0; font-size: 13px; line-height: 1.6; color: #71717a;">Click the green Study button on any note to generate interactive practice questions and flashcards. Testing yourself is the single fastest way to retain knowledge.</p>
                   </td>
                 </tr>
 
-                <!-- Feature 2 -->
+                <!-- Step 02 -->
                 <tr>
-                  <td style="padding: 12px 0;">
-                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f8f9fa; border-radius: 12px; border-left: 4px solid #0a0a0a;">
-                      <tr>
-                        <td style="padding: 20px 24px;">
-                          <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                            <tr>
-                              <td width="40" valign="top" style="font-size: 24px;">📂</td>
-                              <td style="padding-left: 12px;">
-                                <p style="margin: 0 0 4px 0; font-size: 15px; font-weight: 700; color: #0a0a0a;">Smart Organization</p>
-                                <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #6b7280;">Folders, favorites, and trash — keep your workspace clean and find anything in seconds.</p>
-                              </td>
-                            </tr>
-                          </table>
-                        </td>
-                      </tr>
-                    </table>
+                  <td width="36" valign="top" style="padding: 16px 0 16px 0; font-size: 12px; font-weight: 700; color: #52525b; font-family: monospace;">02</td>
+                  <td style="padding: 16px 0 16px 12px; border-bottom: 1px solid #1f1f24;">
+                    <p style="margin: 0 0 4px 0; font-size: 14px; font-weight: 600; color: #ffffff;">AI-Powered Assistant (Iris)</p>
+                    <p style="margin: 0; font-size: 13px; line-height: 1.6; color: #71717a;">Highlight confusing paragraphs to get simple analogies, clear summaries, or answers that connect insights across all your past notes.</p>
                   </td>
                 </tr>
 
-                <!-- Feature 3 -->
+                <!-- Step 03 -->
                 <tr>
-                  <td style="padding: 12px 0;">
-                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f8f9fa; border-radius: 12px; border-left: 4px solid #0a0a0a;">
-                      <tr>
-                        <td style="padding: 20px 24px;">
-                          <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                            <tr>
-                              <td width="40" valign="top" style="font-size: 24px;">🔒</td>
-                              <td style="padding-left: 12px;">
-                                <p style="margin: 0 0 4px 0; font-size: 15px; font-weight: 700; color: #0a0a0a;">Secure & Private</p>
-                                <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #6b7280;">Your notes are encrypted and protected. Only you have access to your data.</p>
-                              </td>
-                            </tr>
-                          </table>
-                        </td>
-                      </tr>
-                    </table>
+                  <td width="36" valign="top" style="padding: 16px 0 8px 0; font-size: 12px; font-weight: 700; color: #52525b; font-family: monospace;">03</td>
+                  <td style="padding: 16px 0 8px 12px;">
+                    <p style="margin: 0 0 4px 0; font-size: 14px; font-weight: 600; color: #ffffff;">True offline freedom</p>
+                    <p style="margin: 0; font-size: 13px; line-height: 1.6; color: #71717a;">Write freely on trains, flights, or spotty connections. Your thoughts save locally first and synchronize quietly the moment you're online.</p>
                   </td>
                 </tr>
 
@@ -242,36 +257,33 @@ export const sendWelcomeEmail = async (email, name) => {
             </td>
           </tr>
 
-          <!-- CTA Button -->
+          <!-- Primary CTA (Single crisp container, no decorative glow slop) -->
           <tr>
-            <td style="padding: 32px 40px 16px 40px; text-align: center;">
-              <a href="${dashboardUrl}" style="display: inline-block; padding: 16px 48px; background-color: #0a0a0a; color: #ffffff; text-decoration: none; border-radius: 10px; font-size: 16px; font-weight: 700; letter-spacing: 0.3px;">Open Your Dashboard →</a>
+            <td style="padding: 0 36px 36px 36px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="padding: 16px; background-color: #1a1a1f; border: 1px solid #27272e; border-radius: 8px; text-align: center;">
+                    <p style="margin: 0 0 14px 0; font-size: 13px; color: #a1a1aa;">
+                      A sample note with a 30-second practice quiz is already waiting in your workspace.
+                    </p>
+                    <a href="${dashboardUrl}" style="display: inline-block; padding: 12px 32px; background-color: #ffffff; color: #0c0c0e; text-decoration: none; border-radius: 6px; font-size: 14px; font-weight: 600; letter-spacing: -0.2px;">Open Workspace &rarr;</a>
+                  </td>
+                </tr>
+              </table>
             </td>
           </tr>
 
-          <!-- Subtext -->
+          <!-- Minimal Colophon Footer -->
           <tr>
-            <td style="padding: 0 40px 40px 40px; text-align: center;">
-              <p style="margin: 0; font-size: 13px; color: #9ca3af;">We've already created a welcome note for you to get started.</p>
-            </td>
-          </tr>
-
-          <!-- Divider -->
-          <tr>
-            <td style="padding: 0 40px;">
-              <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 0;" />
-            </td>
-          </tr>
-
-          <!-- Footer -->
-          <tr>
-            <td style="padding: 24px 40px 32px 40px; text-align: center;">
-              <p style="margin: 0 0 8px 0; font-size: 13px; color: #9ca3af;">
-                You're receiving this because you just created a Notesify account with <strong style="color: #6b7280;">${email}</strong>.
-              </p>
-              <p style="margin: 0; font-size: 12px; color: #d1d5db;">
-                © ${year} Notesify. All rights reserved.
-              </p>
+            <td style="padding: 24px 36px; border-top: 1px solid #1f1f24; text-align: left;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="font-size: 11px; color: #52525b; line-height: 1.5;">
+                    Sent to <span style="color: #71717a;">${email}</span> for your Notesify account.<br />
+                    &copy; ${year} Notesify. Built for focused learning.
+                  </td>
+                </tr>
+              </table>
             </td>
           </tr>
 
@@ -315,7 +327,7 @@ export const sendVerificationEmail = async (email, name, verificationUrl, verifi
     ` : "";
 
     const mailOptions = {
-        from: `"Notesify" <${getMailUser()}>`,
+        from: getMailFrom(),
         to: email,
         subject: verificationOtp ? `${verificationOtp} is your Notesify verification code 🔑` : "Verify your Notesify account 📧",
         html: `

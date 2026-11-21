@@ -817,6 +817,7 @@ export const GlobalChatMessages = memo(({
 
         {/* Spacer to allow scrolling past floating input box & active prompt dialog */}
         <div className={`shrink-0 transition-all duration-300 ${hasActivePrompt ? "h-[360px] sm:h-[400px]" : "h-48"}`} />
+        <div className={"shrink-0"} style={{ height: "var(--keyboard-offset, 0px)" }} />
         <div ref={bottomRef} />
       </MessageScroller>
     </div>

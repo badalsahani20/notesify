@@ -353,6 +353,20 @@ html.is-capacitor.keyboard-transitioning .lmi-border {
     @apply overflow-x-hidden;
   }
 
+  /*
+   * While the IME is up the visual viewport is shorter than the layout
+   * viewport (100vh). If the document stays scrollable, a swipe pans the whole
+   * page: the fixed editor header scrolls away and dragging the floating
+   * toolbar/composer moves them with the page instead of scrolling the list.
+   * The app already scrolls inside its panes, so lock the document for the
+   * duration of the keyboard.
+   */
+  html.keyboard-open,
+  html.keyboard-open body {
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
   /* Keep Notesify's existing 16px rem scale. Fragments uses a 14px
      design-system base, but its tokens must not resize the whole app. */
   html {

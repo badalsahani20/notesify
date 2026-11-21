@@ -1,7 +1,14 @@
 import { useState, useEffect } from "react";
-import { Capacitor } from "@capacitor/core";
 import { useMediaQuery } from "@/hooks/ui/useMediaQuery";
 
+/**
+ * Reads the keyboard inset written once by useCapacitorApp().
+ *
+ * Native and web both publish --keyboard-offset (and the
+ * "notesify:keyboard-offset" event), so this hook never measures the keyboard
+ * itself. That keeps one source of truth and avoids the native/web formulas
+ * drifting apart.
+ */
 export const useKeyboardOffset = () => {
   const [keyboardOffset, setKeyboardOffset] = useState(0);
   const isMobile = useMediaQuery("(max-width: 960px)");
@@ -9,38 +16,19 @@ export const useKeyboardOffset = () => {
   useEffect(() => {
     if (!isMobile) return;
 
-    if (Capacitor.isNativePlatform()) {
-      const readOffset = () => {
-        const offset = Number.parseFloat(
-          getComputedStyle(document.documentElement).getPropertyValue("--keyboard-offset")
-        );
-        setKeyboardOffset(Number.isFinite(offset) ? offset : 0);
-      };
-      const handleNativeOffset = (event: Event) => {
-        setKeyboardOffset((event as CustomEvent<number>).detail ?? 0);
-      };
-
-      readOffset();
-      window.addEventListener("notesify:keyboard-offset", handleNativeOffset);
-      return () => window.removeEventListener("notesify:keyboard-offset", handleNativeOffset);
-    }
-
-    if (!window.visualViewport) return;
-
-    const handler = () => {
-      if (!window.visualViewport) return;
-      const viewport = window.visualViewport;
-      // Calculate how much the bottom is obscured by the keyboard
-      const offset = window.innerHeight - viewport.height - viewport.offsetTop;
-      setKeyboardOffset(Math.max(0, offset));
+    const readOffset = () => {
+      const offset = Number.parseFloat(
+        getComputedStyle(document.documentElement).getPropertyValue("--keyboard-offset")
+      );
+      setKeyboardOffset(Number.isFinite(offset) ? offset : 0);
+    };
+    const handleOffset = (event: Event) => {
+      setKeyboardOffset((event as CustomEvent<number>).detail ?? 0);
     };
 
-    window.visualViewport.addEventListener("resize", handler);
-    window.visualViewport.addEventListener("scroll", handler);
-    return () => {
-      window.visualViewport?.removeEventListener("resize", handler);
-      window.visualViewport?.removeEventListener("scroll", handler);
-    };
+    readOffset();
+    window.addEventListener("notesify:keyboard-offset", handleOffset);
+    return () => window.removeEventListener("notesify:keyboard-offset", handleOffset);
   }, [isMobile]);
 
   return keyboardOffset;

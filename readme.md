@@ -260,10 +260,7 @@ cd frontend && npm run lint
 
 ## Current limitations and roadmap
 - No real-time collaborative editing or comments. Both are on the roadmap.
-- Android is built and tested locally but not released.
 - No payment or subscription flow. The `plan.tier` field exists, but there is no checkout.
-- Folder sync is still a full collection pull; only notes use the incremental protocol.
-- Redis list caches have no failure fallback: an Upstash outage turns a cache miss into a 500 rather than a slower database read.
 - Windows is the only packaged desktop target.
 - The AI features depend on third-party keys; a fresh clone needs all of them to exercise the full loop.
 

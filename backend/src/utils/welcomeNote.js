@@ -1,166 +1,56 @@
+// Hallmark · document: welcome-note · genre: modern-minimal · theme: obsidian
+
 export const getWelcomeNote = () => ({
-  title: "Welcome to Notesify! 🚀",
+  title: "Welcome to Notesify",
   content: `
-<h1>👋 Wait, You Actually Signed Up?</h1>
-<p>Look at you—already getting your life together.</p>
-<p>I'm <strong>Notesify</strong>, and since you're here... I guess we're friends now. <em>(Sorry, Netflix.)</em></p>
-<p>This note isn't just here to say hello—it's your playground. Almost everything below is meant to be clicked, selected, or experimented with.</p>
+<h1>Welcome to Notesify</h1>
+<p>Most notes get written down once and forgotten forever. Notesify is built to change that: capture ideas simply, understand topics faster, and actually remember what you learn.</p>
 
 <hr />
 
-<h1>🎯 Rookie Mission</h1>
-<p>Complete these tiny challenges to learn your way around.</p>
+<h2>Quick Start: A 60-second test drive</h2>
+<p>Everything in this note is interactive. Complete these quick steps to get familiar with your workspace:</p>
 <ul data-type="taskList">
-  <li data-type="taskItem" data-checked="false"><p>Create your first notebook</p></li>
-  <li data-type="taskItem" data-checked="false"><p>Create another note</p></li>
-  <li data-type="taskItem" data-checked="false"><p>Highlight the blue sentence below</p></li>
-  <li data-type="taskItem" data-checked="false"><p>Move this note into a notebook using drag &amp; drop</p></li>
-  <li data-type="taskItem" data-checked="false"><p>Open Iris and ask her a question</p></li>
-  <li data-type="taskItem" data-checked="false"><p>Press <strong>Ctrl + K</strong> and search for <strong>Pizza</strong></p></li>
+  <li data-type="taskItem" data-checked="false"><p>Select any sentence to see the floating formatting bar and test the highlighter</p></li>
+  <li data-type="taskItem" data-checked="false"><p>Select any text and click <strong>Ask Iris</strong> for a quick, plain-English explanation</p></li>
+  <li data-type="taskItem" data-checked="false"><p>Click the green <strong>Study</strong> button in the top toolbar to test yourself on this note</p></li>
+  <li data-type="taskItem" data-checked="false"><p>Create your first notebook in the sidebar to organize your notes</p></li>
 </ul>
-<p>You'll know most of Notesify before you even realize it.</p>
 
 <hr />
 
-<h1>🎨 Your First Experiment</h1>
-<blockquote><p><strong>"I'm just an ordinary line of text... or am I?"</strong></p></blockquote>
-<p>Select this sentence.</p>
-<p>Click the <strong>Highlighter</strong> button.</p>
-<p>Give me your favorite color.</p>
-<p>Congratulations—you've already customized your first note.</p>
-
-<hr />
-
-<h1>✨ Meet Iris</h1>
-<p>Iris is more than an AI chatbot—she's your personal study companion.</p>
-<p>Select any paragraph in this note and click <strong>Ask Iris</strong>. No copy-pasting required.</p>
-<p>She can explain concepts, summarize notes, improve writing, generate Mermaid diagrams, debug code, and even build complete study material.</p>
-
-<h3>📝 Generate Study Notes</h3>
-<p>Choose exactly how you want your notes to be written.</p>
-
-<p><strong>📚 Study Structure</strong></p>
+<h2>Notes that turn into quizzes</h2>
+<p>Re-reading pages of notes is the slowest way to remember anything. The best way is testing yourself.</p>
+<p>Whenever you finish writing — whether it's lecture notes, a book summary, or project research — click the <strong>Study</strong> button at the top. Notesify instantly creates:</p>
 <ul>
-  <li><p>Detailed Structured Notes</p></li>
-  <li><p>Revision Crash Sheet</p></li>
-  <li><p>Concept + Intuition Mode</p></li>
-  <li><p>Interview Prep Notes</p></li>
+  <li><p><strong>Practice Quizzes:</strong> Multiple-choice questions that give you instant answers and explanations.</p></li>
+  <li><p><strong>Smart Flashcards:</strong> Flip through key definitions and ideas at your own pace.</p></li>
 </ul>
 
-<p><strong>🎙️ Explanation Tone</strong></p>
+<hr />
+
+<h2>Meet Iris: your built-in learning partner</h2>
+<p>Iris lives right inside your workspace so you never have to copy-paste between different apps. Highlight any text to:</p>
 <ul>
-  <li><p>Academic</p></li>
-  <li><p>Technical / Precise</p></li>
-  <li><p>Beginner-Friendly</p></li>
-  <li><p>Simple / Analogy-Rich</p></li>
-  <li><p>Exam-Oriented</p></li>
-  <li><p>Q&amp;A Style</p></li>
+  <li><p><strong>Explain simply:</strong> Break down confusing paragraphs into everyday examples.</p></li>
+  <li><p><strong>Summarize in seconds:</strong> Turn long walls of text into clean, bulleted takeaways.</p></li>
+  <li><p><strong>Connect your thoughts:</strong> Ask questions across all your notes to find answers in seconds.</p></li>
 </ul>
 
-<p><strong>📏 Study Depth</strong></p>
-<ul>
-  <li><p>Quick Revision</p></li>
-  <li><p>Standard</p></li>
-  <li><p>Deep Dive</p></li>
-</ul>
+<hr />
 
-<pre><code class="language-mermaid">flowchart LR
-    A[📄 Raw Notes]
-    --> B[📚 Structure]
-    --> C[🎙️ Tone]
-    --> D[📏 Depth]
-    --> E[✨ Study Notes]</code></pre>
-
-<h3>🎓 Study Mode</h3>
-<p>Finished reading?</p>
-<p>Open <strong>Study Mode</strong> from the top-right corner.</p>
-<p>Iris instantly turns your notes into:</p>
-<ul>
-  <li><p>✅ Multiple Choice Questions</p></li>
-  <li><p>✅ True / False Quizzes</p></li>
-  <li><p>✅ Flashcards</p></li>
-</ul>
-
-<pre><code class="language-mermaid">flowchart LR
-    A[📖 Read Notes]
-    --> B[🎓 Study Mode]
-    --> C[📝 MCQs]
-    B --> D[✔️ True / False]
-    B --> E[🗂️ Flashcards]</code></pre>
+<h2>Always ready, even offline</h2>
+<p>You don't need a Wi-Fi connection to stay productive. Write on your laptop or phone anywhere — on a flight, on the train, or during a commute. Everything saves automatically and syncs smoothly the moment you're back online.</p>
 
 <hr />
 
-<h1>🧠 Ideas Look Better Visually</h1>
-<p>Turn messy thoughts into clear diagrams.</p>
-<pre><code class="language-mermaid">mindmap
-  root((Notesify))
-    Notes
-      Rich Text
-      Code
-      Tables
-    AI
-      Study Notes
-      Quizzes
-      Flashcards
-      Mermaid
-    Organization
-      Notebooks
-      Search</code></pre>
+<h2>Try Study Mode on this example</h2>
+<blockquote><p><strong>The Feynman Technique:</strong> The most effective way to truly understand any idea is to explain it in plain, simple words as if teaching a beginner. Whenever you catch yourself using confusing jargon, you have discovered a gap in your knowledge.</p></blockquote>
+<p>Click the green <strong>Study</strong> button in the top toolbar right now to see the quiz questions Notesify creates from this note.</p>
 
 <hr />
 
-<h1>💻 Pretty Code Deserves Pretty Colors</h1>
-<pre><code class="language-javascript">function breakTheFourthWall() {
-  console.log("Nice shirt, by the way.");
-
-  return {
-    status: "Mind Blown",
-    companion: "Iris"
-  };
-}</code></pre>
-
-<hr />
-
-<h1>📊 Tables Work Too</h1>
-<table>
-  <thead>
-    <tr>
-      <th>Feature</th>
-      <th>Why You'll Love It</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>Rich Notes</td>
-      <td>Beautiful formatting without the hassle</td>
-    </tr>
-    <tr>
-      <td>Iris AI</td>
-      <td>Study notes, summaries, explanations &amp; diagrams</td>
-    </tr>
-    <tr>
-      <td>Study Mode</td>
-      <td>MCQs, Flashcards &amp; True/False quizzes</td>
-    </tr>
-    <tr>
-      <td>Mermaid</td>
-      <td>Visualize ideas in seconds</td>
-    </tr>
-    <tr>
-      <td>Search</td>
-      <td>Find anything instantly</td>
-    </tr>
-  </tbody>
-</table>
-
-<hr />
-
-<h1>🚀 You're Ready</h1>
-<p>You've already explored rich text, code blocks, tables, Mermaid diagrams, Study Mode, and met Iris.</p>
-<p>Feel free to keep this note around while you're exploring—you can always delete it later.</p>
-<p>Now go build something awesome.</p>
-<p>Or a list of cat names.</p>
-<p>Both are valid.</p>
-<p>Happy note-taking. ✨</p>
+<h2>Make it your own</h2>
+<p>Feel free to keep this note, edit it, or delete it whenever you're ready. Click <strong>New Note</strong> in the sidebar to start writing.</p>
   `,
 });

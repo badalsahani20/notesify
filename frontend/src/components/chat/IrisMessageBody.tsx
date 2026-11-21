@@ -1,6 +1,7 @@
 import React from "react";
 import { Streamdown } from "streamdown";
-import { code } from "@streamdown/code";
+// @streamdown/code pulls in full shiki (12,000+ language modules) causing OOM during build.
+// streamingMarkdownComponents.code already overrides code blocks with custom MarkdownCodeBlock.
 import { cjk } from "@streamdown/cjk";
 import { math } from "@streamdown/math";
 import "katex/dist/katex.min.css";
@@ -59,7 +60,7 @@ interface MarkdownProps {
 }
 
 const streamingMarkdownComponents = createIrisMarkdownComponents(true);
-const streamingPlugins = { code, math, cjk };
+const streamingPlugins = { math, cjk };
 const streamAnimation = {
   animation: "fadeIn" as const,
   duration: 150,
