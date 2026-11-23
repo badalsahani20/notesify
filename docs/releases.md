@@ -4,6 +4,31 @@ Detailed release history for Notesify. For the product overview, see the [README
 
 ---
 
+## 🚀 What's New in v1.3.6
+
+### 📱 Universal Android Compatibility & V1/V2 Dual-Signing (`Notesify-1.3.6.apk`)
+- **Dual Cryptographic Signing:** Pinned both V1 (JAR) and V2 (Full APK Signature) schemes in Gradle release configurations, resolving "Package appears invalid" and parse failures across older Android OS versions and custom OEM ROMs (MIUI, ColorOS, FunTouch).
+- **Stable Android 14 Target:** Set `targetSdkVersion = 34` while compiling against modern AndroidX API 36 tools, giving 100% install compatibility across Android 7.0 through Android 15.
+- **In-Place Upgrade Support:** Incremented `versionCode` to 5 for clean over-the-air sideloaded upgrades.
+
+### 🔐 Strongly-Typed Auth Centralization (`@/lib/auth`) & Password Security
+- **Unified Client Interface:** Encapsulated password reset requests, token-based resets, magic links, OTP verification, and resend endpoints into `@/lib/auth.ts` with strict TypeScript contracts (`AuthSuccessResponse`, `MessageResponse`).
+- **Reset Password Polish:** Added instant confirmation password matching validation, non-blocking eye visibility toggles, and safe token dispatch on `ResetPasswordPage.tsx`.
+- **Service Delegation:** Updated backend controller to delegate user resolution to `AuthService.getUserById`, enforcing password exclusion and constant-time token verification.
+
+### 🎨 Unboxed Minimal Brand Identity (`<AuthLogo />`)
+- **Shared Brand Component:** Replaced duplicated boxed layouts, heavy black backings, and border tiles with a clean, unboxed 46px SVG mark across Login, Register, Forgot Password, Reset Password, Verify Email, and OAuth Success views.
+
+### 📫 Primary-Inbox Deliverability & Broadcast Infrastructure
+- **Brevo SMTP & DKIM/SPF:** Configured and validated production Brevo SMTP relay for `notesify.in` with authorized domain sending.
+- **Primary Tab Optimization:** Added dual-MIME multipart (HTML + plain text fallback), human reply-to headers, and removed promotional header badges to ensure transactional and update emails land directly in Gmail's Primary tab.
+- **Broadcast Tooling:** Added `backend/scripts/broadcast-update.js` featuring dry-run simulations, verified-user filtering, and 4-emails/sec rate limiting.
+
+### 🌐 Dynamic Landing & Download Experience
+- **Adaptive OS Detection:** Upgraded `DownloadPage.tsx` to dynamically detect mobile vs desktop environments, serving tailored download links and instructions for Android and Windows.
+
+---
+
 ## 🚀 What's New in v1.3.5
 
 ### 🧠 One-Turn Note Creation & Editing (Server-Side `create_note`)

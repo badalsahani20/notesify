@@ -218,11 +218,13 @@ export const DownloadPage = () => {
                 ? `Your Notesify for ${platform.name} installer is downloading. Check your browser's download shelf to launch setup.`
                 : shouldAutoDownload
                   ? `Your download will start automatically in a moment. You can also trigger the direct installer below.`
-                  : isMobile
-                    ? `Notesify desktop is optimized for Windows PC. Download from your computer or launch the full web app below.`
-                    : platform.isReady
-                      ? `Click below to download the official Notesify installer for ${platform.name}.`
-                      : `Desktop build for ${platform.name} is in active preview. You can launch the full web application immediately.`}
+                  : selectedOS === 'android'
+                    ? `Download the official Notesify app for Android directly to your phone below, or launch the web app.`
+                    : isMobile
+                      ? `Notesify for ${platform.name} is designed for desktop computers. If you're on a phone, select Android above or launch the web app.`
+                      : platform.isReady
+                        ? `Click below to download the official Notesify installer for ${platform.name}.`
+                        : `Desktop build for ${platform.name} is in active preview. You can launch the full web application immediately.`}
             </p>
           </FadeIn>
 

@@ -96,7 +96,7 @@ interface ElectronWindow extends Window {
 /**
  * Retrieves the currently running application version.
  */
-export async function getInstalledAppVersion(fallbackVersion = "1.3.5"): Promise<string> {
+export async function getInstalledAppVersion(fallbackVersion = "1.3.6"): Promise<string> {
   if (typeof window !== "undefined") {
     const win = window as unknown as ElectronWindow;
     if (win.electronAPI?.getAppVersion) {
@@ -135,7 +135,7 @@ export function triggerNativeNotification(update: UpdateInfo) {
 
   const showNotification = () => {
     try {
-      const notif = new Notification("Notesify Update Available 🚀", {
+      const notif = new Notification("Notesify Update Available", {
         body: `Version ${update.version} is now available. Click to download.`,
         silent: false,
       });

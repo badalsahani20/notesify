@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import api from "@/lib/api";
 import Google from "@/assets/google.svg";
-import notesifyLogo from "@/assets/notesify-favicon.svg";
+import AuthLogo from "@/components/AuthLogo";
 import { toast } from "sonner";
 import { generatePkceChallenge } from "@/utils/pkce";
 import { Capacitor } from "@capacitor/core";
@@ -90,17 +90,7 @@ const SignupForm = () => {
     <div className="w-full flex flex-col items-center">
       {/* Brand Header */}
       <div className="mb-6 flex flex-col items-center text-center">
-        <div className="relative mb-3 flex items-center justify-center">
-          <div className="relative w-10 h-10 rounded-xl overflow-hidden bg-black border border-white/10 shadow-[0_8px_24px_rgba(0,0,0,0.6)] flex items-center justify-center">
-            <img
-              src={notesifyLogo}
-              alt="Notesify"
-              width={26}
-              height={26}
-              className="w-6.5 h-6.5 object-contain"
-            />
-          </div>
-        </div>
+        <AuthLogo />
         <h1 className="text-2xl font-bold tracking-tight text-white">
           Create an account
         </h1>

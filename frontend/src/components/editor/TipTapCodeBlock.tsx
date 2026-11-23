@@ -1,7 +1,11 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, lazy, Suspense } from "react";
 import { NodeViewWrapper, NodeViewContent, type NodeViewProps } from "@tiptap/react";
 import { CheckCheck, Copy, Eye, Code2 } from "lucide-react";
-import { MermaidViewer } from "./MermaidViewer";
+
+// mermaid is ~3 MB; only load it when a diagram preview is actually opened.
+const MermaidViewer = lazy(() =>
+  import("./MermaidViewer").then((m) => ({ default: m.MermaidViewer }))
+);
 
 export const TipTapCodeBlock = React.memo(({ node, editor, getPos }: NodeViewProps) => {
   const [copied, setCopied] = useState(false);
@@ -75,7 +79,13 @@ export const TipTapCodeBlock = React.memo(({ node, editor, getPos }: NodeViewPro
 
       {isMermaid && viewMode === "preview" && (
         <div className="my-2 border border-white/10 rounded-lg overflow-hidden bg-black/40" contentEditable={false}>
-          <MermaidViewer code={node.textContent} />
+          <Suspense
+            fallback={
+              <div className="p-4 text-xs text-stone-400 animate-pulse">Rendering diagram…</div>
+            }
+          >
+            <MermaidViewer code={node.textContent} />
+          </Suspense>
         </div>
       )}
 

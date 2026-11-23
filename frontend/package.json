@@ -1,13 +1,14 @@
 {
   "name": "frontend",
   "private": true,
-  "version": "1.3.5",
+  "version": "1.3.6",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
-    "build:android": "tsc -b && vite build --mode android",
-    "build:desktop": "tsc -b && vite build --base=./",
+    "typecheck": "node --max-old-space-size=4096 ./node_modules/typescript/bin/tsc -b",
+    "build": "npm run typecheck && node --max-old-space-size=4096 ./node_modules/vite/bin/vite.js build",
+    "build:android": "npm run typecheck && node --max-old-space-size=4096 ./node_modules/vite/bin/vite.js build --mode android",
+    "build:desktop": "npm run typecheck && node --max-old-space-size=4096 ./node_modules/vite/bin/vite.js build --base=./",
     "lint": "eslint .",
     "preview": "vite preview",
     "android:sync": "npm run build:android && npx cap sync android",

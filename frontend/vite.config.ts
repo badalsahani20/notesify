@@ -86,42 +86,19 @@ export default defineConfig(({ mode }) => {
       },
     },
     build: {
+      sourcemap: false,
+      // Gzipping every chunk a second time is a large, pure-overhead memory spike.
+      reportCompressedSize: false,
       rollupOptions: {
+        maxParallelFileOps: 2,
         output: {
+          // Only React core is pinned. Everything else must be left to Rollup:
+          // manual chunks absorb shared helpers (vite/preload-helper, clsx, …),
+          // which then makes every chunk statically import the whole bucket.
           manualChunks(id) {
-            if (id.includes('node_modules')) {
-              if (id.includes('mermaid') || id.includes('cytoscape') || id.includes('d3') || id.includes('dagre')) {
-                return 'vendor-diagrams';
-              }
-              if (id.includes('@tiptap') || id.includes('prosemirror')) {
-                return 'vendor-tiptap';
-              }
-              if (id.includes('katex')) {
-                return 'vendor-katex';
-              }
-              if (id.includes('chart.js') || id.includes('react-chartjs-2')) {
-                return 'vendor-charts';
-              }
-              if (id.includes('html2canvas') || id.includes('jspdf')) {
-                return 'vendor-export';
-              }
-              if (id.includes('dexie')) {
-                return 'vendor-db';
-              }
-              if (id.includes('lucide-react') || id.includes('@tabler')) {
-                return 'vendor-icons';
-              }
-              if (
-                id.includes('react') ||
-                id.includes('react-dom') ||
-                id.includes('react-router-dom') ||
-                id.includes('zustand') ||
-                id.includes('@tanstack') ||
-                id.includes('framer-motion') ||
-                id.includes('motion')
-              ) {
-                return 'vendor-framework';
-              }
+            const pkg = id.replace(/\\/g, '/');
+            if (/\/node_modules\/(react|react-dom|scheduler|react-router|react-router-dom)\//.test(pkg)) {
+              return 'vendor-react';
             }
           },
         },

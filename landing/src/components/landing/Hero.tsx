@@ -26,7 +26,7 @@ export const Hero = () => {
 
         <FadeIn delay={350}>
           <div className="text-[11px] font-mono text-stone-500 tracking-wider mb-6">
-            v1.3.5
+            v1.3.6
           </div>
         </FadeIn>
 

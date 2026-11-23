@@ -5,8 +5,8 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuthStore } from "@/store/useAuthStore";
-import api from "@/lib/api";
-import notesifyLogo from "@/assets/notesify-favicon.svg";
+import { verifyOtp, verifyEmailToken, resendVerificationOtp } from "@/lib/auth";
+import AuthLogo from "@/components/AuthLogo";
 import { Capacitor } from "@capacitor/core";
 import { Preferences } from "@capacitor/preferences";
 
@@ -65,8 +65,7 @@ const VerifyEmailPage = () => {
 
     const verifyToken = async () => {
       try {
-        const res = await api.get(`/users/verify-email/${token}`);
-        const data = res.data;
+        const data = await verifyEmailToken(token);
 
         if (data?.refreshToken) {
           if (isDesktop) {
@@ -82,8 +81,8 @@ const VerifyEmailPage = () => {
 
         setAuth(
           {
-            id: data.user?.id || data.user?._id,
-            name: data.user?.name,
+            id: data.user?.id || data.user?._id || "",
+            name: data.user?.name || "",
             email: data.user?.email,
             avatar: data.user?.avatar,
             isVerified: true,
@@ -135,12 +134,8 @@ const VerifyEmailPage = () => {
 
     setSubmittingOtp(true);
     try {
-      const res = await api.post("/users/verify-otp", {
-        email: targetEmail,
-        otp: finalCode,
-      });
+      const data = await verifyOtp(targetEmail, finalCode);
 
-      const data = res.data;
       if (data?.refreshToken) {
         if (isDesktop) {
           await (window as any).electronAPI?.auth?.setRefreshToken(data.refreshToken);
@@ -152,8 +147,8 @@ const VerifyEmailPage = () => {
       toast.success("Account verified successfully!");
       setAuth(
         {
-          id: data.user?.id || data.user?._id,
-          name: data.user?.name,
+          id: data.user?.id || data.user?._id || "",
+          name: data.user?.name || "",
           email: data.user?.email,
           avatar: data.user?.avatar,
           isVerified: true,
@@ -256,8 +251,8 @@ const VerifyEmailPage = () => {
 
     setResending(true);
     try {
-      const res = await api.post("/users/resend-verification", { email: targetEmail });
-      toast.success(res.data?.message || "A new 6-digit code has been sent to your email!");
+      const data = await resendVerificationOtp(targetEmail);
+      toast.success(data?.message || "A new 6-digit code has been sent to your email!");
       setResendCooldown(30);
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to resend verification code");
@@ -272,17 +267,7 @@ const VerifyEmailPage = () => {
       <div className="w-full flex flex-col items-center text-center">
         {/* Brand Header */}
         <div className="mb-6 flex flex-col items-center">
-          <div className="relative mb-3 flex items-center justify-center">
-            <div className="relative w-10 h-10 rounded-xl overflow-hidden bg-black border border-white/10 shadow-[0_8px_24px_rgba(0,0,0,0.6)] flex items-center justify-center">
-              <img
-                src={notesifyLogo}
-                alt="Notesify"
-                width={26}
-                height={26}
-                className="w-6.5 h-6.5 object-contain"
-              />
-            </div>
-          </div>
+          <AuthLogo />
           <h1 className="text-2xl font-bold tracking-tight text-white">Verifying email</h1>
           <p className="mt-1.5 text-xs text-zinc-400 max-w-[280px]">
             Confirming your account before opening your workspace
@@ -342,17 +327,7 @@ const VerifyEmailPage = () => {
     <div className="w-full flex flex-col items-center text-center">
       {/* Brand Header */}
       <div className="mb-6 flex flex-col items-center">
-        <div className="relative mb-3 flex items-center justify-center">
-          <div className="relative w-10 h-10 rounded-xl overflow-hidden bg-black border border-white/10 shadow-[0_8px_24px_rgba(0,0,0,0.6)] flex items-center justify-center">
-            <img
-              src={notesifyLogo}
-              alt="Notesify"
-              width={26}
-              height={26}
-              className="w-6.5 h-6.5 object-contain"
-            />
-          </div>
-        </div>
+        <AuthLogo />
         <h1 className="text-2xl font-bold tracking-tight text-white">Enter verification code</h1>
         <p className="mt-1.5 text-xs text-zinc-400 max-w-[290px] leading-relaxed">
           We sent a 6-digit security code to your email

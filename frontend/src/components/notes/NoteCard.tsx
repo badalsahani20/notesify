@@ -8,7 +8,6 @@ import { getRelativeUpdatedLabel } from "@/utils/getRelativeUpdatedLabel";
 import { fetchNote } from "@/hooks/notes/useNotesQuery";
 import { triggerSelectionHaptic } from "@/utils/haptics";
 import { toast } from "sonner";
-import { PdfExportService } from "@/services/pdf/PdfExportService";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -94,6 +93,8 @@ const NoteCard = ({
     const toastId = toast.loading("Generating PDF...");
 
     try {
+      // Loaded on demand: pulls in jspdf + html2canvas + mermaid (~4 MB).
+      const { PdfExportService } = await import("@/services/pdf/PdfExportService");
       const result = await PdfExportService.exportNote(
         {
           title: note.title,

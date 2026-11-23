@@ -1,4 +1,3 @@
-import mermaid from "mermaid";
 import type { PdfExportOptions } from "./types";
 
 export interface PreparedExportDocument {
@@ -269,6 +268,9 @@ export class NoteExportDocumentBuilder {
     if (mermaidNodes.length === 0) return;
 
     try {
+      // Imported on demand so mermaid (~3 MB) never enters the initial bundle.
+      const { default: mermaid } = await import("mermaid");
+
       mermaid.initialize({
         startOnLoad: false,
         theme: isDark ? "dark" : "default",

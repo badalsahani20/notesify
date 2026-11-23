@@ -470,11 +470,11 @@ export const exchangeCode = catchAsync(async (req, res) => {
     }
 
     // 3. Lookup authenticated user
-    const user = await User.findById(authorizationCodeData.userId);
+    const user = await AuthService.getUserById(authorizationCodeData.userId);
 
     if (!user) {
         return res.status(404).json({
-            message: "User not found.",
+            message: "Invalid user.",
         });
     }
 
@@ -499,20 +499,7 @@ export const exchangeCode = catchAsync(async (req, res) => {
         }
     );
 
-    // 6. Session creation (temporary until AuthSession is implemented)
-    const userAgent = req.get("User-Agent") || "Unknown Device";
-
-    // TODO:
-    // await AuthSessionService.create({
-    //     userId: user._id,
-    //     clientId: authorizationCodeData.clientId,
-    //     clientType: authorizationCodeData.clientType,
-    //     refreshToken,
-    //     userAgent,
-    //     ip: req.ip,
-    // });
-
-    // 7. Common response payload
+    // 6. Common response payload
     const responsePayload = {
         success: true,
         accessToken,
@@ -553,7 +540,6 @@ export const forgotPassword = catchAsync(async(req, res) => {
   //Construct the URL
   const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
 
-  //For now, log it (Setting up emil is next step)
   await MailService.sendResetPasswordEmail(email, resetUrl);
 
   res.status(200).json({

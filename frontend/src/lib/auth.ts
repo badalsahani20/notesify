@@ -8,6 +8,60 @@ export interface User {
     name?: string;
 }
 
+export interface AuthSuccessResponse {
+    success: boolean;
+    message: string;
+    accessToken: string;
+    refreshToken?: string;
+    user: {
+        id?: string;
+        _id?: string;
+        name?: string;
+        email: string;
+        avatar?: string;
+        isVerified: boolean;
+    }
+}
+
+export interface MessageResponse {
+    success?: boolean;
+    message: string;
+}
+
+export const requestPasswordReset = async (email: string): Promise<MessageResponse> => {
+    const response = await api.post<MessageResponse>("/users/forgot-password", { email: email.trim() });
+    return response.data;
+}
+
+export const resetPassword = async ( token: string, password: string ): Promise<MessageResponse> => {
+    const response = await api.post<MessageResponse>(`/users/reset-password/${token}` , {
+        password
+    });
+    return response.data;
+}
+
+export const verifyOtp = async ( email: string, otp: string ) : Promise<AuthSuccessResponse> => {
+    const response = await api.post<AuthSuccessResponse>("/users/verify-otp", {
+        email: email.trim(),
+        otp: otp.trim(),
+    });
+    return response.data;
+}
+
+export const verifyEmailToken = async (token: string) : Promise<AuthSuccessResponse> => {
+    const response = await api.get<AuthSuccessResponse> (`/users/verify-email/${token}`);
+    return response.data;
+}
+
+export const resendVerificationOtp = async (
+  email: string
+): Promise<MessageResponse> => {
+  const response = await api.post<MessageResponse>("/users/resend-verification", {
+    email: email.trim(),
+  });
+  return response.data;
+};
+
 // * Validate the session by calling the /me endpoint.
 export const checkAuth = async (): Promise<User | null> => {
     try {

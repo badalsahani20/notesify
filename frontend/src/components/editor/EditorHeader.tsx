@@ -3,7 +3,6 @@ import type { Editor } from "@tiptap/react";
 import { Archive, Star, BookOpen, ChevronLeft, Share2, MoreHorizontal, Loader2, ChevronDown, Check, FileText, Search, X, FileDown } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "sonner";
-import { PdfExportService } from "@/services/pdf/PdfExportService";
 import type { AiAction } from "@/components/ai/types";
 import { EditorStats } from "./EditorStats";
 import { ShareModal } from "./ShareModal";
@@ -91,6 +90,8 @@ const EditorHeader = ({
       const currentContent = editor ? editor.getHTML() : (note.content || "");
       const currentTitle = draftTitle || note.title || "Untitled Note";
 
+      // Loaded on demand: pulls in jspdf + html2canvas + mermaid (~4 MB).
+      const { PdfExportService } = await import("@/services/pdf/PdfExportService");
       const result = await PdfExportService.exportNote(
         {
           title: currentTitle,

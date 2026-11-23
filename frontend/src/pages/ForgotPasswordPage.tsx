@@ -3,9 +3,9 @@ import { Link } from "react-router-dom";
 import { ArrowLeft, Loader2, MailCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import api from "@/lib/api";
+import { requestPasswordReset } from "@/lib/auth";
 import { toast } from "sonner";
-import notesifyLogo from "@/assets/notesify-favicon.svg";
+import AuthLogo from "@/components/AuthLogo";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -18,7 +18,7 @@ export default function ForgotPasswordPage() {
 
     setLoading(true);
     try {
-      await api.post("/users/forgot-password", { email: email.trim() });
+      await requestPasswordReset(email);
       setSent(true);
       toast.success("Password reset link sent!");
     } catch (error: any) {
@@ -86,17 +86,7 @@ export default function ForgotPasswordPage() {
     <div className="w-full flex flex-col items-center">
       {/* Brand Header */}
       <div className="mb-6 flex flex-col items-center text-center">
-        <div className="relative mb-3 flex items-center justify-center">
-          <div className="relative w-10 h-10 rounded-xl overflow-hidden bg-black border border-white/10 shadow-[0_8px_24px_rgba(0,0,0,0.6)] flex items-center justify-center">
-            <img
-              src={notesifyLogo}
-              alt="Notesify"
-              width={26}
-              height={26}
-              className="w-6.5 h-6.5 object-contain"
-            />
-          </div>
-        </div>
+        <AuthLogo />
         <h1 className="text-2xl font-bold tracking-tight text-white">
           Reset password
         </h1>
