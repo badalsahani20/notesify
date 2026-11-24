@@ -88,27 +88,17 @@ export const sendMailViaApi = async (options) => {
 };
 
 export const transporter = {
-    sendMail: async (options, callback) => {
+    sendMail: async (options) => {
         const apiKey = cleanEnv(process.env.BREVO_API_KEY || process.env.MAIL_API_KEY);
         if (apiKey) {
-            try {
-                const info = await sendMailViaApi(options);
-                if (callback) callback(null, info);
-                return info;
-            } catch (err) {
-                if (callback) callback(err);
-                throw err;
-            }
+            return sendMailViaApi(options);
         }
-        return getTransporter().sendMail(options, callback);
+        return getTransporter().sendMail(options);
     },
-    verify: (callback) => {
+    verify: async () => {
         const apiKey = cleanEnv(process.env.BREVO_API_KEY || process.env.MAIL_API_KEY);
-        if (apiKey) {
-            if (callback) callback(null, true);
-            return Promise.resolve(true);
-        }
-        return getTransporter().verify(callback);
+        if (apiKey) return true;
+        return getTransporter().verify();
     },
 };
 
