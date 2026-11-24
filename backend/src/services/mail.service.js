@@ -37,15 +37,79 @@ export const getTransporter = () => {
                 user,
                 pass,
             },
+            connectionTimeout: 10000,
+            greetingTimeout: 10000,
+            socketTimeout: 15000,
         });
         cachedConfigKey = configKey;
     }
     return cachedTransporter;
 };
 
+export const sendMailViaApi = async (options) => {
+    const apiKey = cleanEnv(process.env.BREVO_API_KEY || process.env.MAIL_API_KEY);
+    if (!apiKey) return null;
+
+    const fromStr = options.from || getMailFrom();
+    let senderName = "Notesify";
+    let senderEmail = "noreply@notesify.in";
+    const fromMatch = fromStr.match(/(?:"?([^"]*)"?\s)?<?([^>]+)>?/);
+    if (fromMatch) {
+        senderName = fromMatch[1]?.trim() || "Notesify";
+        senderEmail = fromMatch[2]?.trim() || "noreply@notesify.in";
+    }
+
+    const payload = {
+        sender: { name: senderName, email: senderEmail },
+        to: [{ email: options.to }],
+        subject: options.subject,
+        htmlContent: options.html,
+    };
+    if (options.text) payload.textContent = options.text;
+    if (options.replyTo) payload.replyTo = { email: options.replyTo };
+
+    const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+        method: "POST",
+        headers: {
+            "api-key": apiKey,
+            "content-type": "application/json",
+            "accept": "application/json",
+        },
+        body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || `Brevo API HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+    return { messageId: data.messageId };
+};
+
 export const transporter = {
-    sendMail: (options, callback) => getTransporter().sendMail(options, callback),
-    verify: (callback) => getTransporter().verify(callback),
+    sendMail: async (options, callback) => {
+        const apiKey = cleanEnv(process.env.BREVO_API_KEY || process.env.MAIL_API_KEY);
+        if (apiKey) {
+            try {
+                const info = await sendMailViaApi(options);
+                if (callback) callback(null, info);
+                return info;
+            } catch (err) {
+                if (callback) callback(err);
+                throw err;
+            }
+        }
+        return getTransporter().sendMail(options, callback);
+    },
+    verify: (callback) => {
+        const apiKey = cleanEnv(process.env.BREVO_API_KEY || process.env.MAIL_API_KEY);
+        if (apiKey) {
+            if (callback) callback(null, true);
+            return Promise.resolve(true);
+        }
+        return getTransporter().verify(callback);
+    },
 };
 
 export const verifyMailConnection = async () => {
