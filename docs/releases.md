@@ -8,7 +8,7 @@ Detailed release history for Notesify. For the product overview, see the [README
 
 ### 📱 Universal Android Compatibility & V1/V2 Dual-Signing (`Notesify-1.3.6.apk`)
 - **Dual Cryptographic Signing:** Pinned both V1 (JAR) and V2 (Full APK Signature) schemes in Gradle release configurations, resolving "Package appears invalid" and parse failures across older Android OS versions and custom OEM ROMs (MIUI, ColorOS, FunTouch).
-- **Stable Android 14 Target:** Set `targetSdkVersion = 34` while compiling against modern AndroidX API 36 tools, giving 100% install compatibility across Android 7.0 through Android 15.
+- **Android 16 Target:** Kept `targetSdkVersion = 36` (matching `compileSdkVersion`) so the app opts into current platform behaviour; install compatibility is governed by `minSdkVersion = 24` (Android 7.0+), not by the target SDK.
 - **In-Place Upgrade Support:** Incremented `versionCode` to 5 for clean over-the-air sideloaded upgrades.
 
 ### 🔐 Strongly-Typed Auth Centralization (`@/lib/auth`) & Password Security
